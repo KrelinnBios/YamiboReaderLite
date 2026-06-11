@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 class TtlDnsCache(
     private val delegate: Dns,
-    private val ttlMillis: Long = TimeUnit.HOURS.toMillis(24)
+    private val ttlMillis: Long = TimeUnit.MINUTES.toMillis(30)
 ) : Dns {
 
     private val cache = ConcurrentHashMap<String, CachedRecord>()
@@ -32,7 +32,7 @@ class TtlDnsCache(
         if (cached != null) {
             val age = System.currentTimeMillis() - cached.timestamp
             if (age < ttlMillis) {
-                if (age > ttlMillis * 4 / 5) {
+                if (age > ttlMillis / 2) {
                     triggerAsyncRefresh(hostname)
                 }
                 return cached.addresses
@@ -53,7 +53,13 @@ class TtlDnsCache(
             }
             sortedAddresses
         } catch (e: Exception) {
-            cached?.addresses ?: throw e
+            val cachedAge = cached?.let { System.currentTimeMillis() - it.timestamp } ?: Long.MAX_VALUE
+            if (cached != null && cachedAge < ttlMillis * 2) {
+                cached.addresses
+            } else {
+                cache.remove(hostname)
+                throw e
+            }
         }
     }
 

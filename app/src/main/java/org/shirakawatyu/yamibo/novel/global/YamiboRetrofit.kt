@@ -10,6 +10,7 @@ import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.dnsoverhttps.DnsOverHttps
 import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
@@ -211,14 +212,21 @@ class YamiboRetrofit {
                 // 前置网络状态检查
                 val cm =
                     YamiboApplication.application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+                val activeNetwork = cm.activeNetwork
+                val capabilities = activeNetwork?.let(cm::getNetworkCapabilities)
                 val isInternetReady = capabilities?.let {
-                    it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    val hasInternetCapability =
+                        it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    val hasUsableTransport =
+                        it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                                it.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                                it.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+                                it.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+                    hasInternetCapability && hasUsableTransport
                 } ?: false
 
                 if (!isInternetReady) {
-                    throw java.io.IOException("Network is not validated (Disconnected or Captive Portal)")
+                    throw java.io.IOException("No active internet network")
                 }
 
                 val original = chain.request()
@@ -256,7 +264,7 @@ class YamiboRetrofit {
                     .method(original.method, original.body)
                     .build()
 
-                chain.proceed(request)
+                proceedWithDnsRecovery(chain, request)
             }
             if (enableImageChecker) {
                 builder.addNetworkInterceptor(RateLimitInterceptor(100L))
@@ -307,6 +315,18 @@ class YamiboRetrofit {
             }
 
             return builder.build()
+        }
+
+        private fun proceedWithDnsRecovery(
+            chain: okhttp3.Interceptor.Chain,
+            request: Request
+        ): okhttp3.Response {
+            return try {
+                chain.proceed(request)
+            } catch (e: IOException) {
+                request.url.host.takeIf { it.contains("yamibo.com") }?.let(sharedDns::invalidate)
+                throw e
+            }
         }
 
         fun proxyWebViewResource(request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
