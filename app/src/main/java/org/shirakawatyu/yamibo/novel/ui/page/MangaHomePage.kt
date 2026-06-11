@@ -2,6 +2,7 @@ package org.shirakawatyu.yamibo.novel.ui.page
 
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.BorderStroke
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +68,7 @@ import org.shirakawatyu.yamibo.novel.bean.MangaHomeItem
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.ui.vm.MangaHomeVM
+import org.shirakawatyu.yamibo.novel.util.DarkThemeColors
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import java.net.URLEncoder
 
@@ -74,6 +78,7 @@ fun MangaHomePage(
     mangaHomeVM: MangaHomeVM = viewModel()
 ) {
     val state by mangaHomeVM.uiState.collectAsState()
+    val isDarkMode by GlobalData.isDarkMode.collectAsState()
     val context = LocalContext.current
     val bottomNavBarVM: BottomNavBarVM =
         viewModel(viewModelStoreOwner = context as ComponentActivity)
@@ -81,6 +86,26 @@ fun MangaHomePage(
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scope = rememberCoroutineScope()
     var openingTid by remember { mutableStateOf<String?>(null) }
+    val classicDarkColors = DarkThemeColors.CLASSIC
+    val headerContainerColor =
+        if (isDarkMode) classicDarkColors.statusBar else MaterialTheme.colorScheme.primary
+    val headerContentColor =
+        if (isDarkMode) classicDarkColors.onPrimary else MaterialTheme.colorScheme.onPrimary
+    val sectionContainerColor =
+        if (isDarkMode) classicDarkColors.surfaceVariant else MaterialTheme.colorScheme.primaryContainer
+    val sectionOutlineColor =
+        if (isDarkMode) classicDarkColors.outline.copy(alpha = 0.85f)
+        else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+    val selectedSectionColor =
+        if (isDarkMode) classicDarkColors.surface else MaterialTheme.colorScheme.surface
+    val selectedSectionContentColor =
+        if (isDarkMode) classicDarkColors.onSurface else MaterialTheme.colorScheme.onSurface
+    val unselectedSectionContentColor =
+        if (isDarkMode) classicDarkColors.onSurfaceVariant
+        else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+    val selectedSectionBorderColor =
+        if (isDarkMode) classicDarkColors.primary.copy(alpha = 0.95f)
+        else MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
 
     LaunchedEffect(state.isLoading, state.isLoadingMore) {
         if (!state.isLoading && !state.isLoadingMore) {
@@ -110,8 +135,8 @@ fun MangaHomePage(
             .padding(bottom = navBottom + 50.dp)
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            color = headerContainerColor,
+            contentColor = headerContentColor
         ) {
             Column(
                 modifier = Modifier
@@ -123,7 +148,12 @@ fun MangaHomePage(
                         .width(220.dp)
                         .height(36.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .background(sectionContainerColor)
+                        .border(
+                            width = 1.dp,
+                            color = sectionOutlineColor,
+                            shape = RoundedCornerShape(999.dp)
+                        )
                         .padding(3.dp)
                         .align(Alignment.CenterHorizontally),
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -136,10 +166,18 @@ fun MangaHomePage(
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .clickable { mangaHomeVM.setSection(fid) },
-                            color = if (selected) MaterialTheme.colorScheme.tertiary
-                            else androidx.compose.ui.graphics.Color.Transparent,
-                            contentColor = if (selected) MaterialTheme.colorScheme.onTertiary
-                            else MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = if (selected) selectedSectionColor
+                            else Color.Transparent,
+                            contentColor = if (selected) selectedSectionContentColor
+                            else unselectedSectionContentColor,
+                            border = if (selected) {
+                                BorderStroke(
+                                    width = 1.dp,
+                                    color = selectedSectionBorderColor
+                                )
+                            } else {
+                                null
+                            },
                             shape = RoundedCornerShape(999.dp)
                         ) {
                             Box(

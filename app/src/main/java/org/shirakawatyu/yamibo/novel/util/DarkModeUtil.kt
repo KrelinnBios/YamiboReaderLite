@@ -124,9 +124,6 @@ data class DarkThemeColors(
         )
 
         fun forTheme(themeId: Int) = when (themeId) {
-            1 -> OKLCH
-            2 -> OLED
-            3 -> TWILIGHT
             else -> CLASSIC
         }
     }
@@ -192,15 +189,12 @@ data class LightThemeColors(
 @Composable
 fun currentDarkThemeColors(): DarkThemeColors? {
     val isDark by GlobalData.isDarkMode.collectAsState()
-    val themeId by GlobalData.darkModeTheme.collectAsState()
-    return if (isDark) DarkThemeColors.forTheme(themeId) else null
+    return if (isDark) DarkThemeColors.CLASSIC else null
 }
 
 @Composable
 fun currentLightThemeColors(): LightThemeColors? {
-    val isDark by GlobalData.isDarkMode.collectAsState()
-    val themeId by GlobalData.lightModeTheme.collectAsState()
-    return if (!isDark && themeId > 0) LightThemeColors.forTheme(themeId) else null
+    return null
 }
 
 @Composable

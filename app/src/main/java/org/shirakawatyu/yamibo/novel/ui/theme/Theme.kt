@@ -46,8 +46,7 @@ fun _300文学Theme(
     content: @Composable () -> Unit
 ) {
     val isDark by GlobalData.isDarkMode.collectAsState()
-    val darkThemeId by GlobalData.darkModeTheme.collectAsState()
-    val darkColors = DarkThemeColors.forTheme(darkThemeId)
+    val darkColors = DarkThemeColors.CLASSIC
     val colorScheme = if (isDark) darkColors.toDarkColorScheme() else LightColorScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -111,10 +110,9 @@ fun ReaderTheme(
     content: @Composable () -> Unit
 ) {
     val isDark by GlobalData.isDarkMode.collectAsState()
-    val darkThemeId by GlobalData.darkModeTheme.collectAsState()
     MaterialTheme(
         colorScheme = if (isDark) {
-            DarkThemeColors.forTheme(darkThemeId).toDarkColorScheme()
+            DarkThemeColors.CLASSIC.toDarkColorScheme()
         } else {
             ReaderLightColorScheme
         },

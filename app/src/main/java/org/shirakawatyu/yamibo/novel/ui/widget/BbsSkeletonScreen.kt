@@ -25,11 +25,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.shirakawatyu.yamibo.novel.global.GlobalData
@@ -48,42 +48,24 @@ fun BbsSkeletonScreen(modifier: Modifier = Modifier) {
         label = "skeleton_alpha"
     )
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
-    val lightThemeId by GlobalData.lightModeTheme.collectAsState()
-    val isModernWhite = !isDarkMode && lightThemeId > 0
 
-    val baseHeaderColor = if (isModernWhite) {
-        Color(0xFF64748B)
-    } else {
-        darkThemeColor(Color(0xFF551200)) { statusBar }
-    }
+    val baseHeaderColor = darkThemeColor(Color(0xFF551200)) { statusBar }
     val headerBg = if (isDarkMode) {
         baseHeaderColor.copy(alpha = 0.9f)
     } else {
         baseHeaderColor
     }
 
-    val baseSkeletonColor = if (isModernWhite) {
-        Color(0xFFE2E8F0)
-    } else {
-        darkThemeColor(Color(0xFFD4C8B0)) { surfaceVariant }
-    }
+    val baseSkeletonColor = darkThemeColor(Color(0xFFD4C8B0)) { surfaceVariant }
     val skeletonAlpha = when {
         isDarkMode -> alpha * 0.7f
-        isModernWhite -> 0.50f + alpha * 0.55f
         else -> alpha
     }
     val skeletonColor = baseSkeletonColor.copy(alpha = skeletonAlpha)
 
-    val baseSectionHeaderColor = if (isModernWhite) {
-        Color(0xFF64748B)
-    } else {
-        darkThemeColor(Color(0xFF9E6565)) { statusBar }
-    }
-    val sectionHeaderBg = if (isModernWhite) {
-        baseSectionHeaderColor
-    } else {
+    val baseSectionHeaderColor = darkThemeColor(Color(0xFF9E6565)) { statusBar }
+    val sectionHeaderBg =
         baseSectionHeaderColor.copy(alpha = if (isDarkMode) alpha * 0.5f else alpha * 0.8f)
-    }
 
     Column(
         modifier = modifier
