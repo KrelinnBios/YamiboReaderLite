@@ -36,8 +36,6 @@
 
 当前仓库发布的是普通 debug APK，用于自用和测试，不面向应用商店发布。
 
-GitHub Actions 不再依赖 release keystore Secrets，而是直接执行 `assembleDebug` 构建 APK。
-
 由于 debug APK 使用调试签名，若你本机已安装的是不同签名的旧版本，Android 可能不允许直接覆盖安装，此时需要先卸载旧版再安装新版。
 
 系统要求：Android 7.0（API 24）及以上。
