@@ -11,9 +11,6 @@ on:
         description: Increasing Android versionCode for a manual build
         required: true
         default: "3"
-  push:
-    tags:
-      - "v*"
   release:
     types:
       - published

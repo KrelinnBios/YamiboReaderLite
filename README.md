@@ -75,7 +75,6 @@ GitHub Actions 工作流同样会构建 `debug` APK，并将产物命名为 `300
 默认支持以下触发方式：
 
 - 手动运行 `Build Debug APK` workflow
-- 推送 `v*` 标签
 - 发布 GitHub Release
 
 如果通过 GitHub Actions 构建固定签名 APK，需要在仓库 Secrets 中配置：
