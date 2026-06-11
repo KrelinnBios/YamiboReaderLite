@@ -29,5 +29,6 @@ signing.properties
 .DS_Store
 .env*
 .gitee_token
+.gh-cli/
 upload_github.ps1
 plan.txt
