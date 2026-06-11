@@ -14,9 +14,9 @@ val RedLight = Color(0xff551200)
 val YellowLightDark = Color(0xfffcf4cf)
 val YellowLightLight = Color(0xfffffbe7)
 
-val RedDark = Color(0xff210700)
-val YellowDarkDark = Color(0xffafa990)
-val YellowDarkLight = Color(0xffb2afa1)
+val RedDark = Color(0xFF0D141D)
+val YellowDarkDark = Color(0xFF223247)
+val YellowDarkLight = Color(0xFF182332)
 
 class YamiboColors {
     companion object {
@@ -28,10 +28,10 @@ class YamiboColors {
         val onSurface = Color(0xffeee1be)
 
         // Dark mode
-        val primaryDark = Color(0xFFcc7755)
-        val secondaryDark = Color(0xFFaa6644)
-        val tertiaryDark = Color(0xFF2a2a2a)
-        val onSecondaryDark = Color(0xFF3a3a3a)
-        val onSurfaceDark = Color(0xFF1a1a1a)
+        val primaryDark = Color(0xFF4EA1FF)
+        val secondaryDark = Color(0xFF7DBDF2)
+        val tertiaryDark = Color(0xFF223247)
+        val onSecondaryDark = Color(0xFF182332)
+        val onSurfaceDark = Color(0xFF121B27)
     }
 }

@@ -63,7 +63,7 @@ fun BbsSkeletonScreen(modifier: Modifier = Modifier) {
     }
     val skeletonColor = baseSkeletonColor.copy(alpha = skeletonAlpha)
 
-    val baseSectionHeaderColor = darkThemeColor(Color(0xFF9E6565)) { statusBar }
+    val baseSectionHeaderColor = darkThemeColor(Color(0xFF9E6565)) { surface }
     val sectionHeaderBg =
         baseSectionHeaderColor.copy(alpha = if (isDarkMode) alpha * 0.5f else alpha * 0.8f)
 
