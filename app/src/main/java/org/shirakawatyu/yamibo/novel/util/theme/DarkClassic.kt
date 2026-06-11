@@ -1,4 +1,4 @@
-﻿package org.shirakawatyu.yamibo.novel.util.theme
+﻿﻿package org.shirakawatyu.yamibo.novel.util.theme
 
 val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === CSS 鍙橀噺瑕嗙洊 === */",

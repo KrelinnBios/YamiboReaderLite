@@ -1,8 +1,5 @@
 package org.shirakawatyu.yamibo.novel.global
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import okhttp3.ConnectionPool
@@ -209,26 +206,6 @@ class YamiboRetrofit {
 
             // 1. 应用拦截器
             builder.addInterceptor { chain ->
-                // 前置网络状态检查
-                val cm =
-                    YamiboApplication.application.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                val activeNetwork = cm.activeNetwork
-                val capabilities = activeNetwork?.let(cm::getNetworkCapabilities)
-                val isInternetReady = capabilities?.let {
-                    val hasInternetCapability =
-                        it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    val hasUsableTransport =
-                        it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                                it.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                                it.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
-                                it.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-                    hasInternetCapability && hasUsableTransport
-                } ?: false
-
-                if (!isInternetReady) {
-                    throw java.io.IOException("No active internet network")
-                }
-
                 val original = chain.request()
                 if (!original.url.host.contains("yamibo.com")) {
                     return@addInterceptor chain.proceed(original)
