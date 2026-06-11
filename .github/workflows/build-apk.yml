@@ -48,13 +48,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk release/300-Lite-debug.apk
+          cp "app/build/outputs/apk/release/300 Lite.apk" \
+            "release/300 Lite.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 300-Lite-debug-${{ github.run_number }}
-          path: release/300-Lite-debug.apk
+          name: 300 Lite-${{ github.run_number }}
+          path: release/300 Lite.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -62,5 +63,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/300-Lite-debug.apk
+          files: release/300 Lite.apk
           generate_release_notes: true
