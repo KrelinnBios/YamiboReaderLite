@@ -1,7 +1,6 @@
 package org.shirakawatyu.yamibo.novel.util.reader
 
 import android.content.Context
-import com.alibaba.fastjson2.JSON
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -11,8 +10,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
-import org.shirakawatyu.yamibo.novel.network.NovelApi
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -82,7 +79,14 @@ object ReaderMemoryPrewarmManager {
             aliasUrls = normalized.aliasUrls
         ) ?: return null
 
-        return if (data.authorId == null || data.authorId == normalized.authorId) data else null
+        return if (
+            data.contentVersion >= AuthenticatedThreadPageLoader.CONTENT_VERSION &&
+            (data.authorId == null || data.authorId == normalized.authorId)
+        ) {
+            data
+        } else {
+            null
+        }
     }
 
     private fun hasDiskCache(context: Context, target: Target): Boolean {
@@ -119,7 +123,7 @@ object ReaderMemoryPrewarmManager {
                 }
 
                 val data = withTimeout(PREWARM_TIMEOUT_MS) {
-                    fetchReaderPage(normalized)
+                    fetchReaderPage(appContext, normalized)
                 }
 
                 CacheUtil.saveCache(normalized.primaryUrl, data)
@@ -168,36 +172,20 @@ object ReaderMemoryPrewarmManager {
         }
     }
 
-    private suspend fun fetchReaderPage(target: Target): CacheData {
-        val api = YamiboRetrofit.getInstance().create(NovelApi::class.java)
-        val resp = api.getThreadPageByAuthor(
+    private suspend fun fetchReaderPage(context: Context, target: Target): CacheData {
+        val loaded = AuthenticatedThreadPageLoader.loadReaderPage(
             tid = target.tid,
             page = target.page,
-            authorid = target.authorId
+            authorIdHint = target.authorId,
+            context = context
         )
-
-        val json = JSON.parseObject(resp.string())
-        val variables = json.getJSONObject("Variables")
-            ?: throw IllegalStateException("Variables not found")
-        val thread = variables.getJSONObject("thread")
-        val ppp = variables.getString("ppp")?.toIntOrNull()?.coerceAtLeast(1) ?: 20
-        val totalReplies = thread?.getString("replies")?.toIntOrNull() ?: 0
-        val maxPage = ((totalReplies + 1 + ppp - 1) / ppp).coerceAtLeast(1)
-
-        val postlist = variables.getJSONArray("postlist")
-            ?: throw IllegalStateException("postlist not found")
-        val messages = (0 until postlist.size).map { i ->
-            postlist.getJSONObject(i).getString("message")
-        }
-        val combinedHtml = messages.joinToString("") { message ->
-            "<div class=\"message\">$message</div>"
-        }
 
         return CacheData(
             cachedPageNum = target.page,
-            htmlContent = combinedHtml,
-            maxPageNum = maxPage,
-            authorId = target.authorId
+            htmlContent = loaded.html,
+            maxPageNum = loaded.maxPage,
+            authorId = loaded.authorId,
+            contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
         )
     }
 }

@@ -5,10 +5,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import org.shirakawatyu.yamibo.novel.global.GlobalData
+import org.shirakawatyu.yamibo.novel.util.DarkThemeColors
 
 private val LightColorScheme = lightColorScheme(
     primary = RedLight,
@@ -41,20 +45,28 @@ private val LightColorScheme = lightColorScheme(
 fun _300文学Theme(
     content: @Composable () -> Unit
 ) {
+    val isDark by GlobalData.isDarkMode.collectAsState()
+    val darkThemeId by GlobalData.darkModeTheme.collectAsState()
+    val darkColors = DarkThemeColors.forTheme(darkThemeId)
+    val colorScheme = if (isDark) darkColors.toDarkColorScheme() else LightColorScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.navigationBarColor = YamiboColors.onSurface.toArgb()
+            window.navigationBarColor = if (isDark) {
+                darkColors.navBar.toArgb()
+            } else {
+                YamiboColors.onSurface.toArgb()
+            }
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = true
-                isAppearanceLightNavigationBars = true
+                isAppearanceLightStatusBars = !isDark
+                isAppearanceLightNavigationBars = !isDark
             }
         }
     }
 
     MaterialTheme(
-        colorScheme = LightColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )
@@ -98,8 +110,14 @@ private val ReaderLightColorScheme = lightColorScheme(
 fun ReaderTheme(
     content: @Composable () -> Unit
 ) {
+    val isDark by GlobalData.isDarkMode.collectAsState()
+    val darkThemeId by GlobalData.darkModeTheme.collectAsState()
     MaterialTheme(
-        colorScheme = ReaderLightColorScheme,
+        colorScheme = if (isDark) {
+            DarkThemeColors.forTheme(darkThemeId).toDarkColorScheme()
+        } else {
+            ReaderLightColorScheme
+        },
         typography = Typography,
         content = content
     )

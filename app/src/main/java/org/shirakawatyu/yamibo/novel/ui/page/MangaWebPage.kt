@@ -49,6 +49,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -274,6 +275,17 @@ fun MangaWebPage(
             this.webChromeClient = webChromeClient
             YamiboWebViewClient.setupDownloadListener(this)
         }
+    }
+    val isDarkMode by GlobalData.isDarkMode.collectAsState()
+    LaunchedEffect(isDarkMode) {
+        mangaWebView.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                isDarkMode,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
     }
 
     fun resumeMangaWebViewAfterChildPage() {

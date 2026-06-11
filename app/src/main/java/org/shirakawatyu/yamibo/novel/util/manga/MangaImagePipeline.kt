@@ -2,7 +2,6 @@ package org.shirakawatyu.yamibo.novel.util.manga
 
 import android.content.Context
 import android.util.Log
-import android.webkit.CookieManager
 import android.webkit.WebResourceResponse
 import coil.annotation.ExperimentalCoilApi
 import coil.disk.DiskCache
@@ -26,6 +25,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -72,8 +72,22 @@ object MangaImagePipeline {
         val rank: Int
     )
 
+    private data class RequestContext(
+        val cookie: String,
+        val referer: String
+    )
+
+    private const val MAX_REQUEST_CONTEXTS = 600
+
     private val pipelineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val lock = Any()
+    private val requestContextLock = Any()
+    private val requestContexts =
+        object : LinkedHashMap<String, RequestContext>(64, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<String, RequestContext>?
+            ): Boolean = size > MAX_REQUEST_CONTEXTS
+        }
 
     private val inFlight = ConcurrentHashMap<String, InFlightLoad>()
     private val ownerUrlKeys = ConcurrentHashMap<String, MutableSet<String>>()
@@ -109,6 +123,7 @@ object MangaImagePipeline {
         val appContext = context.applicationContext
         val diskCache = appContext.imageLoader.diskCache ?: return null
         val key = cacheKey(url)
+        rememberRequestContext(listOf(url), headers.orEmpty(), "")
 
         openSnapshot(diskCache, key)?.let { snapshot ->
             return createResponse(url, snapshot)
@@ -146,6 +161,7 @@ object MangaImagePipeline {
     ) {
         val normalized = urls.filter { it.isNotBlank() }.distinct()
         if (normalized.isEmpty()) return
+        rememberRequestContext(normalized, headers, cookie)
 
         val safeIndex = clickedIndex.coerceIn(0, normalized.lastIndex)
         val ordered = buildList {
@@ -185,6 +201,7 @@ object MangaImagePipeline {
             cancelOwner(ownerKey)
             return
         }
+        rememberRequestContext(urls, emptyMap(), cookie)
         val previousIndex = ownerLastIndex.put(ownerKey, currentIndex)
 
         val rawDirection = when {
@@ -292,6 +309,7 @@ object MangaImagePipeline {
     ) {
         val normalized = urls.filter { it.isNotBlank() }.distinct()
         if (normalized.isEmpty()) return
+        rememberRequestContext(normalized, emptyMap(), cookie)
 
         normalized.forEach { imgUrl ->
             ensureDiskCached(
@@ -316,6 +334,7 @@ object MangaImagePipeline {
     ) {
         val normalized = urls.filter { it.isNotBlank() }.distinct()
         if (normalized.isEmpty()) return
+        rememberRequestContext(normalized, emptyMap(), cookie)
 
         val ownerKey = "chapter:${normalized.firstOrNull().orEmpty().hashCode()}:${System.nanoTime()}"
         registerChapterColdOwner(parentOwnerKey, ownerKey)
@@ -672,20 +691,52 @@ object MangaImagePipeline {
             if (key.isNotBlank() && value.isNotBlank()) addHeader(key, value)
         }
 
-        val cookie = explicitCookie.ifBlank {
-            try {
-                CookieManager.getInstance().getCookie(url)
-                    ?: CookieManager.getInstance().getCookie(REFERER)
-                    ?: ""
-            } catch (_: Throwable) {
-                ""
-            }
+        val requestContext = synchronized(requestContextLock) {
+            requestContexts[cacheKey(url)]
         }
+        val headerCookie = headers.valueIgnoreCase("Cookie")
+        val cookie = explicitCookie
+            .ifBlank { headerCookie }
+            .ifBlank { requestContext?.cookie.orEmpty() }
+            .ifBlank { YamiboSession.cookieFor(url) }
 
         if (cookie.isNotBlank()) setHeader("Cookie", cookie)
-        if (url.contains("yamibo.com", ignoreCase = true)) setHeader("Referer", REFERER)
+        if (url.contains("yamibo.com", ignoreCase = true)) {
+            val referer = headers.valueIgnoreCase("Referer")
+                .ifBlank { requestContext?.referer.orEmpty() }
+                .ifBlank { REFERER }
+            setHeader("Referer", referer)
+        }
 
         return this
+    }
+
+    private fun rememberRequestContext(
+        urls: List<String>,
+        headers: Map<String, String>,
+        explicitCookie: String
+    ) {
+        val headerCookie = headers.valueIgnoreCase("Cookie")
+        val referer = headers.valueIgnoreCase("Referer")
+        synchronized(requestContextLock) {
+            urls.forEach { url ->
+                val key = cacheKey(url)
+                val previous = requestContexts[key]
+                val cookie = explicitCookie
+                    .ifBlank { headerCookie }
+                    .ifBlank { previous?.cookie.orEmpty() }
+                requestContexts[key] = RequestContext(
+                    cookie = cookie,
+                    referer = referer.ifBlank { previous?.referer.orEmpty() }
+                )
+            }
+        }
+    }
+
+    private fun Map<String, String>.valueIgnoreCase(name: String): String {
+        return entries.firstOrNull { it.key.equals(name, ignoreCase = true) }
+            ?.value
+            .orEmpty()
     }
 
     private fun cacheKey(url: String): String {

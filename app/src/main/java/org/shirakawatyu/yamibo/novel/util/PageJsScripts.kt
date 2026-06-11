@@ -168,7 +168,7 @@ object PageJsScripts {
                 window._mangaClickInjected = true;
                 
                 var disablePhotoSwipe = function() {
-                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a');
+                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a, td.t_f a, .postmessage a');
                     for (var i = 0; i < links.length; i++) {
                         var aNode = links[i];
                         if (aNode.querySelector('img')) {
@@ -185,26 +185,32 @@ object PageJsScripts {
                 observer.observe(document.body, { childList: true, subtree: true });
                 
                 document.addEventListener('click', function(e) {
-                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, .img_one img, .message img');
+                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, td.t_f a, .postmessage a, .img_one img, .message img, td.t_f img, .postmessage img');
                     if (!targetContainer) return;
                     
                     var targetImg = targetContainer.tagName.toLowerCase() === 'img' ? targetContainer : targetContainer.querySelector('img');
                     
                     if (targetImg) {
-                        var imgSrc = targetImg.getAttribute('src') || '';
-                        var imgZsrc = targetImg.getAttribute('zsrc') || '';
+                        var targetRawSrc = targetImg.getAttribute('zsrc') ||
+                            targetImg.getAttribute('data-src') ||
+                            targetImg.getAttribute('zoomfile') ||
+                            targetImg.getAttribute('file') ||
+                            targetImg.getAttribute('src') || '';
                         
-                        if (imgSrc.indexOf('smiley') === -1 && imgZsrc.indexOf('smiley') === -1) { 
+                        if (targetRawSrc.indexOf('smiley') === -1) {
                             e.preventDefault(); 
                             e.stopPropagation();
                             e.stopImmediatePropagation();
                             
-                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"]), td.t_f img:not([src*="smiley"]), .postmessage img:not([src*="smiley"])');
                             var urls = [];
                             var clickedIndex = 0;
                             for (var i = 0; i < allImgs.length; i++) {
                                 var rawSrc = allImgs[i].getAttribute('zsrc') ||
-                                allImgs[i].getAttribute('file') || allImgs[i].getAttribute('src');
+                                    allImgs[i].getAttribute('data-src') ||
+                                    allImgs[i].getAttribute('zoomfile') ||
+                                    allImgs[i].getAttribute('file') ||
+                                    allImgs[i].getAttribute('src');
                                 if (rawSrc) {
                                     var absoluteUrl = new URL(rawSrc, document.baseURI).href;
                                     urls.push(absoluteUrl);
@@ -478,11 +484,15 @@ object PageJsScripts {
             }
 
             if (window.NativeMangaApi) {
-                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"]), td.t_f img:not([src*="smiley"]), .postmessage img:not([src*="smiley"])');
                 if (allImgs.length > 0) {
                     var urls = [];
                     for (var i = 0; i < allImgs.length; i++) {
-                        var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('src');
+                        var rawSrc = allImgs[i].getAttribute('zsrc') ||
+                            allImgs[i].getAttribute('data-src') ||
+                            allImgs[i].getAttribute('zoomfile') ||
+                            allImgs[i].getAttribute('file') ||
+                            allImgs[i].getAttribute('src');
                         if (rawSrc) {
                             urls.push(new URL(rawSrc, document.baseURI).href);
                         }
@@ -524,7 +534,7 @@ object PageJsScripts {
                 if (document.querySelector('.pswp')) return; 
                 
                 clickAttempts++;
-                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, .postmessage a.orange');
+                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, td.t_f a.orange, .postmessage a.orange');
                 var clicked = false;
                 for (var i = 0; i < links.length; i++) {
                     var href = links[i].getAttribute('href') || '';
@@ -664,7 +674,7 @@ object PageJsScripts {
                 window._mangaClickInjected = true;
                 
                 var disablePhotoSwipe = function() {
-                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a');
+                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a, td.t_f a, .postmessage a');
                     for (var i = 0; i < links.length; i++) {
                         var aNode = links[i];
                         if (aNode.querySelector('img')) {
@@ -681,25 +691,32 @@ object PageJsScripts {
                 observer.observe(document.body, { childList: true, subtree: true });
                 
                 document.addEventListener('click', function(e) {
-                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, .img_one img, .message img');
+                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, td.t_f a, .postmessage a, .img_one img, .message img, td.t_f img, .postmessage img');
                     if (!targetContainer) return;
                     
                     var targetImg = targetContainer.tagName.toLowerCase() === 'img' ? targetContainer : targetContainer.querySelector('img');
                     
                     if (targetImg) {
-                        var imgSrc = targetImg.getAttribute('src') || '';
-                        var imgZsrc = targetImg.getAttribute('zsrc') || '';
+                        var targetRawSrc = targetImg.getAttribute('zsrc') ||
+                            targetImg.getAttribute('data-src') ||
+                            targetImg.getAttribute('zoomfile') ||
+                            targetImg.getAttribute('file') ||
+                            targetImg.getAttribute('src') || '';
                         
-                        if (imgSrc.indexOf('smiley') === -1 && imgZsrc.indexOf('smiley') === -1) { 
+                        if (targetRawSrc.indexOf('smiley') === -1) {
                             e.preventDefault(); 
                             e.stopPropagation();
                             e.stopImmediatePropagation();
                             
-                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"]), td.t_f img:not([src*="smiley"]), .postmessage img:not([src*="smiley"])');
                             var urls = [];
                             var clickedIndex = 0;
                             for (var i = 0; i < allImgs.length; i++) {
-                                var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('file') || allImgs[i].getAttribute('src');
+                                var rawSrc = allImgs[i].getAttribute('zsrc') ||
+                                    allImgs[i].getAttribute('data-src') ||
+                                    allImgs[i].getAttribute('zoomfile') ||
+                                    allImgs[i].getAttribute('file') ||
+                                    allImgs[i].getAttribute('src');
                                 if (rawSrc) {
                                     var absoluteUrl = new URL(rawSrc, document.baseURI).href;
                                     urls.push(absoluteUrl);
@@ -755,12 +772,16 @@ object PageJsScripts {
             function extractAndOpenNative() {
                 if (!window.NativeMangaApi) return false;
                 
-                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"]), td.t_f img:not([src*="smiley"]), .postmessage img:not([src*="smiley"])');
                 if (allImgs.length === 0) return false;
                 
                 var urls = [];
                 for (var i = 0; i < allImgs.length; i++) {
-                    var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('src');
+                    var rawSrc = allImgs[i].getAttribute('zsrc') ||
+                        allImgs[i].getAttribute('data-src') ||
+                        allImgs[i].getAttribute('zoomfile') ||
+                        allImgs[i].getAttribute('file') ||
+                        allImgs[i].getAttribute('src');
                     if (rawSrc) urls.push(new URL(rawSrc, document.baseURI).href);
                 }
                 
@@ -945,7 +966,7 @@ object PageJsScripts {
                     return;
                 }
 
-                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, .postmessage a.orange');
+                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, td.t_f a.orange, .postmessage a.orange');
                 var targetEl = null;
                 for (var i = 0; i < links.length; i++) {
                     var href = links[i].getAttribute('href') || '';

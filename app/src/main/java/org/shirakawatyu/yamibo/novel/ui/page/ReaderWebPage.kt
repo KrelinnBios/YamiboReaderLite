@@ -81,8 +81,8 @@ import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient
-import org.shirakawatyu.yamibo.novel.network.NovelApi
 import org.shirakawatyu.yamibo.novel.util.reader.CacheData
+import org.shirakawatyu.yamibo.novel.util.reader.AuthenticatedThreadPageLoader
 import org.shirakawatyu.yamibo.novel.util.reader.LocalCacheUtil
 import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
@@ -363,6 +363,16 @@ fun ReaderWebPage(
             this.webChromeClient = webChromeClient
             YamiboWebViewClient.setupDownloadListener(this)
         }
+    }
+    LaunchedEffect(isDarkMode) {
+        readerWebView.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                isDarkMode,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
     }
     LaunchedEffect(Unit) {
         try {
@@ -882,22 +892,18 @@ fun ReaderWebPage(
                             ?: pendingRefresh.url.substringAfter("tid=").substringBefore("&")
                         if (tid.isBlank() || pendingRefresh.authorId == null) return@launch
                         try {
-                            val api = YamiboRetrofit.getInstance().create(NovelApi::class.java)
-                            val resp = api.getThreadPageByAuthor(tid, pendingRefresh.pageNum, pendingRefresh.authorId)
-                            val json = JSON.parseObject(resp.string())
-                            val variables = json.getJSONObject("Variables")
-                            val postlist = variables.getJSONArray("postlist")
-                            val messages = (0 until postlist.size).map { i ->
-                                postlist.getJSONObject(i).getString("message")
-                            }
-                            val combinedHtml = messages.joinToString("") {
-                                "<div class=\"message\">$it</div>"
-                            }
+                            val loaded = AuthenticatedThreadPageLoader.loadReaderPage(
+                                tid = tid,
+                                page = pendingRefresh.pageNum,
+                                authorIdHint = pendingRefresh.authorId,
+                                context = context
+                            )
                             val cacheData = CacheData(
                                 cachedPageNum = pendingRefresh.pageNum,
-                                htmlContent = combinedHtml,
-                                maxPageNum = 1,
-                                authorId = pendingRefresh.authorId
+                                htmlContent = loaded.html,
+                                maxPageNum = loaded.maxPage,
+                                authorId = loaded.authorId,
+                                contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
                             )
                             LocalCacheUtil.getInstance(context).savePage(
                                 pendingRefresh.url, pendingRefresh.pageNum, cacheData,

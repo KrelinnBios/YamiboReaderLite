@@ -26,11 +26,13 @@ import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.module.CoilWebViewProxy
 import org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient
 import org.shirakawatyu.yamibo.novel.network.MangaApi
+import org.shirakawatyu.yamibo.novel.parser.ThreadHtmlParser
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
+import org.shirakawatyu.yamibo.novel.util.YamiboSession
+import org.shirakawatyu.yamibo.novel.util.reader.AuthenticatedThreadPageLoader
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.abs
 
 /**
  * 漫画探测工具
@@ -42,7 +44,7 @@ class MangaProber {
         private val IMAGE_EXT_REGEX = Regex("\\.(jpg|jpeg|png|webp|gif)", RegexOption.IGNORE_CASE)
         // 启发式正则：榨取所有带 src 的 img 标签
         private val IMG_TAG_REGEX = Regex(
-            """<img\s+[^>]*?(?:zsrc|data-src|file|src)=["']([^"']+)["'][^>]*>""",
+            """<img\s+[^>]*?(?:zsrc|data-src|zoomfile|file|src)=["']([^"']+)["'][^>]*>""",
             RegexOption.IGNORE_CASE
         )
 
@@ -51,6 +53,8 @@ class MangaProber {
             val urls: List<String>,
             val title: String,
             val messageHtml: String,
+            val cookie: String = "",
+            val referer: String = "",
             val timestamp: Long = System.currentTimeMillis()
         )
 
@@ -68,9 +72,6 @@ class MangaProber {
         // 固定 32 个锁，按 TID 的哈希值路由，O(1) 且完全 0 内存增长。
         private const val STRIPE_COUNT = 32
         private val stripedLocks = Array(STRIPE_COUNT) { Mutex() }
-
-        // ─── JS 桥 ──────────────────────────────────────────
-        private var cachedProberJSInterface: ProberJSInterface? = null
 
         // 规范化 URL 拼接工具 + API脏数据自愈
         private fun safeConcatUrl(base: String, path: String): String {
@@ -93,28 +94,6 @@ class MangaProber {
         }
     }
 
-    @Keep
-    class ProberJSInterface {
-        var onSuccess: ((String, String) -> Unit)? = null
-        var onFail: (() -> Unit)? = null
-
-        @Keep
-        @JavascriptInterface
-        fun triggerSuccess(urlsJoined: String, title: String) {
-            Handler(Looper.getMainLooper()).post {
-                onSuccess?.invoke(urlsJoined, title)
-            }
-        }
-
-        @Keep
-        @JavascriptInterface
-        fun triggerFail() {
-            Handler(Looper.getMainLooper()).post {
-                onFail?.invoke()
-            }
-        }
-    }
-
     suspend fun probeUrl(
         context: Context,
         url: String,
@@ -129,14 +108,22 @@ class MangaProber {
             // 第 1 层：快速游离态读取缓存
             val cachedEntry = if (forceRefresh) null else getValidCache(tid)
             if (cachedEntry != null) {
-                MangaImagePipeline.handoffPrefetch(appContext, cachedEntry.urls, 0)
+                MangaImagePipeline.handoffPrefetch(
+                    context = appContext,
+                    urls = cachedEntry.urls,
+                    clickedIndex = 0,
+                    headers = cachedEntry.referer.takeIf(String::isNotBlank)
+                        ?.let { mapOf("Referer" to it) }
+                        .orEmpty(),
+                    cookie = cachedEntry.cookie
+                )
                 onSuccess(cachedEntry.urls, cachedEntry.title, cachedEntry.messageHtml)
                 return
             }
 
             try {
                 // 根据 TID 的哈希值路由到固定的分段锁
-                val lockIndex = abs(tid.hashCode()) % STRIPE_COUNT
+                val lockIndex = (tid.hashCode() and Int.MAX_VALUE) % STRIPE_COUNT
                 val mutex = stripedLocks[lockIndex]
 
                 // 加锁后，执行防并发双重检查 (Double-Checked Locking)
@@ -145,7 +132,15 @@ class MangaProber {
                     val doubleCheckCache = if (forceRefresh) null else getValidCache(tid)
                     if (doubleCheckCache != null) {
                         withContext(Dispatchers.Main) {
-                            MangaImagePipeline.handoffPrefetch(appContext, doubleCheckCache.urls, 0)
+                            MangaImagePipeline.handoffPrefetch(
+                                context = appContext,
+                                urls = doubleCheckCache.urls,
+                                clickedIndex = 0,
+                                headers = doubleCheckCache.referer.takeIf(String::isNotBlank)
+                                    ?.let { mapOf("Referer" to it) }
+                                    .orEmpty(),
+                                cookie = doubleCheckCache.cookie
+                            )
                             onSuccess(doubleCheckCache.urls, doubleCheckCache.title, doubleCheckCache.messageHtml)
                         }
                         return@withLock true
@@ -161,13 +156,25 @@ class MangaProber {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "API probe failed for $tid, falling back to WebView", e)
-                // 异常静默，流转到 WebView 兜底
+                Log.w(TAG, "API probe failed for $tid, trying authenticated HTML", e)
+            }
+
+            try {
+                val htmlSuccess = fastHtmlProbe(appContext, tid, onSuccess)
+                if (htmlSuccess) {
+                    return
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Authenticated HTML probe failed for $tid", e)
             }
         }
 
         // 降级轨：兜底走原有 WebView 探针
-        fallbackWebViewProbe(context, url, onSuccess, onFallback)
+        withContext(Dispatchers.Main.immediate) {
+            fallbackWebViewProbe(context, url, onSuccess, onFallback)
+        }
     }
 
     /**
@@ -203,6 +210,7 @@ class MangaProber {
         val threadObj = variables.getJSONObject("thread") ?: return@withContext false
         val title = threadObj.getString("subject") ?: return@withContext false
         val threadAuthorId = threadObj.getString("authorid") ?: ""
+        val threadRequiresPermission = threadObj.getIntValue("readperm") > 0
 
         // --- 深度还原 WebView 的业务过滤逻辑 ---
         val forumName = variables.getJSONObject("forum")?.getString("name") ?: ""
@@ -225,6 +233,7 @@ class MangaProber {
         val urls = mutableListOf<String>()
         val seenFromMessage = mutableSetOf<String>()
         val combinedMessage = StringBuilder()
+        var hasProtectedAttachments = false
 
         // 极客优化：不仅看 1 楼，还要遍历整个首页。
         // 但严格校验 `authorid` 必须是楼主，解决楼主跨多层楼连载漫画的漏图问题，同时过滤水友回复。
@@ -255,6 +264,9 @@ class MangaProber {
             if (attachments != null) {
                 for (key in attachments.keys) {
                     val attachObj = attachments.getJSONObject(key) ?: continue
+                    if (attachObj.getIntValue("readperm") > 0) {
+                        hasProtectedAttachments = true
+                    }
                     val urlPrefix = attachObj.getString("url") ?: ""
                     val attachmentPath = attachObj.getString("attachment") ?: ""
 
@@ -271,7 +283,7 @@ class MangaProber {
             }
         }
 
-        if (urls.isNotEmpty()) {
+        if (urls.isNotEmpty() && !threadRequiresPermission && !hasProtectedAttachments) {
             val urlList = urls.toList()
 
             // 将纯正文拼接并套一层 <div class="message">，欺骗 MangaHtmlParser 提取全楼层的同页目录
@@ -295,6 +307,69 @@ class MangaProber {
         return@withContext false
     }
 
+    @Keep
+    class ProberJSInterface {
+        var onSuccess: ((String, String) -> Unit)? = null
+        var onFail: (() -> Unit)? = null
+
+        @Keep
+        @JavascriptInterface
+        fun triggerSuccess(urlsJoined: String, title: String) {
+            Handler(Looper.getMainLooper()).post {
+                onSuccess?.invoke(urlsJoined, title)
+            }
+        }
+
+        @Keep
+        @JavascriptInterface
+        fun triggerFail() {
+            Handler(Looper.getMainLooper()).post {
+                onFail?.invoke()
+            }
+        }
+    }
+
+    private suspend fun fastHtmlProbe(
+        context: Context,
+        tid: String,
+        onSuccess: (List<String>, String, String) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        val page = AuthenticatedThreadPageLoader.fetchPage(tid = tid)
+        val parsed = ThreadHtmlParser.parseMangaPage(
+            html = page.html,
+            baseUrl = page.url
+        )
+        if (parsed.imageUrls.isEmpty()) {
+            parsed.accessDeniedReason?.let {
+                Log.i(TAG, "Authenticated HTTP page still denied for $tid: $it")
+            }
+            return@withContext false
+        }
+
+        val title = parsed.title.orEmpty().ifBlank { "漫画阅读" }
+        synchronized(probeCache) {
+            probeCache[tid] = CacheEntry(
+                urls = parsed.imageUrls,
+                title = title,
+                messageHtml = parsed.compatibleHtml,
+                cookie = page.cookie,
+                referer = page.url
+            )
+        }
+
+        withContext(Dispatchers.Main) {
+            MangaImagePipeline.handoffPrefetch(
+                context = context,
+                urls = parsed.imageUrls,
+                clickedIndex = 0,
+                headers = mapOf("Referer" to page.url),
+                cookie = page.cookie
+            )
+            onSuccess(parsed.imageUrls, title, parsed.compatibleHtml)
+        }
+        true
+    }
+
     /**
      * 传统的无头 WebView 降级兜底方案
      * (底层兼容逻辑未受重构影响，保证 100% 可用性兜底)
@@ -311,8 +386,8 @@ class MangaProber {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            blockNetworkImage = false
-            loadsImagesAutomatically = true
+            blockNetworkImage = true
+            loadsImagesAutomatically = false
         }
 
         val activity = context as? Activity
@@ -326,14 +401,17 @@ class MangaProber {
         }
 
         val isFinished = AtomicBoolean(false)
+        val extractionStarted = AtomicBoolean(false)
         val finalUrl = safeConcatUrl(RequestConfig.BASE_URL, url)
+        val proberApi = ProberJSInterface()
 
         val cleanupAndFinish = {
             if (isFinished.compareAndSet(false, true)) {
-                cachedProberJSInterface?.onSuccess = null
-                cachedProberJSInterface?.onFail = null
+                proberApi.onSuccess = null
+                proberApi.onFail = null
 
                 webView.stopLoading()
+                webView.removeJavascriptInterface("ProberApi")
                 (webView.parent as? ViewGroup)?.removeView(webView)
                 WebViewPool.release(webView)
             }
@@ -374,7 +452,9 @@ class MangaProber {
                         return;
                     }
 
-                    var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                    var allImgs = document.querySelectorAll(
+                        '.img_one img, .message img:not([src*="smiley"]), td.t_f img:not([src*="smiley"]), .postmessage img:not([src*="smiley"])'
+                    );
                     if (allImgs.length === 0) return;
 
                     var urls = [];
@@ -382,6 +462,7 @@ class MangaProber {
                     for (var i = 0; i < allImgs.length; i++) {
                         var rawSrc = allImgs[i].getAttribute('zsrc') ||
                                      allImgs[i].getAttribute('data-src') ||
+                                     allImgs[i].getAttribute('zoomfile') ||
                                      allImgs[i].getAttribute('file') ||
                                      allImgs[i].getAttribute('src');
                         if (rawSrc) {
@@ -407,12 +488,8 @@ class MangaProber {
         val maxAbsoluteTimeout = 18_000L
 
         try {
-            val proberApi = cachedProberJSInterface ?: ProberJSInterface().also {
-                cachedProberJSInterface = it
-            }
-
             proberApi.onSuccess = { urlsJoined, title ->
-                if (!isFinished.get()) {
+                if (!isFinished.get() && extractionStarted.compareAndSet(false, true)) {
                     webView.evaluateJavascript("(function() { return document.documentElement.outerHTML; })();") { htmlResult ->
                         val cleanHtml = try {
                             JSON.parse(htmlResult) as? String ?: ""
@@ -428,11 +505,27 @@ class MangaProber {
                             .map { it.trim() }
                             .filter { it.isNotBlank() }
                             .distinct()
+                        val pageUrl = webView.url?.takeIf(String::isNotBlank) ?: finalUrl
+                        val cookie = YamiboSession.cookieFor(pageUrl)
+                        val tid = MangaTitleCleaner.extractTidFromUrl(pageUrl)
+                        if (tid != null) {
+                            synchronized(probeCache) {
+                                probeCache[tid] = CacheEntry(
+                                    urls = urls,
+                                    title = title,
+                                    messageHtml = cleanHtml,
+                                    cookie = cookie,
+                                    referer = pageUrl
+                                )
+                            }
+                        }
 
                         MangaImagePipeline.handoffPrefetch(
                             context = appContext,
                             urls = urls,
-                            clickedIndex = 0
+                            clickedIndex = 0,
+                            headers = mapOf("Referer" to pageUrl),
+                            cookie = cookie
                         )
 
                         cleanupAndFinish()
@@ -555,8 +648,9 @@ class MangaProber {
                     detail: RenderProcessGoneDetail?
                 ): Boolean {
                     if (isFinished.compareAndSet(false, true)) {
-                        cachedProberJSInterface?.onSuccess = null
-                        cachedProberJSInterface?.onFail = null
+                        proberApi.onSuccess = null
+                        proberApi.onFail = null
+                        (webView.parent as? ViewGroup)?.removeView(webView)
                         WebViewPool.discard(webView)
                         onFallback()
                     }
@@ -565,6 +659,7 @@ class MangaProber {
             }
 
             webView.resumeTimers()
+            YamiboSession.syncToWebView(finalUrl)
             webView.loadUrl(finalUrl)
 
             val checkInterval = 500L

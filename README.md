@@ -28,6 +28,21 @@
 
 从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 APK。
 
+应用启动时会通过 GitHub Releases API 检查新版本。检测到更新后可以在应用内下载并调起系统安装器；如果自动检查、下载或安装器启动失败，应用会提供 Releases 手动下载入口。
+
+### 发布签名
+
+Android 只允许使用相同签名的 APK 覆盖更新。GitHub Actions 发布前需要配置以下仓库 Secrets：
+
+- `ANDROID_KEYSTORE_BASE64`：release keystore 的 Base64 内容
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+- `ANDROID_STORE_PASSWORD`
+
+请在安全位置长期备份 keystore 和密码。缺少任一 Secret 时，发布工作流会停止，不会生成使用临时 debug 签名的 Release。
+
+早期 `v1.0.0` 使用 GitHub 临时环境生成的 debug 签名，该密钥无法找回。已经安装该版本的用户升级到首个固定签名版本时需要卸载旧版并从 Releases 重新安装一次；之后的版本可以正常覆盖更新。
+
 系统要求：Android 7.0（API 24）及以上。
 
 ## 截图
@@ -68,6 +83,7 @@
 
 - [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)
 - [flben233/YamiboReader](https://github.com/flben233/YamiboReader)
+- [duck123ducker/yamibo_manga_reader](https://github.com/duck123ducker/yamibo_manga_reader)（参考）
 
 ## 反馈与贡献
 

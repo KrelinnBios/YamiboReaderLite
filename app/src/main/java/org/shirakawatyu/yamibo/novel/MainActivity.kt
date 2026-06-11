@@ -110,6 +110,7 @@ import org.shirakawatyu.yamibo.novel.ui.page.OtherWebPage
 import org.shirakawatyu.yamibo.novel.ui.page.ReaderPage
 import org.shirakawatyu.yamibo.novel.ui.page.ReaderWebPage
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
+import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
 import org.shirakawatyu.yamibo.novel.ui.state.BBSPageState
 import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.ui.theme._300文学Theme
@@ -120,6 +121,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.BottomNavBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToastHost
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
+import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AutoSignManager
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
@@ -531,7 +533,7 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 }
                 SettingsUtil.getDnsOptimizationMode { GlobalData.dnsOptimizationMode.value = it }
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
-                GlobalData.isDarkMode.value = false
+                SettingsUtil.getDarkMode { GlobalData.isDarkMode.value = it }
                 GlobalData.darkModeTheme.value = 0
                 GlobalData.lightModeTheme.value = 0
                 GlobalData.isAppInitialized = true
@@ -543,6 +545,7 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
     var showClipboardHint by remember { mutableStateOf(false) }
     var detectedClipboardUrl by remember { mutableStateOf("") }
     var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var appUpdateFailure by remember { mutableStateOf<String?>(null) }
     var hasCheckedAppUpdate by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(
@@ -556,7 +559,11 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
             !hasCheckedAppUpdate
         ) {
             hasCheckedAppUpdate = true
-            appUpdateInfo = AppUpdateManager.checkForUpdate()
+            when (val result = AppUpdateManager.checkForUpdate()) {
+                AppUpdateCheckResult.NoUpdate -> Unit
+                is AppUpdateCheckResult.UpdateAvailable -> appUpdateInfo = result.info
+                is AppUpdateCheckResult.Failed -> appUpdateFailure = result.reason
+            }
         }
     }
     LaunchedEffect(isAppInitialized, isNetworkAvailable) {
@@ -1506,6 +1513,12 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                     AppUpdateDialog(
                         info = info,
                         onDismiss = { appUpdateInfo = null }
+                    )
+                }
+                appUpdateFailure?.let { reason ->
+                    AppUpdateFailureDialog(
+                        reason = reason,
+                        onDismiss = { appUpdateFailure = null }
                     )
                 }
 

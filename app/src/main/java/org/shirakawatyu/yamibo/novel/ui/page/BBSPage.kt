@@ -602,6 +602,18 @@ fun BBSPage(
 
     var autoOpenMangaMode by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val isDarkMode by GlobalData.isDarkMode.collectAsState()
+
+    LaunchedEffect(isDarkMode) {
+        webView.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                isDarkMode,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+    }
 
     val canConvertToReader = remember(BBSPageState.currentUrl, BBSPageState.pageTitle) {
         ReaderModeDetector.canConvertToReaderMode(BBSPageState.currentUrl, BBSPageState.pageTitle)

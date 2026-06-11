@@ -34,8 +34,6 @@ import org.shirakawatyu.yamibo.novel.bean.ContentType
 import org.shirakawatyu.yamibo.novel.bean.ReaderSettings
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
-import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
-import org.shirakawatyu.yamibo.novel.network.NovelApi
 import org.shirakawatyu.yamibo.novel.ui.page.typefaceFromMode
 import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
@@ -46,6 +44,7 @@ import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.reader.CacheData
 import org.shirakawatyu.yamibo.novel.util.reader.CacheUtil
+import org.shirakawatyu.yamibo.novel.util.reader.AuthenticatedThreadPageLoader
 import org.shirakawatyu.yamibo.novel.util.reader.ChineseConvertUtil
 import org.shirakawatyu.yamibo.novel.util.reader.FontMetricsUtil
 import org.shirakawatyu.yamibo.novel.util.reader.HTMLUtil
@@ -54,7 +53,6 @@ import org.shirakawatyu.yamibo.novel.util.reader.TextUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ValueUtil
 import java.io.IOException
 import java.util.concurrent.Executors
-import kotlin.math.ceil
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -167,8 +165,6 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             _uiState.value = _uiState.value.copy(authorId = value)
         }
     private var isPreloading = false
-    private var ppp: Int = 20
-    private var totalReplies: Int = 0
     private var maxPageCalculated: Int = 0
     private val PRELOAD_THRESHOLD_VERTICAL = 300
     private val PRELOAD_THRESHOLD_HORIZONTAL = 30
@@ -356,6 +352,11 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
+    private fun isCurrentReaderCache(data: CacheData?): Boolean {
+        return data != null &&
+            data.contentVersion >= AuthenticatedThreadPageLoader.CONTENT_VERSION
+    }
+
     private fun isDiskCacheHtmlValid(htmlContent: String?): Boolean {
         if (htmlContent.isNullOrBlank()) return false
         if (htmlContent.length < 300) return false
@@ -368,28 +369,20 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     private fun loadPageForDiskCache(pageNum: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val api = YamiboRetrofit.getInstance().create(NovelApi::class.java)
                 val authorId = currentAuthorId ?: run {
                     withContext(Dispatchers.Main) { processDiskCachePage(pageNum, "", 1) }
                     return@launch
                 }
-                val resp = api.getThreadPageByAuthor(tid = extractTid(), page = pageNum, authorid = authorId)
-                val json = com.alibaba.fastjson2.JSON.parseObject(resp.string())
-                val variables = json.getJSONObject("Variables")
-                val postlist = variables.getJSONArray("postlist")
-                val messages = (0 until postlist.size).map { i ->
-                    postlist.getJSONObject(i).getString("message")
+                val loaded = AuthenticatedThreadPageLoader.loadReaderPage(
+                    tid = extractTid(),
+                    page = pageNum,
+                    authorIdHint = authorId,
+                    context = applicationContext
+                )
+                maxPageCalculated = maxOf(maxPageCalculated, loaded.maxPage)
+                withContext(Dispatchers.Main) {
+                    processDiskCachePage(pageNum, loaded.html, maxPageCalculated)
                 }
-                val combinedHtml = messages.joinToString("") { msg -> "<div class=\"message\">$msg</div>" }
-
-                if (maxPageCalculated == 0) {
-                    val thread = variables.getJSONObject("thread")
-                    totalReplies = thread.getString("replies")?.toIntOrNull() ?: 0
-                    ppp = variables.getString("ppp")?.toIntOrNull() ?: 20
-                    maxPageCalculated = ceil((totalReplies + 1f) / ppp).toInt().coerceAtLeast(1)
-                }
-
-                withContext(Dispatchers.Main) { processDiskCachePage(pageNum, combinedHtml, maxPageCalculated) }
             } catch (e: Exception) {
                 Log.e(logTag, "DiskCache: Error loading page $pageNum", e)
                 withContext(Dispatchers.Main) { processDiskCachePage(pageNum, "", 1) }
@@ -419,7 +412,13 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
         diskCacheRetries.remove(pageNum)
 
-        val cacheData = CacheData(cachedPageNum = pageNum, htmlContent = html, maxPageNum = maxPage, authorId = currentAuthorId)
+        val cacheData = CacheData(
+            cachedPageNum = pageNum,
+            htmlContent = html,
+            maxPageNum = maxPage,
+            authorId = currentAuthorId,
+            contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
+        )
         withContext(Dispatchers.IO) { localCache.savePage(url, pageNum, cacheData, diskCacheIncludeImages, cacheTitleForDisk()) }
         CacheUtil.saveCache(url, cacheData)
 
@@ -647,11 +646,21 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
 
             val localData = withContext(Dispatchers.IO) {
-                localCache.loadPageCompat(
+                val cached = localCache.loadPageCompat(
                     primaryUrl = url,
                     pageNum = targetView,
                     aliasUrls = readerIdentityAliases()
                 )
+                if (cached != null && !isCurrentReaderCache(cached)) {
+                    localCache.deletePageCompat(
+                        primaryUrl = url,
+                        pageNum = targetView,
+                        aliasUrls = readerIdentityAliases()
+                    )
+                    null
+                } else {
+                    cached
+                }
             }
 
             if (localData != null) {
@@ -679,7 +688,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
 
             // 内存缓存
-            val memData = getMemoryCacheCompat(targetView)
+            val memData = getMemoryCacheCompat(targetView).takeIf(::isCurrentReaderCache)
             if (memData != null && (memData.authorId == currentAuthorId || currentAuthorId == null)) {
                 if (currentAuthorId == null && memData.authorId != null) {
                     currentAuthorId = memData.authorId
@@ -703,7 +712,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
 
             // 如果 ReaderWebPage 已经在静默预热同一页，继承那次发射结果，避免 FAB 返回后再开第二个网络请求。
-            val prewarmData = awaitInFlightMemoryPrewarm(targetView)
+            val prewarmData = awaitInFlightMemoryPrewarm(targetView).takeIf(::isCurrentReaderCache)
             if (prewarmData != null && (prewarmData.authorId == currentAuthorId || currentAuthorId == null)) {
                 if (currentAuthorId == null && prewarmData.authorId != null) {
                     currentAuthorId = prewarmData.authorId
@@ -797,11 +806,21 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
         loadJob = viewModelScope.launch(Dispatchers.Main) {
             val localData = withContext(Dispatchers.IO) {
-                localCache.loadPageCompat(
+                val cached = localCache.loadPageCompat(
                     primaryUrl = url,
                     pageNum = view,
                     aliasUrls = readerIdentityAliases()
                 )
+                if (cached != null && !isCurrentReaderCache(cached)) {
+                    localCache.deletePageCompat(
+                        primaryUrl = url,
+                        pageNum = view,
+                        aliasUrls = readerIdentityAliases()
+                    )
+                    null
+                } else {
+                    cached
+                }
             }
 
             if (thisRequestId != loadRequestId) return@launch
@@ -828,7 +847,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 return@launch
             }
 
-            val memData = getMemoryCacheCompat(view)
+            val memData = getMemoryCacheCompat(view).takeIf(::isCurrentReaderCache)
             if (thisRequestId != loadRequestId) return@launch
             if (memData != null && (memData.authorId == currentAuthorId || currentAuthorId == null)) {
                 if (currentAuthorId == null && memData.authorId != null) {
@@ -853,7 +872,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
 
             // 如果 ReaderWebPage 的静默预热还在进行中，等待并复用它的结果。
-            val prewarmData = awaitInFlightMemoryPrewarm(view)
+            val prewarmData = awaitInFlightMemoryPrewarm(view).takeIf(::isCurrentReaderCache)
             if (thisRequestId != loadRequestId) return@launch
             if (prewarmData != null && (prewarmData.authorId == currentAuthorId || currentAuthorId == null)) {
                 if (currentAuthorId == null && prewarmData.authorId != null) {
@@ -902,46 +921,38 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     }
 
     private suspend fun loadFromApi(view: Int): Triple<String, Int, String?> {
-        val api = YamiboRetrofit.getInstance().create(NovelApi::class.java)
-        // 获取 authorId（如果还没有）
-        if (currentAuthorId == null) {
-            val metaResp = api.getThreadFirstPage(tid = extractTid(), page = 1)
-            val metaJson = com.alibaba.fastjson2.JSON.parseObject(metaResp.string())
-            val authorId = metaJson.getJSONObject("Variables").getJSONObject("thread").getString("authorid")
-            if (authorId.isNullOrEmpty()) throw Exception("无法获取作者ID")
-            currentAuthorId = authorId
+        val loaded = AuthenticatedThreadPageLoader.loadReaderPage(
+            tid = extractTid(),
+            page = view,
+            authorIdHint = currentAuthorId,
+            context = applicationContext
+        )
+        if (currentAuthorId != loaded.authorId) {
+            currentAuthorId = loaded.authorId
             viewModelScope.launch(Dispatchers.IO) {
                 val map = FavoriteUtil.getFavoriteMapSuspend()
-                map[url]?.let { FavoriteUtil.updateFavoriteSuspend(it.copy(authorId = authorId)) }
+                map[url]?.let {
+                    FavoriteUtil.updateFavoriteSuspend(it.copy(authorId = loaded.authorId))
+                }
             }
         }
-        val authorId = currentAuthorId!!
-        val resp = api.getThreadPageByAuthor(tid = extractTid(), page = view, authorid = authorId)
-        val json = com.alibaba.fastjson2.JSON.parseObject(resp.string())
-        val variables = json.getJSONObject("Variables")
-        val thread = variables.getJSONObject("thread")
-        currentThreadTitle = thread.getString("subject")
-            ?.takeIf(String::isNotBlank)
-            ?: currentThreadTitle
-        currentThreadAuthor = thread.getString("author").orEmpty()
-        currentThreadSection = variables.getJSONObject("forum")
-            ?.getString("name")
-            ?.takeIf(String::isNotBlank)
-            ?: currentThreadSection
+        currentThreadTitle = loaded.title?.takeIf(String::isNotBlank) ?: currentThreadTitle
+        currentThreadAuthor = loaded.author.orEmpty().ifBlank { currentThreadAuthor }
+        currentThreadSection = loaded.section?.takeIf(String::isNotBlank) ?: currentThreadSection
+        maxPageCalculated = maxOf(maxPageCalculated, loaded.maxPage)
 
-        if (maxPageCalculated == 0) {
-            ppp = variables.getString("ppp")?.toIntOrNull() ?: 20
-            totalReplies = thread.getString("replies")?.toIntOrNull() ?: 0
-            maxPageCalculated = ceil((totalReplies + 1f) / ppp).toInt().coerceAtLeast(1)
-        }
-
-        val postlist = variables.getJSONArray("postlist")
-        val messages = (0 until postlist.size).map { i -> postlist.getJSONObject(i).getString("message") }
-        val combinedHtml = messages.joinToString("") { msg -> "<div class=\"message\">$msg</div>" }
-
-        CacheUtil.saveCache(url, CacheData(cachedPageNum = view, htmlContent = combinedHtml, maxPageNum = maxPageCalculated, authorId = authorId))
+        CacheUtil.saveCache(
+            url,
+            CacheData(
+                cachedPageNum = view,
+                htmlContent = loaded.html,
+                maxPageNum = maxPageCalculated,
+                authorId = loaded.authorId,
+                contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
+            )
+        )
         val title = currentThreadTitle
-        return Triple(combinedHtml, maxPageCalculated, title)
+        return Triple(loaded.html, maxPageCalculated, title)
     }
 
     private suspend fun loadFromApiBounded(view: Int): Triple<String, Int, String?> {
@@ -1011,7 +1022,13 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     return@launch
                 }
                 isPreloading = false
-                val cacheData = CacheData(cachedPageNum = targetView, htmlContent = html, maxPageNum = maxPage, authorId = currentAuthorId)
+                val cacheData = CacheData(
+                    cachedPageNum = targetView,
+                    htmlContent = html,
+                    maxPageNum = maxPage,
+                    authorId = currentAuthorId,
+                    contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
+                )
                 CacheUtil.saveCache(url, cacheData)
                 if (_cachedPages.value.contains(targetView)) {
                     launch(Dispatchers.IO) { localCache.savePage(url, targetView, cacheData, false, cacheTitleForDisk()) }
@@ -1029,7 +1046,13 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             } else {
                 // 正常加载
                 if (!isFromCache) {
-                    val cacheData = CacheData(cachedPageNum = targetView, htmlContent = html, maxPageNum = maxPage, authorId = currentAuthorId)
+                    val cacheData = CacheData(
+                        cachedPageNum = targetView,
+                        htmlContent = html,
+                        maxPageNum = maxPage,
+                        authorId = currentAuthorId,
+                        contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
+                    )
                     CacheUtil.saveCache(url, cacheData)
                     if (_cachedPages.value.contains(targetView)) {
                         launch(Dispatchers.IO) { localCache.savePage(url, targetView, cacheData, false, cacheTitleForDisk()) }
@@ -1174,14 +1197,25 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val authorId = currentAuthorId ?: return@launch
-                val api = YamiboRetrofit.getInstance().create(NovelApi::class.java)
-                val resp = api.getThreadPageByAuthor(tid = extractTid(), page = targetView, authorid = authorId)
-                val json = com.alibaba.fastjson2.JSON.parseObject(resp.string())
-                val postlist = json.getJSONObject("Variables").getJSONArray("postlist")
-                val messages = (0 until postlist.size).map { i -> postlist.getJSONObject(i).getString("message") }
-                val combinedHtml = messages.joinToString("") { msg -> "<div class=\"message\">$msg</div>" }
+                val loaded = AuthenticatedThreadPageLoader.loadReaderPage(
+                    tid = extractTid(),
+                    page = targetView,
+                    authorIdHint = authorId,
+                    context = applicationContext
+                )
+                maxPageCalculated = maxOf(maxPageCalculated, loaded.maxPage)
+                val combinedHtml = loaded.html
 
-                CacheUtil.saveCache(url, CacheData(cachedPageNum = targetView, htmlContent = combinedHtml, maxPageNum = maxPageCalculated, authorId = authorId))
+                CacheUtil.saveCache(
+                    url,
+                    CacheData(
+                        cachedPageNum = targetView,
+                        htmlContent = combinedHtml,
+                        maxPageNum = maxPageCalculated,
+                        authorId = loaded.authorId,
+                        contentVersion = AuthenticatedThreadPageLoader.CONTENT_VERSION
+                    )
+                )
 
                 val (passages, chapters) = withContext(readerLayoutDispatcher) {
                     val preloadContent = parseHtmlToContentList(

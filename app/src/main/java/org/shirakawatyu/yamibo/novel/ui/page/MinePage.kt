@@ -542,6 +542,17 @@ fun MinePage(
 
         webView
     }
+    val isDarkMode by GlobalData.isDarkMode.collectAsState()
+    LaunchedEffect(isDarkMode) {
+        mineWebView.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                isDarkMode,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+    }
 
     val rootHistoryIndex = remember { mineWebView.copyBackForwardList().currentIndex }
 
@@ -1524,6 +1535,36 @@ fun MinePage(
                                 modifier = Modifier.verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("暗黑模式", fontSize = 15.sp)
+                                        Text(
+                                            "使用经典黑蓝界面和论坛配色",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isDarkMode,
+                                        onCheckedChange = { enabled ->
+                                            GlobalData.isDarkMode.value = enabled
+                                            SettingsUtil.saveDarkMode(enabled)
+                                            mineWebView.evaluateJavascript(
+                                                PageJsScripts.getThemeSetJs(
+                                                    enabled,
+                                                    GlobalData.darkModeTheme.value,
+                                                    GlobalData.lightModeTheme.value
+                                                ),
+                                                null
+                                            )
+                                        },
+                                        colors = yamiboSwitchColors()
+                                    )
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically

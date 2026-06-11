@@ -2,6 +2,15 @@ name: Build APK
 
 on:
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: Version name for a manual build
+        required: true
+        default: "1.0.0"
+      version_code:
+        description: Increasing Android versionCode for a manual build
+        required: true
+        default: "3"
   push:
     tags:
       - "v*"
@@ -15,9 +24,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build debug APK
+    name: Build signed release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -38,23 +52,81 @@ jobs:
       - name: Install Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      - name: Validate signing secrets
+        shell: bash
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Required GitHub Actions secret $name is missing."
+              exit 1
+            fi
+          done
+
+      - name: Restore release keystore
+        shell: bash
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yamibo-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/yamibo-release.jks" >> "$GITHUB_ENV"
+
+      - name: Resolve Android version
+        id: version
+        shell: bash
+        env:
+          MANUAL_VERSION_NAME: ${{ inputs.version_name }}
+          MANUAL_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version_name="${GITHUB_REF_NAME#v}"
+            if [[ ! "$version_name" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
+              echo "::error::Release tag must use vMAJOR.MINOR.PATCH format."
+              exit 1
+            fi
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+            version_code=$((major * 1000000 + minor * 1000 + patch))
+          else
+            version_name="$MANUAL_VERSION_NAME"
+            version_code="$MANUAL_VERSION_CODE"
+          fi
+
+          if [[ ! "$version_code" =~ ^[1-9][0-9]*$ ]] || (( version_code > 2100000000 )); then
+            echo "::error::versionCode must be between 1 and 2100000000."
+            exit 1
+          fi
+
+          echo "name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "code=$version_code" >> "$GITHUB_OUTPUT"
+
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew --no-daemon assembleDebug
+      - name: Build signed release APK
+        run: |
+          ./gradlew --no-daemon assembleRelease \
+            -PAPP_VERSION_NAME="${{ steps.version.outputs.name }}" \
+            -PAPP_VERSION_CODE="${{ steps.version.outputs.code }}"
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify \
+            --verbose \
+            --print-certs \
+            "app/build/outputs/apk/release/300 Lite.apk"
 
       - name: Prepare APK
         shell: bash
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk release/300-Lite-debug.apk
+          cp "app/build/outputs/apk/release/300 Lite.apk" \
+            "release/300 Lite.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 300-Lite-debug-${{ github.run_number }}
-          path: release/300-Lite-debug.apk
+          name: 300 Lite-v${{ steps.version.outputs.name }}
+          path: release/300 Lite.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -62,5 +134,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: release/300-Lite-debug.apk
+          files: release/300 Lite.apk
           generate_release_notes: true

@@ -20,6 +20,10 @@ output-metadata.json
 # Release
 release/
 release_notes.txt
+*.jks
+*.keystore
+keystore.properties
+signing.properties
 
 # Misc
 .DS_Store

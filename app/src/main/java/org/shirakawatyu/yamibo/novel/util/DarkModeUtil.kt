@@ -60,19 +60,19 @@ data class DarkThemeColors(
 
     companion object {
         val CLASSIC = DarkThemeColors(
-            statusBar = Color(0xFF1A1A1A),
-            navBar = Color(0xFF1A1A1A),
-            background = Color(0xFF121212),
-            surface = Color(0xFF1E1E1E),
-            surfaceVariant = Color(0xFF2A2A2A),
-            primary = Color(0xFFCC7755),
+            statusBar = Color(0xFF08111F),
+            navBar = Color(0xFF08111F),
+            background = Color(0xFF050B14),
+            surface = Color(0xFF0B1625),
+            surfaceVariant = Color(0xFF12243A),
+            primary = Color(0xFF4EA1FF),
             onPrimary = Color(0xFFFFFFFF),
-            onBackground = Color(0xFFCCCCCC),
-            onSurface = Color(0xFFCCCCCC),
-            onSurfaceVariant = Color(0xFF999999),
-            outline = Color(0xFF444444),
-            tertiary = Color(0xFF2A2A2A),
-            onSecondary = Color(0xFFCCCCCC),
+            onBackground = Color(0xFFD8E6F3),
+            onSurface = Color(0xFFD8E6F3),
+            onSurfaceVariant = Color(0xFF8FA9C2),
+            outline = Color(0xFF274766),
+            tertiary = Color(0xFF102338),
+            onSecondary = Color(0xFFD8E6F3),
         )
 
         val OKLCH = DarkThemeColors(

@@ -284,6 +284,16 @@ fun OtherWebPage(
             YamiboWebViewClient.setupDownloadListener(this)
         }
     }
+    LaunchedEffect(isDarkMode) {
+        otherWebView.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                isDarkMode,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+    }
     LaunchedEffect(Unit) {
         try {
             otherWebView.onResume()

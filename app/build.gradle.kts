@@ -3,18 +3,53 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val appUpdateUrl = providers.gradleProperty("APP_UPDATE_URL").orElse("").get()
+fun buildValue(name: String, defaultValue: String? = null): String? {
+    val value = providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .orNull
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+    return value ?: defaultValue
+}
+
+val appUpdateUrl = buildValue(
+    "APP_UPDATE_URL",
+    "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases/latest"
+)!!
+val appVersionName = buildValue("APP_VERSION_NAME", "1.0.0")!!
+val appVersionCode = buildValue("APP_VERSION_CODE", "3")!!.toInt()
+val releaseKeystorePath = buildValue("ANDROID_KEYSTORE_PATH")
+val releaseKeyAlias = buildValue("ANDROID_KEY_ALIAS")
+val releaseKeyPassword = buildValue("ANDROID_KEY_PASSWORD")
+val releaseStorePassword = buildValue("ANDROID_STORE_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseKeystorePath,
+    releaseKeyAlias,
+    releaseKeyPassword,
+    releaseStorePassword
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "org.shirakawatyu.yamibo.novel"
     compileSdk = 34
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.krelinnbios.yamiboreaderlite"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField(
             "String",
             "APP_UPDATE_URL",
@@ -34,6 +69,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -57,6 +93,13 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "300 Lite.apk"
         }
     }
 }

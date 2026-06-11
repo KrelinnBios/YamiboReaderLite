@@ -17,7 +17,8 @@ data class CacheData @JSONCreator constructor(
     @JSONField(name = "cachedPageNum") val cachedPageNum: Int = 0,
     @JSONField(name = "htmlContent") val htmlContent: String = "",
     @JSONField(name = "maxPageNum") val maxPageNum: Int = 1,
-    @JSONField(name = "authorId") val authorId: String? = null
+    @JSONField(name = "authorId") val authorId: String? = null,
+    @JSONField(name = "contentVersion") val contentVersion: Int = 0
 )
 
 /**

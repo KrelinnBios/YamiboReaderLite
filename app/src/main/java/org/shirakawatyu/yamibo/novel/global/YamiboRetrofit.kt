@@ -245,7 +245,10 @@ class YamiboRetrofit {
                     .header("Accept-Language", acceptLanguage)
                     .header("Cookie", cookie)
 
-                if (original.url.host.contains("yamibo.com")) {
+                if (
+                    original.url.host.contains("yamibo.com") &&
+                    original.header("Referer").isNullOrBlank()
+                ) {
                     requestBuilder.header("Referer", "https://bbs.yamibo.com/")
                 }
 
@@ -316,7 +319,12 @@ class YamiboRetrofit {
                 val reqBuilder = okhttp3.Request.Builder().url(url)
                 request.requestHeaders?.forEach { (key, value) -> reqBuilder.header(key, value) }
 
-                if (url.contains("yamibo.com", ignoreCase = true)) {
+                if (
+                    url.contains("yamibo.com", ignoreCase = true) &&
+                    request.requestHeaders?.keys?.none {
+                        it.equals("Referer", ignoreCase = true)
+                    } != false
+                ) {
                     reqBuilder.header("Referer", "https://bbs.yamibo.com/")
                 }
 
@@ -376,7 +384,9 @@ class YamiboRetrofit {
                     val cmCookie = android.webkit.CookieManager.getInstance().getCookie(urlStr)
                     if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
                 }
-                reqBuilder.header("Referer", "https://bbs.yamibo.com/")
+                if (reqBuilder.build().header("Referer").isNullOrBlank()) {
+                    reqBuilder.header("Referer", "https://bbs.yamibo.com/")
+                }
                 val response = okHttpClient.newCall(reqBuilder.build()).execute()
                 if (response.isSuccessful) {
                     syncSetCookieToWebView(response)
