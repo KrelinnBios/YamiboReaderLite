@@ -1,0 +1,29 @@
+# IDE
+.idea/
+.claude/
+*.iml
+
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Android
+local.properties
+.externalNativeBuild/
+.cxx/
+captures/
+*.apk
+*.aab
+output-metadata.json
+
+# Release
+release/
+release_notes.txt
+
+# Misc
+.DS_Store
+.env*
+.gitee_token
+upload_github.ps1
+plan.txt

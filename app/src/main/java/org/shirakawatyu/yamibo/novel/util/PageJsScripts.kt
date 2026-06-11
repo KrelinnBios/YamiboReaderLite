@@ -1,0 +1,1179 @@
+package org.shirakawatyu.yamibo.novel.util
+
+import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_CLASSIC
+import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_OKLCH
+import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_OLED
+import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_TWILIGHT
+import org.shirakawatyu.yamibo.novel.util.theme.LIGHT_MODE_CSS_RULES_MODERN_WHITE
+
+object PageJsScripts {
+
+    private fun combineJs(vararg namedScripts: Pair<String, String>): String {
+        return namedScripts.joinToString("\n;\n") { (name, script) ->
+            """
+                (function() {
+                    try {
+                        $script
+                    } catch (e) {
+                        console.error('[YamiboInject:' + '$name' + ']', e);
+                    }
+                })();
+            """.trimIndent()
+        }
+    }
+
+    private fun jsStringLiteral(value: String): String = buildString {
+        append('\'')
+        value.forEach { ch ->
+            when (ch) {
+                '\\' -> append("\\\\")
+                '\'' -> append("\\'")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                '<' -> append("\\u003C")
+                '>' -> append("\\u003E")
+                '&' -> append("\\u0026")
+                else -> append(ch)
+            }
+        }
+        append('\'')
+    }
+
+
+    val FIX_CAROUSEL_LAYOUT_JS = """
+        (function() {
+            if (document.getElementById('carousel-fix-style')) return;
+            var style = document.createElement('style');
+            style.id = 'carousel-fix-style';
+            style.innerHTML = `
+                .swiper-wrapper {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                }
+                .swiper-slide, .slidebox, .scrool_img, .slide, #slide, .img_slide {
+                    width: 100% !important;
+                    flex-shrink: 0 !important;
+                    aspect-ratio: 363 / 126 !important;
+                    background-color: rgba(212, 200, 176, 0.2) !important;
+                    display: block !important;
+                    box-sizing: border-box !important;
+                }
+                #dhnavs .swiper-slide, #dhnavs_li .swiper-slide {
+                    width: auto !important;
+                    aspect-ratio: auto !important;
+                    background-color: transparent !important;
+                }
+                .swiper-slide img, .slidebox img, .scrool_img img, .slide img, #slide img, .img_slide img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: cover !important;
+                }
+            `;
+            if(document.head) document.head.appendChild(style);
+            else document.documentElement.appendChild(style);
+        })();
+    """.trimIndent()
+
+    val INJECT_PSWP_AND_MANGA_JS = """
+        (function(){
+            window.__pswpInit = function() {
+                if (window.__globalPswpAttached) return;
+                var pswp = document.querySelector('.pswp');
+                if (!pswp) {
+                    if (window.__pswpWaitingObserverAttached) return;
+                    window.__pswpWaitingObserverAttached = true;
+                    var bodyObserver = new MutationObserver(function(mutations, obs) {
+                        if (document.querySelector('.pswp')) {
+                            obs.disconnect();
+                            window.__pswpWaitingObserverAttached = false;
+                            window.__pswpInit();
+                        }
+                    });
+                    bodyObserver.observe(document.body, { childList: true, subtree: true });
+                    return;
+                }
+                window.__globalPswpAttached = true;
+                var checkState = function() {
+                    var isOpen = pswp.classList.contains('pswp--open') ||
+                                 pswp.classList.contains('pswp--visible') || 
+                                 (getComputedStyle(pswp).display !== 'none' && getComputedStyle(pswp).opacity > 0);
+                    if (window.__pswpLastState !== isOpen) {
+                        window.__pswpLastState = isOpen;
+                        if (window.AndroidFullscreen) window.AndroidFullscreen.notify(isOpen);
+                        if (isOpen) {
+                            setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 100);
+                        }
+                    }
+                };
+                var pswpObserver = new MutationObserver(checkState);
+                pswpObserver.observe(pswp, { attributes: true, attributeFilter: ['class', 'style'] });
+                checkState();
+            };
+            window.__pswpInit();
+            if (!window.__pswpLongPressInjected) {
+                window.__pswpLongPressInjected = true;
+                var _lpTimer = null;
+                var _lpStartPos = null;
+                document.addEventListener('pointerdown', function(e) {
+                    var pswp = document.querySelector('.pswp');
+                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
+                    _lpStartPos = { x: e.clientX, y: e.clientY };
+                    _lpTimer = setTimeout(function() {
+                        _lpTimer = null;
+                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
+                        if (img && img.src && window.AndroidFullscreen) {
+                            window.AndroidFullscreen.saveImage(img.src);
+                        }
+                    }, 500);
+                }, { passive: true });
+                document.addEventListener('pointermove', function(e) {
+                    if (!_lpTimer || !_lpStartPos) return;
+                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
+                        clearTimeout(_lpTimer); _lpTimer = null;
+                    }
+                }, { passive: true });
+                document.addEventListener('pointerup', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+                document.addEventListener('pointercancel', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+            }
+            if (!window._backBtnFixed) {
+                window._backBtnFixed = true;
+                document.addEventListener('click', function(e) {
+                    var target = e.target.closest ? e.target.closest('a[href*="history.back"]') : null;
+                    if (target) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (window.NativeMangaApi && window.NativeMangaApi.goBack) {
+                            window.NativeMangaApi.goBack();
+                        } else {
+                            window.history.back();
+                        }
+                    }
+                }, true);
+            }
+            var a = document.querySelector('.header h2 a');
+            var isManga = false;
+            if (a) {
+                var t = a.innerText;
+                isManga = t.indexOf('中文百合漫画区') !== -1 || 
+                          t.indexOf('百合漫画图源区') !== -1;
+            }
+            if (isManga) {
+                if (window._mangaClickInjected) return 'true';
+                window._mangaClickInjected = true;
+                
+                var disablePhotoSwipe = function() {
+                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a');
+                    for (var i = 0; i < links.length; i++) {
+                        var aNode = links[i];
+                        if (aNode.querySelector('img')) {
+                            aNode.removeAttribute('data-pswp-width');
+                            if (aNode.href && aNode.href.indexOf('javascript') === -1) {
+                                aNode.setAttribute('data-disabled-href', aNode.href);
+                                aNode.removeAttribute('href');
+                            }
+                        }
+                    }
+                };
+                disablePhotoSwipe();
+                var observer = new MutationObserver(disablePhotoSwipe);
+                observer.observe(document.body, { childList: true, subtree: true });
+                
+                document.addEventListener('click', function(e) {
+                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, .img_one img, .message img');
+                    if (!targetContainer) return;
+                    
+                    var targetImg = targetContainer.tagName.toLowerCase() === 'img' ? targetContainer : targetContainer.querySelector('img');
+                    
+                    if (targetImg) {
+                        var imgSrc = targetImg.getAttribute('src') || '';
+                        var imgZsrc = targetImg.getAttribute('zsrc') || '';
+                        
+                        if (imgSrc.indexOf('smiley') === -1 && imgZsrc.indexOf('smiley') === -1) { 
+                            e.preventDefault(); 
+                            e.stopPropagation();
+                            e.stopImmediatePropagation();
+                            
+                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                            var urls = [];
+                            var clickedIndex = 0;
+                            for (var i = 0; i < allImgs.length; i++) {
+                                var rawSrc = allImgs[i].getAttribute('zsrc') ||
+                                allImgs[i].getAttribute('file') || allImgs[i].getAttribute('src');
+                                if (rawSrc) {
+                                    var absoluteUrl = new URL(rawSrc, document.baseURI).href;
+                                    urls.push(absoluteUrl);
+                                    if (allImgs[i] === targetImg) clickedIndex = urls.length - 1;
+                                }
+                            }
+                            if (window.NativeMangaApi) {
+                                window.NativeMangaApi.openNativeManga(urls.join('|||'), clickedIndex, document.title);
+                            }
+                        }
+                    }
+                }, true);
+            }
+            return isManga ? 'true' : 'false';
+        })()
+    """.trimIndent()
+
+    val THREAD_LIST_CLICK_FIX_JS = """
+        (function() {
+            if (window.__threadListClickFixV3) return;
+            window.__threadListClickFixV3 = true;
+
+            function closest(el, selector) {
+                while (el && el !== document && el.nodeType === 1) {
+                    if (el.matches && el.matches(selector)) return el;
+                    el = el.parentElement;
+                }
+                return null;
+            }
+
+            function isSafeThreadUrl(rawHref) {
+                if (!rawHref || rawHref === '#' || /^javascript:/i.test(rawHref)) return false;
+                try {
+                    var url = new URL(rawHref, document.baseURI);
+                    if (url.hostname !== 'bbs.yamibo.com') return false;
+                    var path = String(url.pathname || '').replace(/^\/+/, '').toLowerCase();
+                    var query = String(url.search || '').toLowerCase();
+                    return /^thread-\d+/.test(path) ||
+                           (path === 'forum.php' && query.indexOf('mod=viewthread') !== -1);
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            if (!document.getElementById('yamibo-thread-list-click-style')) {
+                var style = document.createElement('style');
+                style.id = 'yamibo-thread-list-click-style';
+                style.textContent = 'li.list { cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.08); }';
+                document.head.appendChild(style);
+            }
+
+            document.addEventListener('click', function(e) {
+                var li = closest(e.target, 'li.list');
+                if (!li) return;
+
+                if (closest(e.target, 'a[href], button, input, textarea, select, label, .pswp')) return;
+
+                var threadLink =
+                    li.querySelector('a[href*="mod=viewthread"]') ||
+                    li.querySelector('a[href^="thread-"]');
+
+                if (!threadLink || !threadLink.href) return;
+                if (!isSafeThreadUrl(threadLink.getAttribute('href'))) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                location.href = threadLink.href;
+            }, true);
+        })();
+    """.trimIndent()
+
+    val REMOVE_TRANSITION_STYLE_JS = """
+        var style = document.getElementById('manga-transition-style');
+        if (style) style.remove();
+    """.trimIndent()
+
+    val CLEANUP_FULLSCREEN_JS = """
+        (function() {
+            var style = document.getElementById('manga-transition-style');
+            if (style) style.remove();
+            window.pswpObserverAttached = false;
+        })();
+    """.trimIndent()
+
+    val CHECK_SECTION_JS = """
+        (function() {
+            var sectionHeader = document.querySelector('.header h2 a');
+            if (sectionHeader) return sectionHeader.innerText.trim();
+            var nav = document.querySelector('.z, .nav, .mz, .thread_nav, .sq_nav');
+            if (nav) return nav.innerText.trim();
+            return '';
+        })();
+    """.trimIndent()
+
+    // 获取帖子历史详情专用JS
+    val EXTRACT_THREAD_INFO_JS = """
+        (function() {
+            var title = document.title || '';
+            var section = '';
+            var sectionHeader = document.querySelector('.header h2 a');
+            if (sectionHeader) {
+                section = sectionHeader.innerText.trim();
+            } else {
+                var nav = document.querySelector('.z, .nav, .mz, .thread_nav, .sq_nav');
+                if (nav) section = nav.innerText.trim();
+            }
+            var author = '';
+            var authorEl = document.querySelector('.authi a.xw1, .authi a, .mtit .z a, .pi .authi a');
+            if (authorEl) {
+                author = authorEl.innerText.trim();
+            } else {
+                var byUser = document.querySelector('.by a');
+                if (byUser) author = byUser.innerText.trim();
+            }
+            title = title.replace(/\s*-\s*百合会.*$/, '');
+            return JSON.stringify({title: title, section: section, author: author});
+        })();
+    """.trimIndent()
+
+    // 从 assets/icons/link-45deg.svg 加载的图标内容，由 YamiboApplication 在启动时初始化
+    @Volatile var copyLinkIconSvg: String? = null
+
+    // 仅在帖子详情页的 #nav-more-menu 中注入“复制链接”菜单项。
+    // 注意：SVG 可能来自 assets，必须转成 JS 字符串字面量；否则换行/引号会让整段注入脚本语法错误。
+    val INJECT_COPY_LINK_JS by lazy {
+        val iconSvg = copyLinkIconSvg ?: """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-link-45deg nav-more-item-text" viewBox="0 0 16 16" style="position:relative;top:5px"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>"""
+        val iconSvgLiteral = jsStringLiteral(iconSvg)
+        """
+        (function() {
+            var ITEM_ID = 'yamibo-copy-link-menu-item';
+            var OBSERVER_KEY = '__yamiboCopyLinkObserver';
+
+            function isThreadPage() {
+                try {
+                    var url = new URL(window.location.href, document.baseURI);
+                    var host = String(url.hostname || '').toLowerCase();
+                    var path = String(url.pathname || '').replace(/^\/+/, '').toLowerCase();
+                    var query = String(url.search || '').toLowerCase();
+                    var bodyIsThread = !!(document.body && document.body.classList && document.body.classList.contains('pg_viewthread'));
+                    var urlIsThread = /^thread-\d+-\d+-\d+\.html$/.test(path) ||
+                        (path === 'forum.php' && query.indexOf('mod=viewthread') !== -1 && query.indexOf('tid=') !== -1);
+                    return (host === 'bbs.yamibo.com' || host === 'm.yamibo.com' || host === 'yamibo.com' || host === 'www.yamibo.com') && (bodyIsThread || urlIsThread);
+                } catch (e) {
+                    return !!(document.body && document.body.classList && document.body.classList.contains('pg_viewthread'));
+                }
+            }
+
+            function cleanTitle() {
+                var title = document.title || '';
+                return title.replace(/\s*-\s*百合会.*${'$'}/, '').trim();
+            }
+
+            function threadUrl() {
+                var canonical = document.querySelector('link[rel="canonical"]');
+                if (canonical && canonical.href) return canonical.href;
+                return window.location.href;
+            }
+
+            function removeItem() {
+                var oldItem = document.getElementById(ITEM_ID) || document.getElementById('copy-link-menu-item');
+                if (oldItem && oldItem.parentNode) oldItem.parentNode.removeChild(oldItem);
+            }
+
+            function inject() {
+                if (!isThreadPage()) {
+                    removeItem();
+                    return true;
+                }
+
+                var menu = document.getElementById('nav-more-menu');
+                if (!menu) return false;
+
+                var legacyItem = document.getElementById('copy-link-menu-item');
+                if (legacyItem && legacyItem.id !== ITEM_ID) legacyItem.id = ITEM_ID;
+                if (document.getElementById(ITEM_ID)) return true;
+
+                var item = document.createElement('a');
+                item.id = ITEM_ID;
+                item.className = 'nav-more-item';
+                item.href = 'javascript:;';
+                item.setAttribute('role', 'button');
+                item.setAttribute('aria-label', '复制帖子链接');
+                item.style.marginTop = '-3px';
+                item.innerHTML = $iconSvgLiteral + '<span class="nav-more-item-text">复制链接</span>';
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (window.AndroidFullscreen && typeof window.AndroidFullscreen.copyLink === 'function') {
+                        window.AndroidFullscreen.copyLink(cleanTitle(), threadUrl());
+                    }
+                    return false;
+                }, true);
+                menu.appendChild(item);
+                return true;
+            }
+
+            if (window[OBSERVER_KEY]) {
+                try { window[OBSERVER_KEY].disconnect(); } catch (e) {}
+                window[OBSERVER_KEY] = null;
+            }
+
+            if (inject()) return;
+
+            var root = document.documentElement || document.body;
+            if (!root || typeof MutationObserver === 'undefined') return;
+
+            var observer = new MutationObserver(function() {
+                if (inject()) {
+                    observer.disconnect();
+                    window[OBSERVER_KEY] = null;
+                }
+            });
+            observer.observe(root, { childList: true, subtree: true });
+            window[OBSERVER_KEY] = observer;
+            setTimeout(function() {
+                if (window[OBSERVER_KEY] === observer) {
+                    observer.disconnect();
+                    window[OBSERVER_KEY] = null;
+                }
+            }, 5000);
+        })();
+        """.trimIndent()
+    }
+
+    val AUTO_OPEN_MANGA_JS = """
+        (function() {
+            // 版块白名单
+            var sectionHeader = document.querySelector('.header h2 a');
+            var sectionName = sectionHeader ? sectionHeader.innerText.trim() : '';
+            if (sectionName !== '') {
+                var allowedSections = ['中文百合漫画区', '百合漫画图源区'];
+                var isAllowedSection = false;
+                for (var k = 0; k < allowedSections.length; k++) {
+                    if (sectionName.indexOf(allowedSections[k]) !== -1) {
+                        isAllowedSection = true;
+                        break;
+                    }
+                }
+                if (!isAllowedSection) {
+                    if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) {
+                        window.AndroidFullscreen.notifyMangaActionDone();
+                    }
+                    return;
+                }
+            }
+            
+            // 公告帖拦截
+            var typeLabel = document.querySelector('.view_tit em');
+            if (typeLabel && typeLabel.innerText.indexOf('公告') !== -1) {
+                if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) {
+                    window.AndroidFullscreen.notifyMangaActionDone();
+                }
+                return; 
+            }
+
+            // 过渡黑屏样式
+            if (!document.getElementById('manga-transition-style')) {
+                var style = document.createElement('style');
+                style.id = 'manga-transition-style';
+                style.innerHTML = 'body > *:not(.pswp) { opacity: 0 !important; pointer-events: none !important; } body { background: #000 !important; }';
+                document.head.appendChild(style);
+            }
+
+            function abortAndNotify() {
+                var style = document.getElementById('manga-transition-style');
+                if (style) style.remove();
+                if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) {
+                    window.AndroidFullscreen.notifyMangaActionDone();
+                }
+            }
+
+            if (window.NativeMangaApi) {
+                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                if (allImgs.length > 0) {
+                    var urls = [];
+                    for (var i = 0; i < allImgs.length; i++) {
+                        var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('src');
+                        if (rawSrc) {
+                            urls.push(new URL(rawSrc, document.baseURI).href);
+                        }
+                    }
+                    if (urls.length > 0) {
+                        window.NativeMangaApi.openNativeManga(urls.join('|||'), 0, document.title);
+                        return;
+                    }
+                }
+            }
+
+            var clickTimer = null;
+            var timeoutTimer = null;
+            
+            var observer = new MutationObserver(function(mutations, obs) {
+                if (document.querySelector('.pswp')) {
+                    obs.disconnect();
+                    clearTimeout(timeoutTimer);
+                    if (clickTimer) clearInterval(clickTimer);
+                    
+                    if (window.AndroidFullscreen) {
+                        window.AndroidFullscreen.notify(true);
+                        window.AndroidFullscreen.notifyMangaActionDone();
+                    }
+                    return;
+                }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            var clickAttempts = 0;
+            var maxClicks = 10;
+
+            function tryClickTarget() {
+                if (clickAttempts >= maxClicks) {
+                    if (clickTimer) clearInterval(clickTimer);
+                    return;
+                }
+                if (document.querySelector('.pswp')) return; 
+                
+                clickAttempts++;
+                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, .postmessage a.orange');
+                var clicked = false;
+                for (var i = 0; i < links.length; i++) {
+                    var href = links[i].getAttribute('href') || '';
+                    var innerHtml = links[i].innerHTML || '';
+                    if (href.toLowerCase().indexOf('.gif') === -1 && href.indexOf('static/image/') === -1 && innerHtml.indexOf('static/image/') === -1) {
+                        links[i].dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
+                        clicked = true;
+                        break; 
+                    }
+                }
+
+                if (!clicked) {
+                    var fallbackImgs = document.querySelectorAll('.img_one img');
+                    if(fallbackImgs.length > 0 && fallbackImgs[0].parentElement && fallbackImgs[0].parentElement.tagName === 'A'){
+                        fallbackImgs[0].parentElement.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
+                    }
+                }
+            }
+
+            tryClickTarget();
+
+            clickTimer = setInterval(tryClickTarget, 250);
+
+            timeoutTimer = setTimeout(function() {
+                observer.disconnect();
+                if (clickTimer) clearInterval(clickTimer);
+                abortAndNotify();
+            }, 5000);
+        })();
+    """.trimIndent()
+
+    // MinePage脚本
+    val MINE_INJECT_PSWP_AND_MANGA_JS = """
+        (function(){
+            window.__pswpInit = function() {
+                if (window.__globalPswpAttached) return;
+                var pswp = document.querySelector('.pswp');
+                if (!pswp) {
+                    if (window.__pswpWaitingObserverAttached) return;
+                    window.__pswpWaitingObserverAttached = true;
+                    var bodyObserver = new MutationObserver(function(mutations, obs) {
+                        if (document.querySelector('.pswp')) {
+                            obs.disconnect();
+                            window.__pswpWaitingObserverAttached = false;
+                            window.__pswpInit();
+                        }
+                    });
+                    bodyObserver.observe(document.body, { childList: true, subtree: true });
+                    return;
+                }
+                window.__globalPswpAttached = true;
+                
+                var checkState = function() {
+                    var isOpen = pswp.classList.contains('pswp--open') || 
+                                 pswp.classList.contains('pswp--visible') || 
+                                 (getComputedStyle(pswp).display !== 'none' && getComputedStyle(pswp).opacity > 0);
+                    if (window.__pswpLastState !== isOpen) {
+                        window.__pswpLastState = isOpen;
+                        if (window.AndroidFullscreen) window.AndroidFullscreen.notify(isOpen);
+                        if (isOpen) {
+                            setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 100);
+                        }
+                    }
+                };
+                
+                var pswpObserver = new MutationObserver(checkState);
+                pswpObserver.observe(pswp, { attributes: true, attributeFilter: ['class', 'style'] });
+                checkState();
+            };
+            window.__pswpInit();
+            if (!window.__pswpLongPressInjected) {
+                window.__pswpLongPressInjected = true;
+                var _lpTimer = null;
+                var _lpStartPos = null;
+                document.addEventListener('pointerdown', function(e) {
+                    var pswp = document.querySelector('.pswp');
+                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
+                    _lpStartPos = { x: e.clientX, y: e.clientY };
+                    _lpTimer = setTimeout(function() {
+                        _lpTimer = null;
+                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
+                        if (img && img.src && window.AndroidFullscreen) {
+                            window.AndroidFullscreen.saveImage(img.src);
+                        }
+                    }, 500);
+                }, { passive: true });
+                document.addEventListener('pointermove', function(e) {
+                    if (!_lpTimer || !_lpStartPos) return;
+                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
+                        clearTimeout(_lpTimer); _lpTimer = null;
+                    }
+                }, { passive: true });
+                document.addEventListener('pointerup', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+                document.addEventListener('pointercancel', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+            }
+
+            var rewriteHomeLink = function() {
+                var homeLink = document.querySelector('.my a[href*="index.php"]');
+                if (homeLink) {
+                    homeLink.href = 'home.php?mod=space&do=profile&mycenter=1&mobile=2';
+                }
+            };
+            rewriteHomeLink();
+            if (!window._mineHomeLinkObserver) {
+                window._mineHomeLinkObserver = new MutationObserver(rewriteHomeLink);
+                window._mineHomeLinkObserver.observe(document.body, { childList: true, subtree: true });
+            }
+            
+            if (!window._backBtnFixed) {
+                window._backBtnFixed = true;
+                document.addEventListener('click', function(e) {
+                    var target = e.target.closest ? e.target.closest('a[href*="history.back"], #hui-back') : null;
+                    if (target) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (window.NativeMangaApi && window.NativeMangaApi.goBack) {
+                            window.NativeMangaApi.goBack();
+                        } else {
+                            window.history.back();
+                        }
+                    }
+                }, true);
+            }
+            var a = document.querySelector('.header h2 a');
+            var isManga = false;
+            if (a) {
+                var t = a.innerText;
+                isManga = t.indexOf('中文百合漫画区') !== -1 || 
+                          t.indexOf('百合漫画图源区') !== -1;
+            }
+            if (isManga) {
+                if (window._mangaClickInjected) return 'true';
+                window._mangaClickInjected = true;
+                
+                var disablePhotoSwipe = function() {
+                    var links = document.querySelectorAll('a[data-pswp-width], .img_one a, .message a');
+                    for (var i = 0; i < links.length; i++) {
+                        var aNode = links[i];
+                        if (aNode.querySelector('img')) {
+                            aNode.removeAttribute('data-pswp-width');
+                            if (aNode.href && aNode.href.indexOf('javascript') === -1) {
+                                aNode.setAttribute('data-disabled-href', aNode.href);
+                                aNode.removeAttribute('href');
+                            }
+                        }
+                    }
+                };
+                disablePhotoSwipe();
+                var observer = new MutationObserver(disablePhotoSwipe);
+                observer.observe(document.body, { childList: true, subtree: true });
+                
+                document.addEventListener('click', function(e) {
+                    var targetContainer = e.target.closest('.img_one li, .img_one a, .message a, .img_one img, .message img');
+                    if (!targetContainer) return;
+                    
+                    var targetImg = targetContainer.tagName.toLowerCase() === 'img' ? targetContainer : targetContainer.querySelector('img');
+                    
+                    if (targetImg) {
+                        var imgSrc = targetImg.getAttribute('src') || '';
+                        var imgZsrc = targetImg.getAttribute('zsrc') || '';
+                        
+                        if (imgSrc.indexOf('smiley') === -1 && imgZsrc.indexOf('smiley') === -1) { 
+                            e.preventDefault(); 
+                            e.stopPropagation();
+                            e.stopImmediatePropagation();
+                            
+                            var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                            var urls = [];
+                            var clickedIndex = 0;
+                            for (var i = 0; i < allImgs.length; i++) {
+                                var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('file') || allImgs[i].getAttribute('src');
+                                if (rawSrc) {
+                                    var absoluteUrl = new URL(rawSrc, document.baseURI).href;
+                                    urls.push(absoluteUrl);
+                                    if (allImgs[i] === targetImg) clickedIndex = urls.length - 1;
+                                }
+                            }
+                            if (window.NativeMangaApi) {
+                                window.NativeMangaApi.openNativeManga(urls.join('|||'), clickedIndex, document.title);
+                            }
+                        }
+                    }
+                }, true); 
+            }
+            return isManga ? 'true' : 'false';
+        })()
+    """.trimIndent()
+
+
+    // MangaWebPage脚本
+
+    val MANGA_WEB_HIDE_COMMAND = """
+        javascript:(function() {
+            var style = document.createElement('style');
+            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search, #nav-more-menu .btn-to-pc { display: none !important; }';
+            if (document.head) document.head.appendChild(style);
+        })()
+    """.trimIndent()
+
+    val MANGA_WEB_AUTO_OPEN_JS = """
+        (function() {
+            // 版块与公告检查
+            var sectionHeader = document.querySelector('.header h2 a');
+            var sectionName = sectionHeader ? sectionHeader.innerText.trim() : '';
+            if (sectionName !== '') {
+                var allowedSections = ['中文百合漫画区', '百合漫画图源区'];
+                var isAllowedSection = false;
+                for (var k = 0; k < allowedSections.length; k++) {
+                    if (sectionName.indexOf(allowedSections[k]) !== -1) { isAllowedSection = true; break; }
+                }
+                if (!isAllowedSection) {
+                    if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) window.AndroidFullscreen.notifyMangaActionDone();
+                    return;
+                }
+            }
+            
+            var typeLabel = document.querySelector('.view_tit em');
+            if (typeLabel && typeLabel.innerText.indexOf('公告') !== -1) {
+                if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) window.AndroidFullscreen.notifyMangaActionDone();
+                return; 
+            }
+
+            // 提取图片
+            function extractAndOpenNative() {
+                if (!window.NativeMangaApi) return false;
+                
+                var allImgs = document.querySelectorAll('.img_one img, .message img:not([src*="smiley"])');
+                if (allImgs.length === 0) return false;
+                
+                var urls = [];
+                for (var i = 0; i < allImgs.length; i++) {
+                    var rawSrc = allImgs[i].getAttribute('zsrc') || allImgs[i].getAttribute('src');
+                    if (rawSrc) urls.push(new URL(rawSrc, document.baseURI).href);
+                }
+                
+                if (urls.length > 0) {
+                    window.NativeMangaApi.openNativeManga(urls.join('|||'), 0, document.title);
+                    return true;
+                }
+                return false;
+            }
+
+            if (extractAndOpenNative()) {
+                return; // 如果第一次就成功了，直接结束
+            }
+
+            var extractAttempts = 0;
+            var maxExtracts = 10;
+            
+            var extractTimer = setInterval(function() {
+                extractAttempts++;
+                
+                if (extractAndOpenNative()) {
+                    clearInterval(extractTimer);
+                    return;
+                }
+                
+                if (extractAttempts >= maxExtracts) {
+                    clearInterval(extractTimer);
+                    if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) {
+                        window.AndroidFullscreen.notifyMangaActionDone();
+                    }
+                }
+            }, 250);
+
+        })();
+    """.trimIndent()
+
+
+    // OtherWebPage脚本
+
+    val OTHER_WEB_HIDE_COMMAND = """
+        (function() {
+            var style = document.createElement('style');
+            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search, #nav-more-menu .btn-to-pc { display: none !important; }';
+            if (document.head) document.head.appendChild(style);
+        })()
+    """.trimIndent()
+
+    val OTHER_WEB_INIT_PSWP_JS = """
+        (function(){
+            window.__pswpInit = function() {
+                if (window.__globalPswpAttached) return;
+                var pswp = document.querySelector('.pswp');
+                if (!pswp) {
+                    if (window.__pswpWaitingObserverAttached) return;
+                    window.__pswpWaitingObserverAttached = true;
+                    var bodyObserver = new MutationObserver(function(mutations, obs) {
+                        if (document.querySelector('.pswp')) {
+                            obs.disconnect();
+                            window.__pswpWaitingObserverAttached = false;
+                            window.__pswpInit();
+                        }
+                    });
+                    bodyObserver.observe(document.body, { childList: true, subtree: true });
+                    return;
+                }
+                window.__globalPswpAttached = true;
+                
+                var checkState = function() {
+                    var isOpen = pswp.classList.contains('pswp--open') || 
+                                 pswp.classList.contains('pswp--visible') || 
+                                 (getComputedStyle(pswp).display !== 'none' && getComputedStyle(pswp).opacity > 0);
+                    if (window.__pswpLastState !== isOpen) {
+                        window.__pswpLastState = isOpen;
+                        if (window.AndroidFullscreen) window.AndroidFullscreen.notify(isOpen);
+                        if (isOpen) {
+                            setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 100);
+                        }
+                    }
+                };
+                
+                var pswpObserver = new MutationObserver(checkState);
+                pswpObserver.observe(pswp, { attributes: true, attributeFilter: ['class', 'style'] });
+                checkState();
+            };
+            window.__pswpInit();
+            if (!window.__pswpLongPressInjected) {
+                window.__pswpLongPressInjected = true;
+                var _lpTimer = null;
+                var _lpStartPos = null;
+                document.addEventListener('pointerdown', function(e) {
+                    var pswp = document.querySelector('.pswp');
+                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
+                    _lpStartPos = { x: e.clientX, y: e.clientY };
+                    _lpTimer = setTimeout(function() {
+                        _lpTimer = null;
+                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
+                        if (img && img.src && window.AndroidFullscreen) {
+                            window.AndroidFullscreen.saveImage(img.src);
+                        }
+                    }, 500);
+                }, { passive: true });
+                document.addEventListener('pointermove', function(e) {
+                    if (!_lpTimer || !_lpStartPos) return;
+                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
+                        clearTimeout(_lpTimer); _lpTimer = null;
+                    }
+                }, { passive: true });
+                document.addEventListener('pointerup', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+                document.addEventListener('pointercancel', function() {
+                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+                }, { passive: true });
+            }
+        })()
+    """.trimIndent()
+
+    val OTHER_WEB_CHECK_TYPE_JS = """
+        (function() {
+            var sectionHeader = document.querySelector('.header h2 a');
+            var sectionName = sectionHeader ? sectionHeader.innerText.trim() : '';
+            var currentUrl = window.location.href;
+            var mangaSections = ['中文百合漫画区', '百合漫画图源区'];
+            var isManga = mangaSections.some(function(s) { return sectionName.indexOf(s) !== -1; }) || currentUrl.indexOf('fid=30') !== -1 || currentUrl.indexOf('fid=37') !== -1;
+            var novelSections = ['文學區', '文学区', '轻小说/译文区', 'TXT小说区'];
+            var isNovel = novelSections.some(function(s) { return sectionName.indexOf(s) !== -1; }) || currentUrl.indexOf('fid=49') !== -1 || currentUrl.indexOf('fid=55') !== -1 || currentUrl.indexOf('fid=60') !== -1;
+            if (isNovel) return 1;
+            if (isManga) return 2;
+            return 3;
+        })();
+    """.trimIndent()
+
+    val OTHER_WEB_AUTO_OPEN_JS = """
+        (function() {
+            var sectionHeader = document.querySelector('.header h2 a');
+            var sectionName = sectionHeader ? sectionHeader.innerText.trim() : '';
+            if (sectionName !== '') {
+                var allowedSections = ['中文百合漫画区', '百合漫画图源区'];
+                var isAllowedSection = false;
+                for (var k = 0; k < allowedSections.length; k++) {
+                    if (sectionName.indexOf(allowedSections[k]) !== -1) { isAllowedSection = true; break; }
+                }
+                if (!isAllowedSection) {
+                    if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) window.AndroidFullscreen.notifyMangaActionDone();
+                    return;
+                }
+            }
+            
+            var typeLabel = document.querySelector('.view_tit em');
+            if (typeLabel && typeLabel.innerText.indexOf('公告') !== -1) {
+                if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) window.AndroidFullscreen.notifyMangaActionDone();
+                return; 
+            }
+            
+            if (!document.getElementById('manga-transition-style')) {
+                var style = document.createElement('style');
+                style.id = 'manga-transition-style';
+                style.innerHTML = 'body > *:not(.pswp) { opacity: 0 !important; pointer-events: none !important; } body { background: #000 !important; }';
+                document.head.appendChild(style);
+            }
+
+            function abortAndNotify() {
+                var style = document.getElementById('manga-transition-style');
+                if (style) style.remove();
+                if (window.AndroidFullscreen && window.AndroidFullscreen.notifyMangaActionDone) window.AndroidFullscreen.notifyMangaActionDone();
+            }
+
+            var isDone = false;
+            var attempts = 0;
+            var timer = setInterval(function() {
+                if (isDone) { clearInterval(timer); return; }
+                attempts++;
+
+                var pswp = document.querySelector('.pswp');
+                if (pswp) {
+                    isDone = true;
+                    clearInterval(timer);
+                    if (window.AndroidFullscreen) {
+                        window.AndroidFullscreen.notify(true);
+                        window.AndroidFullscreen.notifyMangaActionDone();
+                    }
+                    return;
+                }
+
+                var links = document.querySelectorAll('a[data-pswp-width], .img_one a.orange, .message a.orange, .postmessage a.orange');
+                var targetEl = null;
+                for (var i = 0; i < links.length; i++) {
+                    var href = links[i].getAttribute('href') || '';
+                    var innerHtml = links[i].innerHTML || '';
+                    if (href.toLowerCase().indexOf('.gif') === -1 && href.indexOf('static/image/') === -1 && innerHtml.indexOf('static/image/') === -1) {
+                        targetEl = links[i]; break;
+                    }
+                }
+                
+                if (targetEl) targetEl.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
+                if (attempts >= 25) { isDone = true; clearInterval(timer); abortAndNotify(); }
+            }, 200);
+        })();
+    """.trimIndent()
+
+    fun getDarkModeSetJs(enable: Boolean, themeId: Int = 0): String {
+        val rulesList = when (themeId) {
+            1 -> DARK_MODE_CSS_RULES_OKLCH
+            2 -> DARK_MODE_CSS_RULES_OLED
+            3 -> DARK_MODE_CSS_RULES_TWILIGHT
+            else -> DARK_MODE_CSS_RULES_CLASSIC
+        }
+        val styleString = rulesList.joinToString(",\n") { "                '$it'" }
+
+        return """
+            (function() {
+                var styleId = 'yamibo-dark-mode';
+                var existing = document.getElementById(styleId);
+                var enable = $enable;
+                if (!enable) {
+                    if (existing) existing.remove();
+                    return;
+                }
+                if (existing) existing.remove();
+                var style = document.createElement('style');
+                style.id = styleId;
+                style.innerHTML = [
+$styleString
+                ].join('\n');
+                (document.body || document.documentElement).appendChild(style);
+            })();
+        """.trimIndent()
+    }
+
+    fun getLightModeSetJs(enable: Boolean, themeId: Int = 0): String {
+        val rulesList = when (themeId) {
+            else -> LIGHT_MODE_CSS_RULES_MODERN_WHITE
+        }
+        val styleString = rulesList.joinToString(",\n") { "                '$it'" }
+
+        return """
+            (function() {
+                var styleId = 'yamibo-light-mode';
+                var existing = document.getElementById(styleId);
+                var enable = $enable;
+                if (!enable) {
+                    if (existing) existing.remove();
+                    return;
+                }
+                if (existing) existing.remove();
+                var style = document.createElement('style');
+                style.id = styleId;
+                style.innerHTML = [
+$styleString
+                ].join('\n');
+                (document.body || document.documentElement).appendChild(style);
+            })();
+        """.trimIndent()
+    }
+
+    fun injectDarkModeCssIntoHtml(html: String, themeId: Int = 0): String {
+        val rulesList = when (themeId) {
+            1 -> DARK_MODE_CSS_RULES_OKLCH
+            2 -> DARK_MODE_CSS_RULES_OLED
+            3 -> DARK_MODE_CSS_RULES_TWILIGHT
+            else -> DARK_MODE_CSS_RULES_CLASSIC
+        }
+        val css = rulesList.joinToString("\n")
+        val styleTag = "<style id=\"yamibo-dark-mode\">\n$css\n</style>"
+        return when {
+            html.contains("</head>") -> html.replace("</head>", "$styleTag</head>")
+            html.contains("<head>") -> html.replace("<head>", "<head>$styleTag")
+            html.contains("<html>") -> html.replace("<html>", "<html><head>$styleTag</head>")
+            html.contains("<body") -> html.replace("<body", "$styleTag<body")
+            else -> "$styleTag$html"
+        }
+    }
+
+    fun injectLightModeCssIntoHtml(html: String, themeId: Int = 0): String {
+        val rulesList = when (themeId) {
+            else -> LIGHT_MODE_CSS_RULES_MODERN_WHITE
+        }
+        val css = rulesList.joinToString("\n")
+        val styleTag = "<style id=\"yamibo-light-mode\">\n$css\n</style>"
+        return when {
+            html.contains("</head>") -> html.replace("</head>", "$styleTag</head>")
+            html.contains("<head>") -> html.replace("<head>", "<head>$styleTag")
+            html.contains("<html>") -> html.replace("<html>", "<html><head>$styleTag</head>")
+            html.contains("<body") -> html.replace("<body", "$styleTag<body")
+            else -> "$styleTag$html"
+        }
+    }
+
+    fun getThemeSetJs(isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
+        val darkJs = getDarkModeSetJs(isDark, darkThemeId)
+        val lightJs = getLightModeSetJs(!isDark && lightThemeId > 0, lightThemeId)
+        return "$darkJs\n$lightJs"
+    }
+
+    fun injectThemeCssIntoHtml(html: String, isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
+        return when {
+            isDark -> injectDarkModeCssIntoHtml(html, darkThemeId)
+            lightThemeId > 0 -> injectLightModeCssIntoHtml(html, lightThemeId)
+            else -> html
+        }
+    }
+
+    val SEARCH_DIRECT_NAV_JS = """
+        (function() {
+            if (window.__yamiboSearchNav) return;
+            window.__yamiboSearchNav = true;
+
+            // 事件委托在 document 上，避免导航后 DOM 替换导致监听丢失
+            document.addEventListener('submit', function(e) {
+                var form = e.target;
+                if (!form || !form.classList.contains('searchform')) return;
+                if (!/search\.php/.test(window.location.href)) return;
+
+                var input = document.getElementById('scform_srchtxt');
+                if (!input) return;
+
+                var keyword = input.value.trim();
+                if (!keyword) return;
+
+                // 包含中文或空白字符则不匹配（必须是纯网址）
+                if (/[一-鿿㐀-䶿豈-﫿\s]/.test(keyword)) return;
+
+                var url = null;
+
+                // 只匹配帖子网址:
+                // https://bbs.yamibo.com/forum.php?mod=viewthread&tid=XXX...
+                // https://m.yamibo.com/forum.php?mod=viewthread&tid=XXX...
+                if (/^https?:\/\/(bbs|m)\.yamibo\.com\/forum\.php\?mod=viewthread&tid=\d+/.test(keyword)) {
+                    url = keyword.replace(/&highlight=[^&]*/g, '');
+                }
+
+                // https://bbs.yamibo.com/thread-XXX-X-X.html
+                if (!url && /^https?:\/\/(bbs|m)\.yamibo\.com\/thread-\d+-\d+-\d+\.html$/.test(keyword)) {
+                    url = keyword;
+                }
+
+                if (url && window.AndroidSearchNav) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.AndroidSearchNav.navigateToPost(url);
+                }
+            }, true);
+        })();
+    """.trimIndent()
+
+    val BBS_COMMIT_BOOTSTRAP_JS by lazy {
+        combineJs(
+            "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
+            "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val BBS_MANGA_REINJECT_JS by lazy {
+        combineJs(
+            "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
+            "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val OTHER_COMMIT_BOOTSTRAP_JS by lazy {
+        combineJs(
+            "OTHER_WEB_INIT_PSWP_JS" to OTHER_WEB_INIT_PSWP_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val MINE_COMMIT_BOOTSTRAP_JS by lazy {
+        combineJs(
+            "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val MINE_MANGA_REINJECT_JS by lazy {
+        combineJs(
+            "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val MANGA_BOOTSTRAP_JS by lazy {
+        combineJs(
+            "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
+            "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
+        )
+    }
+
+    val RELOAD_BROKEN_IMAGES_JS = """
+        (function(){
+            var imgs = document.querySelectorAll('img');
+            for(var i=0; i<imgs.length; i++) {
+                var img = imgs[i];
+                if(!img.complete || typeof img.naturalWidth === 'undefined' || img.naturalWidth === 0 || img.style.opacity === '0') {
+                    img.onload = function() {
+                        this.style.transition = 'opacity 0.2s ease-in';
+                        this.style.opacity = '1';
+                    };
+                    var src = img.src;
+                    img.src = '';
+                    img.src = src;
+                }
+            }
+        })();
+    """.trimIndent()
+
+}
