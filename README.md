@@ -62,7 +62,12 @@
 
 ## 许可协议
 
-本项目依据 [GNU AGPL-3.0](LICENSE) 发布，版权信息见 [NOTICE](NOTICE)。
+本项目依据 [GNU AGPL-3.0](LICENSE) 发布。
+
+相关项目：
+
+- [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)
+- [flben233/YamiboReader](https://github.com/flben233/YamiboReader)
 
 ## 反馈与贡献
 
