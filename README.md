@@ -4,10 +4,12 @@
   <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="120" alt="300 Lite">
 </p>
 
+
 <p align="center">
   <strong>300 Lite</strong><br>
   面向百合会论坛的非官方 Android 阅读客户端
 </p>
+
 
 > [!IMPORTANT]
 > YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
@@ -40,6 +42,7 @@
   <img src="screenshots/5.png" width="19%" alt="应用设置">
 </p>
 
+
 <p align="center">
   <img src="screenshots/6.png" width="19%" alt="浏览历史">
   <img src="screenshots/7.png" width="19%" alt="漫画阅读">
@@ -47,6 +50,7 @@
   <img src="screenshots/9.png" width="19%" alt="小说阅读">
   <img src="screenshots/10.png" width="19%" alt="小说阅读设置">
 </p>
+
 
 ## 构建
 
@@ -68,7 +72,9 @@
 
 - [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)
 - [flben233/YamiboReader](https://github.com/flben233/YamiboReader)
+- [duck123ducker/yamibo_manga_reader](https://github.com/duck123ducker/yamibo_manga_reader)（参考）
 
 ## 反馈与贡献
 
 欢迎通过 [GitHub Issue](https://github.com/KrelinnBios/YamiboReaderLite/issues) 提交使用问题、兼容性问题、功能建议或其他改进建议。
+
