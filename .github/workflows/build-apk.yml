@@ -1,25 +1,13 @@
-name: Build Debug APK
+name: Build APK
 
 on:
   workflow_dispatch:
-    inputs:
-      version_name:
-        description: Version name for a manual build
-        required: true
-        default: "1.0.0"
-      version_code:
-        description: Increasing Android versionCode for a manual build
-        required: true
-        default: "3"
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
   group: build-apk-${{ github.ref }}
@@ -30,128 +18,49 @@ jobs:
     name: Build debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Configure Android SDK
-        shell: bash
-        run: |
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          if [[ ! -d "$SDK_ROOT" ]]; then
-            echo "::error::Android SDK not found on runner."
-            exit 1
-          fi
-
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
-          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install Android SDK 34
-        shell: bash
-        run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Resolve Android version
-        id: version
-        shell: bash
-        env:
-          MANUAL_VERSION_NAME: ${{ inputs.version_name }}
-          MANUAL_VERSION_CODE: ${{ inputs.version_code }}
-          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [[ -n "$RELEASE_TAG_NAME" ]]; then
-            version_name="${RELEASE_TAG_NAME#v}"
-          elif [[ "$REF_NAME" == v* ]]; then
-            version_name="${REF_NAME#v}"
-          else
-            version_name="$MANUAL_VERSION_NAME"
-            version_code="$MANUAL_VERSION_CODE"
-          fi
-
-          if [[ "$version_name" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
-            major="${BASH_REMATCH[1]}"
-            minor="${BASH_REMATCH[2]}"
-            patch="${BASH_REMATCH[3]}"
-            version_code=$((major * 1000000 + minor * 1000 + patch))
-          elif [[ -n "$RELEASE_TAG_NAME" || "$REF_NAME" == v* ]]; then
-            echo "::error::Release tag must use vMAJOR.MINOR.PATCH format."
-            exit 1
-          else
-            version_code="$MANUAL_VERSION_CODE"
-          fi
-
-          if [[ ! "$version_code" =~ ^[1-9][0-9]*$ ]] || (( version_code > 2100000000 )); then
-            echo "::error::versionCode must be between 1 and 2100000000."
-            exit 1
-          fi
-
-          echo "name=$version_name" >> "$GITHUB_OUTPUT"
-          echo "code=$version_code" >> "$GITHUB_OUTPUT"
-
-      - name: Validate signing secrets
-        shell: bash
-        run: |
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Required GitHub Actions secret $name is missing."
-              exit 1
-            fi
-          done
-
-      - name: Restore signing keystore
-        shell: bash
-        run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yamibo-stable-signing.jks"
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/yamibo-stable-signing.jks" >> "$GITHUB_ENV"
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: |
-          ./gradlew --no-daemon assembleDebug \
-            -PAPP_VERSION_NAME="${{ steps.version.outputs.name }}" \
-            -PAPP_VERSION_CODE="${{ steps.version.outputs.code }}"
+        run: ./gradlew --no-daemon assembleDebug
 
       - name: Prepare APK
         shell: bash
         run: |
           mkdir -p release
-          cp "app/build/outputs/apk/debug/300 Lite.apk" \
-            "release/300 Lite.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk release/300-Lite-debug.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: 300 Lite-debug-v${{ steps.version.outputs.name }}
-          path: release/300 Lite.apk
+          name: 300-Lite-debug-${{ github.run_number }}
+          path: release/300-Lite-debug.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Attach APK to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v3
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: release/300 Lite.apk
+          files: release/300-Lite-debug.apk
+          generate_release_notes: true
