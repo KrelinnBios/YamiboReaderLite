@@ -18,15 +18,15 @@ val appUpdateUrl = buildValue(
 )!!
 val appVersionName = buildValue("APP_VERSION_NAME", "1.0.0")!!
 val appVersionCode = buildValue("APP_VERSION_CODE", "3")!!.toInt()
-val releaseKeystorePath = buildValue("ANDROID_KEYSTORE_PATH")
-val releaseKeyAlias = buildValue("ANDROID_KEY_ALIAS")
-val releaseKeyPassword = buildValue("ANDROID_KEY_PASSWORD")
-val releaseStorePassword = buildValue("ANDROID_STORE_PASSWORD")
-val hasReleaseSigning = listOf(
-    releaseKeystorePath,
-    releaseKeyAlias,
-    releaseKeyPassword,
-    releaseStorePassword
+val signingKeystorePath = buildValue("ANDROID_KEYSTORE_PATH")
+val signingKeyAlias = buildValue("ANDROID_KEY_ALIAS")
+val signingKeyPassword = buildValue("ANDROID_KEY_PASSWORD")
+val signingStorePassword = buildValue("ANDROID_STORE_PASSWORD")
+val hasStableSigning = listOf(
+    signingKeystorePath,
+    signingKeyAlias,
+    signingKeyPassword,
+    signingStorePassword
 ).all { !it.isNullOrBlank() }
 
 android {
@@ -34,12 +34,12 @@ android {
     compileSdk = 34
 
     signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseStorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+        if (hasStableSigning) {
+            create("stable") {
+                storeFile = file(signingKeystorePath!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
             }
         }
     }
@@ -67,9 +67,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.findByName("stable")
+        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("release")
+            signingConfig = signingConfigs.findByName("stable")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

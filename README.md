@@ -36,7 +36,9 @@
 
 当前仓库发布的是普通 debug APK，用于自用和测试，不面向应用商店发布。
 
-由于 debug APK 使用调试签名，若你本机已安装的是不同签名的旧版本，Android 可能不允许直接覆盖安装，此时需要先卸载旧版再安装新版。
+当前工作流会使用固定签名构建 debug APK。安装过同签名版本后，后续更新可直接覆盖安装。
+
+如果你手机里已经安装的是更早期的不同签名版本，首次切换到当前固定签名版本时，Android 仍可能提示签名冲突，此时需要先卸载旧版再安装一次；之后的更新可正常覆盖。
 
 系统要求：Android 7.0（API 24）及以上。
 
@@ -70,6 +72,19 @@
 
 GitHub Actions 工作流同样会构建 `debug` APK，并将产物命名为 `300 Lite.apk`。
 
+默认支持以下触发方式：
+
+- 手动运行 `Build Debug APK` workflow
+- 推送 `v*` 标签
+- 发布 GitHub Release
+
+如果通过 GitHub Actions 构建固定签名 APK，需要在仓库 Secrets 中配置：
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+- `ANDROID_STORE_PASSWORD`
+
 ## 内容边界
 
 本项目与百合会论坛运营方无隶属关系，请遵守论坛规则及所在地法律法规。
@@ -87,4 +102,3 @@ GitHub Actions 工作流同样会构建 `debug` APK，并将产物命名为 `300
 ## 反馈与贡献
 
 欢迎通过 [GitHub Issue](https://github.com/KrelinnBios/YamiboReaderLite/issues) 提交使用问题、兼容性问题、功能建议或其他改进建议。
-
