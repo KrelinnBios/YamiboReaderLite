@@ -1,4 +1,4 @@
-﻿﻿package org.shirakawatyu.yamibo.novel.util.theme
+package org.shirakawatyu.yamibo.novel.util.theme
 
 val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === CSS 鍙橀噺瑕嗙洊 === */",
@@ -228,4 +228,3 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === PhotoSwipe鎸夐挳 === */",
     ".pswp__button, .pswp__button:hover, .pswp__button:active { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }"
 )
-
