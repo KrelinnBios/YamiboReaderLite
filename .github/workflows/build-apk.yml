@@ -11,6 +11,9 @@ on:
         description: Increasing Android versionCode for a manual build
         required: true
         default: "3"
+  push:
+    tags:
+      - "v*"
   release:
     types:
       - published
@@ -73,19 +76,26 @@ jobs:
           MANUAL_VERSION_NAME: ${{ inputs.version_name }}
           MANUAL_VERSION_CODE: ${{ inputs.version_code }}
           RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ -n "$RELEASE_TAG_NAME" ]]; then
             version_name="${RELEASE_TAG_NAME#v}"
-            if [[ ! "$version_name" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
-              echo "::error::Release tag must use vMAJOR.MINOR.PATCH format."
-              exit 1
-            fi
+          elif [[ "$REF_NAME" == v* ]]; then
+            version_name="${REF_NAME#v}"
+          else
+            version_name="$MANUAL_VERSION_NAME"
+            version_code="$MANUAL_VERSION_CODE"
+          fi
+
+          if [[ "$version_name" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
             major="${BASH_REMATCH[1]}"
             minor="${BASH_REMATCH[2]}"
             patch="${BASH_REMATCH[3]}"
             version_code=$((major * 1000000 + minor * 1000 + patch))
+          elif [[ -n "$RELEASE_TAG_NAME" || "$REF_NAME" == v* ]]; then
+            echo "::error::Release tag must use vMAJOR.MINOR.PATCH format."
+            exit 1
           else
-            version_name="$MANUAL_VERSION_NAME"
             version_code="$MANUAL_VERSION_CODE"
           fi
 
