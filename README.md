@@ -84,6 +84,29 @@ GitHub Actions 工作流同样会构建 `debug` APK，并将产物命名为 `300
 - `ANDROID_KEY_PASSWORD`
 - `ANDROID_STORE_PASSWORD`
 
+如果你还没有自己的签名文件，可以先本地生成一把长期使用的 keystore：
+
+```bash
+keytool -genkeypair -v -keystore yamibo-stable.jks -alias yamibo -keyalg RSA -keysize 2048 -validity 36500
+```
+
+然后把 `yamibo-stable.jks` 转成 Base64，再填入 `ANDROID_KEYSTORE_BASE64`。
+
+Windows PowerShell 示例：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("yamibo-stable.jks")) | Set-Clipboard
+```
+
+各 Secrets 的对应关系如下：
+
+- `ANDROID_KEYSTORE_BASE64`：`yamibo-stable.jks` 的 Base64 内容
+- `ANDROID_KEY_ALIAS`：例如 `yamibo`
+- `ANDROID_KEY_PASSWORD`：key 密码
+- `ANDROID_STORE_PASSWORD`：keystore 密码
+
+请长期保管同一把 keystore 和密码。只要后续构建一直使用同一套签名，应用更新就可以直接覆盖安装。
+
 ## 内容边界
 
 本项目与百合会论坛运营方无隶属关系，请遵守论坛规则及所在地法律法规。
