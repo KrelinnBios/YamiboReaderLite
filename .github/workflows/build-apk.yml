@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Debug APK
 
 on:
   workflow_dispatch:
@@ -24,14 +24,9 @@ concurrency:
 
 jobs:
   build:
-    name: Build signed release APK
+    name: Build debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -51,22 +46,6 @@ jobs:
 
       - name: Install Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Validate signing secrets
-        shell: bash
-        run: |
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Required GitHub Actions secret $name is missing."
-              exit 1
-            fi
-          done
-
-      - name: Restore release keystore
-        shell: bash
-        run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/yamibo-release.jks"
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/yamibo-release.jks" >> "$GITHUB_ENV"
 
       - name: Resolve Android version
         id: version
@@ -101,31 +80,23 @@ jobs:
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
-      - name: Build signed release APK
+      - name: Build debug APK
         run: |
-          ./gradlew --no-daemon assembleRelease \
+          ./gradlew --no-daemon assembleDebug \
             -PAPP_VERSION_NAME="${{ steps.version.outputs.name }}" \
             -PAPP_VERSION_CODE="${{ steps.version.outputs.code }}"
-
-      - name: Verify APK signature
-        shell: bash
-        run: |
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify \
-            --verbose \
-            --print-certs \
-            "app/build/outputs/apk/release/300 Lite.apk"
 
       - name: Prepare APK
         shell: bash
         run: |
           mkdir -p release
-          cp "app/build/outputs/apk/release/300 Lite.apk" \
+          cp "app/build/outputs/apk/debug/300 Lite.apk" \
             "release/300 Lite.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: 300 Lite-v${{ steps.version.outputs.name }}
+          name: 300 Lite-debug-v${{ steps.version.outputs.name }}
           path: release/300 Lite.apk
           if-no-files-found: error
           retention-days: 30
