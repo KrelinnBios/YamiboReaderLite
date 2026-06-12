@@ -27,8 +27,6 @@ class SettingsUtil {
         private val dnsEnabledKey = stringPreferencesKey("dns_optimization_enabled")
         private val dnsModeKey = stringPreferencesKey("dns_optimization_mode")
         private val darkModeKey = stringPreferencesKey("dark_mode")
-        private val darkModeThemeKey = stringPreferencesKey("dark_mode_theme")
-        private val lightModeThemeKey = stringPreferencesKey("light_mode_theme")
         private val customDnsUrlKey = stringPreferencesKey("custom_dns_url")
         private val skipVersionKey = stringPreferencesKey("skip_version")
         fun saveSettings(settings: ReaderSettings) {
@@ -160,16 +158,6 @@ class SettingsUtil {
                 callback("")
             })
         }
-        fun saveDarkModeTheme(themeId: Int) {
-            DataStoreUtil.addData(themeId.toString(), darkModeThemeKey)
-        }
-        fun getDarkModeTheme(callback: (Int) -> Unit) {
-            DataStoreUtil.getData(darkModeThemeKey, callback = {
-                callback(it.toIntOrNull() ?: 0)
-            }, onNull = {
-                callback(0)
-            })
-        }
         fun saveDarkMode(enabled: Boolean) {
             DataStoreUtil.addData(enabled.toString(), darkModeKey)
         }
@@ -178,16 +166,6 @@ class SettingsUtil {
                 callback(it.toBooleanStrictOrNull() ?: false)
             }, onNull = {
                 callback(false)
-            })
-        }
-        fun saveLightModeTheme(themeId: Int) {
-            DataStoreUtil.addData(themeId.toString(), lightModeThemeKey)
-        }
-        fun getLightModeTheme(callback: (Int) -> Unit) {
-            DataStoreUtil.getData(lightModeThemeKey, callback = {
-                callback(it.toIntOrNull() ?: 0)
-            }, onNull = {
-                callback(0)
             })
         }
         fun saveSkipVersion(version: String) {

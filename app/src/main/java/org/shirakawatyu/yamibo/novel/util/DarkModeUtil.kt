@@ -74,58 +74,6 @@ data class DarkThemeColors(
             tertiary = Color(0xFF223247),
             onSecondary = Color(0xFFD7E3F1),
         )
-
-        val OKLCH = DarkThemeColors(
-            statusBar = Color(0xFF13191F),
-            navBar = Color(0xFF13191F),
-            background = Color(0xFF0F1419),
-            surface = Color(0xFF191F26),
-            surfaceVariant = Color(0xFF20262E),
-            primary = Color(0xFFCC7755),
-            onPrimary = Color(0xFFFFFFFF),
-            onBackground = Color(0xFFBCC0C6),
-            onSurface = Color(0xFFBCC0C6),
-            onSurfaceVariant = Color(0xFF8A8F95),
-            outline = Color(0xFF495058),
-            tertiary = Color(0xFF191F26),
-            onSecondary = Color(0xFFBCC0C6),
-        )
-
-        val OLED = DarkThemeColors(
-            statusBar = Color(0xFF000000),
-            navBar = Color(0xFF080808),
-            background = Color(0xFF000000),
-            surface = Color(0xFF121212),
-            surfaceVariant = Color(0xFF1A1A1A),
-            primary = Color(0xFFCC7755),
-            onPrimary = Color(0xFFFFFFFF),
-            onBackground = Color(0xFFB3B3B3),
-            onSurface = Color(0xFFB3B3B3),
-            onSurfaceVariant = Color(0xFF808080),
-            outline = Color(0xFF2A2A2A),
-            tertiary = Color(0xFF121212),
-            onSecondary = Color(0xFFB3B3B3),
-        )
-
-        val TWILIGHT = DarkThemeColors(
-            statusBar = Color(0xFF191925),
-            navBar = Color(0xFF191925),
-            background = Color(0xFF15151F),
-            surface = Color(0xFF1E1E2E),
-            surfaceVariant = Color(0xFF252535),
-            primary = Color(0xFFB983C5),
-            onPrimary = Color(0xFFFAF5FF),
-            onBackground = Color(0xFFBEBCC4),
-            onSurface = Color(0xFFBEBCC4),
-            onSurfaceVariant = Color(0xFF89868F),
-            outline = Color(0xFF3E394C),
-            tertiary = Color(0xFF1E1E2E),
-            onSecondary = Color(0xFFBEBCC4),
-        )
-
-        fun forTheme(themeId: Int) = when (themeId) {
-            else -> CLASSIC
-        }
     }
 }
 
@@ -179,10 +127,6 @@ data class LightThemeColors(
             tertiary = Color(0xFFEEF2F6),
             onSecondary = Color(0xFF111827),
         )
-
-        fun forTheme(themeId: Int) = when (themeId) {
-            else -> MODERN_WHITE
-        }
     }
 }
 
