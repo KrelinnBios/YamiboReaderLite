@@ -39,12 +39,22 @@ class BottomNavBarVM : ViewModel() {
         val targetRoute = pageList[index]
         val routeChanged = currentRoute != targetRoute
         if (routeChanged) {
-            navController.navigate(targetRoute) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+            showBottomNavBar = true
+            val isTransientWebRoute =
+                currentRoute?.startsWith("MangaWebPage") == true ||
+                        currentRoute?.startsWith("ReaderWebPage") == true ||
+                        currentRoute?.startsWith("OtherWebPage") == true
+            val returnedToExistingDestination =
+                isTransientWebRoute && navController.popBackStack(targetRoute, inclusive = false)
+
+            if (!returnedToExistingDestination) {
+                navController.navigate(targetRoute) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = !isTransientWebRoute
+                    }
+                    launchSingleTop = true
+                    restoreState = true
                 }
-                launchSingleTop = true
-                restoreState = true
             }
         }
         if (!notifyHome) return

@@ -99,9 +99,10 @@ fun MangaHomePage(
         if (isDarkMode) classicDarkColors.outline.copy(alpha = 0.85f)
         else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
     val selectedSectionColor =
-        if (isDarkMode) classicDarkColors.surface else MaterialTheme.colorScheme.surface
+        if (isDarkMode) classicDarkColors.primary.copy(alpha = 0.32f)
+        else MaterialTheme.colorScheme.surface
     val selectedSectionContentColor =
-        if (isDarkMode) classicDarkColors.onSurface else MaterialTheme.colorScheme.onSurface
+        if (isDarkMode) Color.White else MaterialTheme.colorScheme.onSurface
     val unselectedSectionContentColor =
         if (isDarkMode) classicDarkColors.onSurfaceVariant
         else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)

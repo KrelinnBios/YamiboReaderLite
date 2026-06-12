@@ -136,10 +136,15 @@ object ReaderReturnBridge {
 
     /** 给百合会论坛链接补上 mobile=2，强制走 Discuz 手机版模板（PC 端 cookie 也会被覆盖）。 */
     fun forceMobileTemplate(url: String): String {
-        if (!url.contains("yamibo.com")) return url
-        if (Regex("[?&]mobile=").containsMatchIn(url)) return url
+        if (!url.contains("yamibo.com", ignoreCase = true)) return url
         val base = url.substringBefore("#")
         val fragment = url.substring(base.length)
+        val mobileParam = Regex("([?&])mobile=[^&#]*", RegexOption.IGNORE_CASE)
+        if (mobileParam.containsMatchIn(base)) {
+            return mobileParam.replace(base) { match ->
+                "${match.groupValues[1]}mobile=2"
+            } + fragment
+        }
         val sep = if (base.contains("?")) "&" else "?"
         return "$base${sep}mobile=2$fragment"
     }

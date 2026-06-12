@@ -43,28 +43,39 @@ object PageJsScripts {
             var style = document.createElement('style');
             style.id = 'carousel-fix-style';
             style.innerHTML = `
-                .swiper-wrapper {
+                .slidebox .swiper-wrapper,
+                .scrool_img .swiper-wrapper,
+                .slide .swiper-wrapper,
+                #slide .swiper-wrapper,
+                .img_slide .swiper-wrapper {
                     display: flex !important;
                     flex-direction: row !important;
                     flex-wrap: nowrap !important;
                 }
-                .swiper-slide, .slidebox, .scrool_img, .slide, #slide, .img_slide {
+                .slidebox .swiper-slide,
+                .scrool_img .swiper-slide,
+                .slide .swiper-slide,
+                #slide .swiper-slide,
+                .img_slide .swiper-slide {
                     width: 100% !important;
                     flex-shrink: 0 !important;
                     aspect-ratio: 363 / 126 !important;
                     background-color: rgba(212, 200, 176, 0.2) !important;
                     display: block !important;
                     box-sizing: border-box !important;
+                    visibility: visible !important;
                 }
-                #dhnavs .swiper-slide, #dhnavs_li .swiper-slide {
-                    width: auto !important;
-                    aspect-ratio: auto !important;
-                    background-color: transparent !important;
-                }
-                .swiper-slide img, .slidebox img, .scrool_img img, .slide img, #slide img, .img_slide img {
+                .slidebox img,
+                .scrool_img img,
+                .slide img,
+                #slide img,
+                .img_slide img {
                     width: 100% !important;
                     height: 100% !important;
                     object-fit: cover !important;
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
                 }
             `;
             if(document.head) document.head.appendChild(style);

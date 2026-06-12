@@ -322,7 +322,9 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
         if (request?.isForMainFrame == false &&
             request.method == "GET" &&
             urlStr.contains("yamibo.com") &&
-            isImage
+            isImage &&
+            org.shirakawatyu.yamibo.novel.util.WebViewImagePolicy
+                .shouldProxyForumAttachment(urlStr)
         ) {
             if (!urlStr.contains("smiley") &&
                 !urlStr.contains("avatar") &&

@@ -140,6 +140,7 @@ import org.shirakawatyu.yamibo.novel.util.manga.MangaReaderManager
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.manga.ZoomPanGestureHandler
 import org.shirakawatyu.yamibo.novel.util.manga.verticalMangaZoomGesture
+import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import java.net.URLEncoder
 
 private val SpecialChapterRegex =
@@ -326,8 +327,10 @@ fun NativeMangaPage(
         if (previousRoute?.startsWith("MangaWebPage") == true || previousRoute == "BBSPage" || previousRoute == "MinePage" || previousRoute?.startsWith("MineHistoryPostPage") == true) {
             navController.navigateUp()
         } else {
-            val encodedChapterUrl = URLEncoder.encode(url, "utf-8")
-            val encodedOriginalUrl = URLEncoder.encode(originalUrl, "utf-8")
+            val encodedChapterUrl =
+                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(url), "utf-8")
+            val encodedOriginalUrl =
+                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(originalUrl), "utf-8")
             navController.navigate("MangaWebPage/$encodedChapterUrl/$encodedOriginalUrl?fastForward=true&initialPage=0") {
                 navController.currentDestination?.id?.let { currentId ->
                     popUpTo(currentId) {

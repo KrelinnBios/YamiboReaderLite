@@ -50,7 +50,9 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".tabs a.mon, .dhnv a.mon, #dhnav_li li.mon { border-bottom-color: #666666 !important; }",
     ".dhnavs_box, #dhnavs { background: #121b27 !important; }",
     "#dhnavs .swiper-slide a { color: #acbed1 !important; }",
-    "#dhnavs .swiper-slide.mon a { color: #ffffff !important; }",
+    "#dhnavs .swiper-slide.mon, #dhnavs .swiper-slide.active, #dhnavs .swiper-slide[aria-selected=\"true\"] { background-color: #274766 !important; border-radius: 999px !important; box-shadow: inset 0 -3px #4ea1ff !important; }",
+    "#dhnavs .swiper-slide.mon a, #dhnavs .swiper-slide.active a, #dhnavs .swiper-slide[aria-selected=\"true\"] a { color: #ffffff !important; font-weight: 700 !important; }",
+    ".dhnav_box .mon, #dhnav .mon, #dhnav_li li.mon, .tabs a.mon, .dhnv a.mon { background-color: #274766 !important; color: #ffffff !important; border-bottom-color: #4ea1ff !important; }",
     "/* === 璁哄潧鍒楄〃瀹瑰櫒 === */",
     ".forumlist, .forumlist > div, .forumlist .mlist1 { background: #0d141d !important; }",
     ".forumlist .subforumshow { background: #121b27 !important; }",
@@ -160,7 +162,6 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".showcollapse_content a { color: #7dbdf2 !important; }",
     ".showcollapse_gather { color: #8099b2 !important; }",
     "/* === 甯栧瓙鍐呰仈楂樹寒 (瑕嗙洊 inline style) 寮哄埗娓呴櫎鍙戝笘浜鸿嚜甯﹀簳鑹?=== */",
-    ".message *[style*=\"background\" i] { background-color: transparent !important; }",
     "font[color] { color: #c7d8ea !important; }",
     "font[color=\"#ff0000\" i], font[color=\"red\" i] { color: #ff6666 !important; }",
     "/* === 甯栧瓙搴曢儴鎿嶄綔鏍?(璇勫垎/鐐硅瘎)  & 鍒楄〃椤瑰簳閮ㄤ俊鎭?=== */",
@@ -242,5 +243,13 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "#scbar_type, #scbar_type.showmenu { color: #acbed1 !important; }",
     "#scbar_txt { background-color: #223247 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
     "#scbar_txt::placeholder { color: #8099b2 !important; }",
-    "#scbar_btn { background-color: #274766 !important; border-color: #4b6a8f !important; }"
-)
+    "#scbar_btn { background-color: #274766 !important; border-color: #4b6a8f !important; }",
+    "/* === Desktop Discuz fallback pages and profile pages === */",
+    "#nv_forum, #nv_home, #nv_portal, .ct2, .ct3, .mn, .sd, #uhd, .h, .tns, .pf_l, .xld, .xlda, .ml, .buddy, .fl, .fl_tb, .fl_row, .fl_g, .fl_i, .fl_by, #chart, .chart, .ptm, .pbm, .mbm { color: #c7d8ea !important; }",
+    ".ct2 a, .ct3 a, .mn a, .sd a, #uhd a, .h a, .tns a, .pf_l a, .xld a, .xlda a, .ml a, .buddy a, .fl a, .fl_tb a, .fl_row a, .fl_g a, .fl_i a, .fl_by a, #chart a, .chart a { color: #7dbdf2 !important; }",
+    ".ct2 .xg1, .ct3 .xg1, .fl .xg1, .fl_i, .fl_by, .tns th, .tns td, .pf_l li, .xld dd, .xlda dd { color: #95acc4 !important; }",
+    ".fl_tb, .fl_tb td, .fl_tb th, .fl_row, #uhd, .tns, .pf_l, .xld, .xlda { border-color: #274766 !important; }"
+).map { rule ->
+    // Keep site-supplied background images while changing only their backing color.
+    rule.replace("background:", "background-color:")
+}
