@@ -123,7 +123,6 @@ import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
-import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
@@ -1504,17 +1503,7 @@ fun MinePage(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .then(blockModifier),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            if (isLoading && !isPullRefreshing && !shouldBlockOldWebContent) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = darkModeColor(YamiboColors.secondary, YamiboColors.secondaryDark)
+                        .then(blockModifier)
                 )
             }
 

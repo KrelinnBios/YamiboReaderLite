@@ -51,6 +51,18 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun koreanTitleWithUpperPartSuffixKeepsBookNameAndChapterOrder() {
+        val title =
+            "[个人汉化][Willow（윌로우）]장마에서 살아남는 방법（从梅雨中活下来的方法）上篇"
+
+        assertEquals(
+            "장마에서 살아남는 방법（从梅雨中活下来的方法）",
+            MangaTitleCleaner.getCleanBookName(title)
+        )
+        assertEquals(0.1f, MangaTitleCleaner.extractChapterNum(title))
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))

@@ -226,6 +226,60 @@ fun FavoritePage(
     var showTopToast by remember { mutableStateOf(false) }
     var newItemsCount by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
+    val openMangaFavorite: (Favorite) -> Unit =
+        remember(context, navController, coroutineScope) {
+            { favorite ->
+                val targetUrl = favorite.lastMangaUrl ?: favorite.url
+                val encodedTarget = java.net.URLEncoder.encode(targetUrl, "utf-8")
+                val encodedOriginal = java.net.URLEncoder.encode(favorite.url, "utf-8")
+                probingUrl = targetUrl
+                probingJob = coroutineScope.launch {
+                    MangaProber().probeUrl(
+                        context = context,
+                        url = targetUrl,
+                        forceRefresh = true,
+                        onSuccess = { urls, title, html ->
+                            val normalizedUrls = urls
+                                .map { it.trim() }
+                                .filter { it.isNotBlank() }
+                                .distinct()
+                            val targetIndex = favorite.lastPage.coerceIn(
+                                0,
+                                maxOf(0, normalizedUrls.size - 1)
+                            )
+
+                            MangaImagePipeline.handoffPrefetch(
+                                context = context.applicationContext,
+                                urls = normalizedUrls,
+                                clickedIndex = targetIndex
+                            )
+
+                            GlobalData.tempMangaUrls = normalizedUrls
+                            GlobalData.tempHtml = html
+                            GlobalData.tempTitle = title
+                            GlobalData.tempMangaIndex = targetIndex
+
+                            navController.navigate(
+                                "NativeMangaPage?url=$encodedTarget&originalUrl=$encodedOriginal"
+                            )
+                            coroutineScope.launch {
+                                delay(300)
+                                probingUrl = null
+                                probingJob = null
+                            }
+                        },
+                        onFallback = {
+                            navController.navigate(
+                                "MangaWebPage/$encodedTarget/$encodedOriginal" +
+                                        "?fastForward=false&initialPage=${favorite.lastPage}"
+                            )
+                            probingUrl = null
+                            probingJob = null
+                        }
+                    )
+                }
+            }
+        }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -638,93 +692,45 @@ fun FavoritePage(
                     items = searchedFavoriteList,
                     key = { _, item -> item.url }
                 ) { _, item ->
-                    val currentOnClick = remember(item, isInManageMode) {
+                    val currentOnClick = remember(item, isInManageMode, openMangaFavorite) {
                         {
                             if (isInManageMode) {
                                 favoriteVM.toggleItemSelection(item.url)
                             } else {
-                                when (item.type) {
-                                    1 -> favoriteVM.clearNovelUpdateCheckFlag(item.url)
-                                    2 -> favoriteVM.clearMangaUpdateCheckFlag(item.url)
-                                }
-                                favoriteVM.updateStrategyBeforeNavigation(item.type)
                                 val encodedUrl = java.net.URLEncoder.encode(item.url, "utf-8")
-                                when (item.type) {
-                                    0 -> {
-                                        val knownType = when (item.sourceFid) {
-                                            "30", "37" -> 2
-                                            "49", "55", "60" -> 1
-                                            else -> 0
-                                        }
-                                        if (knownType == 1) {
+                                val openByType: (Int) -> Unit = { type ->
+                                    favoriteVM.updateStrategyBeforeNavigation(type)
+                                    when (type) {
+                                        1 -> {
+                                            favoriteVM.clearNovelUpdateCheckFlag(item.url)
                                             navController.navigate("ReaderPage/$encodedUrl")
-                                        } else if (knownType == 2) {
-                                            navController.navigate(
-                                                "MangaWebPage/$encodedUrl/$encodedUrl?fastForward=false&initialPage=${item.lastPage}"
-                                            )
-                                        } else {
-                                            probingJob = coroutineScope.launch {
-                                                when (favoriteVM.resolveFavoriteTypeForOpen(item)) {
-                                                    1 -> navController.navigate("ReaderPage/$encodedUrl")
-                                                    2 -> navController.navigate(
-                                                        "MangaWebPage/$encodedUrl/$encodedUrl?fastForward=false&initialPage=${item.lastPage}"
-                                                    )
-                                                    else -> navController.navigate("OtherWebPage/$encodedUrl")
-                                                }
-                                                probingJob = null
-                                            }
                                         }
+                                        2 -> {
+                                            favoriteVM.clearMangaUpdateCheckFlag(item.url)
+                                            openMangaFavorite(item)
+                                        }
+                                        else -> navController.navigate("OtherWebPage/$encodedUrl")
                                     }
-                                    1 -> navController.navigate("ReaderPage/$encodedUrl")
-                                    3 -> navController.navigate("OtherWebPage/$encodedUrl")
-                                    else -> {
-                                        val targetUrl = item.lastMangaUrl ?: item.url
-                                        val encodedTarget =
-                                            java.net.URLEncoder.encode(targetUrl, "utf-8")
-                                        val encodedOriginal =
-                                            java.net.URLEncoder.encode(item.url, "utf-8")
-                                        probingUrl = targetUrl
-                                        probingJob = coroutineScope.launch {
-                                            MangaProber().probeUrl(
-                                                context = context,
-                                                url = targetUrl,
-                                                forceRefresh = true,
-                                                onSuccess = { urls, title, html ->
-                                                    val normalizedUrls = urls
-                                                        .map { it.trim() }
-                                                        .filter { it.isNotBlank() }
-                                                        .distinct()
+                                }
+                                val knownType = when {
+                                    item.type != 0 -> item.type
+                                    item.sourceFid in setOf("30", "37") -> 2
+                                    item.sourceFid in setOf("49", "55", "60") -> 1
+                                    else -> 0
+                                }
 
-                                                    val targetIndex = item.lastPage.coerceIn(
-                                                        0,
-                                                        maxOf(0, normalizedUrls.size - 1)
-                                                    )
-
-                                                    MangaImagePipeline.handoffPrefetch(
-                                                        context = context.applicationContext,
-                                                        urls = normalizedUrls,
-                                                        clickedIndex = targetIndex
-                                                    )
-
-                                                    GlobalData.tempMangaUrls = normalizedUrls
-                                                    GlobalData.tempHtml = html
-                                                    GlobalData.tempTitle = title
-                                                    GlobalData.tempMangaIndex = targetIndex
-
-                                                    navController.navigate("NativeMangaPage?url=$encodedTarget&originalUrl=$encodedOriginal")
-
-                                                    coroutineScope.launch {
-                                                        delay(300)
-                                                        probingUrl = null
-                                                        probingJob = null
-                                                    }
-                                                },
-                                                onFallback = {
-                                                    navController.navigate("MangaWebPage/$encodedTarget/$encodedOriginal?fastForward=false&initialPage=${item.lastPage}")
-                                                    probingUrl = null
-                                                    probingJob = null
-                                                }
-                                            )
+                                if (knownType != 0) {
+                                    openByType(knownType)
+                                } else {
+                                    probingUrl = item.url
+                                    probingJob = coroutineScope.launch {
+                                        val resolvedType = favoriteVM.resolveFavoriteTypeForOpen(item)
+                                        if (resolvedType == 2) {
+                                            openByType(resolvedType)
+                                        } else {
+                                            probingUrl = null
+                                            openByType(resolvedType)
+                                            probingJob = null
                                         }
                                     }
                                 }
