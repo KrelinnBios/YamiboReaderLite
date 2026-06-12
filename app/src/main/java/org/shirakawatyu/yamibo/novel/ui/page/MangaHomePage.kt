@@ -39,6 +39,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -250,13 +252,26 @@ fun MangaHomePage(
             }
         }
 
+        val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
                 isRefreshing = true
                 mangaHomeVM.refresh()
             },
-            modifier = Modifier.fillMaxSize()
+            state = pullState,
+            modifier = Modifier.fillMaxSize(),
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = if (isDarkMode) classicDarkColors.surfaceVariant
+                    else MaterialTheme.colorScheme.surface,
+                    color = if (isDarkMode) classicDarkColors.primary
+                    else MaterialTheme.colorScheme.primary
+                )
+            }
         ) {
             when {
                 state.isLoading && state.items.isEmpty() -> {

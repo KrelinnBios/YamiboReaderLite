@@ -54,6 +54,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -607,10 +609,21 @@ fun FavoritePage(
             }
         }
 
+        val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { favoriteVM.refreshList(showLoading = true, isSmartSync = false) },
-            modifier = Modifier.weight(1f)
+            state = pullState,
+            modifier = Modifier.weight(1f),
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    containerColor = darkThemeColor(YellowLightLight) { surfaceVariant },
+                    color = darkThemeColor(YamiboColors.primary) { primary }
+                )
+            }
         ) {
 
             // 收藏列表
