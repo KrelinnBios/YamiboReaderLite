@@ -157,7 +157,10 @@ class YamiboRetrofit {
                 "http_cache_default",
                 128L * 1024 * 1024,
                 enableCache = true,
-                enableImageChecker = false
+                enableImageChecker = false,
+                // 论坛服务器偶发 HTTP/2 stream reset(PROTOCOL_ERROR)，会让接口刷新失败、
+                // 暗黑模式 HTML 代理取不到页面而回退成原色。主客户端固定走 HTTP/1.1 规避。
+                forceHttp1 = true
             )
         }
 
@@ -188,7 +191,8 @@ class YamiboRetrofit {
             cacheSize: Long,
             enableCache: Boolean,
             enableImageChecker: Boolean,
-            maxRequestsPerHost: Int = 5
+            maxRequestsPerHost: Int = 5,
+            forceHttp1: Boolean = false
         ): OkHttpClient {
             val customDispatcher = okhttp3.Dispatcher().apply {
                 this.maxRequestsPerHost = maxRequestsPerHost
@@ -197,7 +201,12 @@ class YamiboRetrofit {
                 .dispatcher(customDispatcher)
                 .dns(sharedDns)
                 .connectionPool(sharedConnectionPool)
+                .retryOnConnectionFailure(true)
                 .pingInterval(20, TimeUnit.SECONDS)
+
+            if (forceHttp1) {
+                builder.protocols(listOf(okhttp3.Protocol.HTTP_1_1))
+            }
 
             if (enableCache) {
                 val cacheDir = File(YamiboApplication.globalCacheDir, cacheDirName)
