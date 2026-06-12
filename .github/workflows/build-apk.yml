@@ -47,6 +47,20 @@ jobs:
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
+      # Release 触发时版本号必须从 tag 推导，否则 APK 永远是 build.gradle.kts 里的
+      # 默认版本（1.0.0/3），应用内更新会把新版误判为已安装版本，提示死循环。
+      - name: Derive app version from release tag
+        if: github.event_name == 'release'
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if ! [[ "$tag" =~ ^v?[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "❌ Release tag '$tag' is not a version number (expected e.g. v1.0.1)."
+            exit 1
+          fi
+          echo "APP_VERSION_NAME=${tag#v}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
       - name: Validate signing secrets
         shell: bash
         env:
