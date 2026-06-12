@@ -788,7 +788,6 @@ fun ReaderPage(
                                 if (uiState.isVerticalMode) {
                                     val effectiveAlpha = if (showSettings) 1f else headerAlpha.value
                                     VerticalModeHeader(
-                                        chapterTitle = currentChapterTitle,
                                         currentPage = currentPageIndex + 1,
                                         pageCount = uiState.htmlList.size,
                                         backgroundColor = finalBackground,
@@ -842,6 +841,33 @@ fun ReaderPage(
                         ) {
                             IconButton(onClick = exitReader) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                            }
+                            // 与漫画阅读界面一致：标题放在弹出菜单中间，不再常驻正文顶部
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = bookTitle.ifBlank {
+                                        currentChapterTitle?.takeIf { it.isNotBlank() && it != "footer" }
+                                            ?: "小说阅读"
+                                    },
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 15.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                currentChapterTitle
+                                    ?.takeIf { it.isNotBlank() && it != "footer" && bookTitle.isNotBlank() }
+                                    ?.let { chapter ->
+                                        Text(
+                                            text = chapter,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                             }
                             TextButton(
                                 onClick = {
@@ -1102,11 +1128,8 @@ private fun MainSettingsMenu(
     val hasPrevChapter = currentChapterIndex > 0
     val hasNextChapter =
         currentChapterIndex >= 0 && currentChapterIndex < uiState.chapterList.size - 1
-    val displayText = if (isVerticalMode) {
-        "${sliderPos.roundToInt()}%"
-    } else {
-        "${sliderPos.roundToInt() + 1} / $pageCount"
-    }
+    // 统一显示页数，不显示百分比
+    val displayText = "${targetPageIndex + 1} / $pageCount"
 
     Column(
         modifier = Modifier
@@ -1392,7 +1415,6 @@ private fun CompactOptionRow(
 
 @Composable
 private fun VerticalModeHeader(
-    chapterTitle: String?,
     currentPage: Int,
     pageCount: Int,
     backgroundColor: Color,
@@ -1400,9 +1422,6 @@ private fun VerticalModeHeader(
     alpha: Float = 1f
 ) {
     val chapterTitleHeight = 24.dp
-
-    val totalItems = pageCount.coerceAtLeast(1)
-    val percent = ((currentPage.toFloat() - 1) / totalItems) * 100f
 
     Surface(
         modifier = Modifier
@@ -1419,24 +1438,12 @@ private fun VerticalModeHeader(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 章节标题（左）
-            chapterTitle?.takeIf { it.isNotBlank() && it != "footer" }?.let { title ->
-                Text(
-                    text = title,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 1.dp, top = 4.dp, end = 7.dp),
-                    textAlign = TextAlign.Start
-                )
-            } ?: Spacer(modifier = Modifier.weight(1f))
+            // 标题不再常驻显示（移入点击弹出的菜单），左侧留空
+            Spacer(modifier = Modifier.weight(1f))
 
             // 页码（右）
             Text(
-                text = "${percent.roundToInt()}%",
+                text = "$currentPage/${pageCount.coerceAtLeast(1)}",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 1.dp, top = 4.dp, end = 4.dp),

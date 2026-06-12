@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.bean.MangaHomeItem
 import org.shirakawatyu.yamibo.novel.global.GlobalData
@@ -121,7 +122,11 @@ fun MangaHomePage(
     LaunchedEffect(bottomNavBarVM) {
         bottomNavBarVM.goHomeEvent.collect { route ->
             if (route == "MangaHomePage") {
-                mangaHomeVM.clearSearch()
+                // 只有确实处于搜索态才清空并重新拉取；
+                // 否则单纯切回本页不要触发网络刷新，网络波动时会把好端端的列表刷成错误页。
+                if (mangaHomeVM.uiState.value.query.isNotBlank()) {
+                    mangaHomeVM.clearSearch()
+                }
                 listState.animateScrollToItem(0)
             }
         }
@@ -316,6 +321,11 @@ fun MangaHomePage(
                                 onClick = {
                                     if (openingTid == null) {
                                         openingTid = item.tid
+                                        // 看门狗：探测请求挂死时自动解锁，否则整页列表会永久不可点击
+                                        scope.launch {
+                                            delay(12_000L)
+                                            if (openingTid == item.tid) openingTid = null
+                                        }
                                         scope.launch {
                                             MangaProber().probeUrl(
                                                 context = context,
