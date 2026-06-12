@@ -1068,14 +1068,39 @@ fun ChapterDrawerContent(
                 val isSelected = index == currentChapterIndex
                 NavigationDrawerItem(
                     label = {
-                        Text(
-                            text = chapter.title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = (index + 1).toString(),
+                                modifier = Modifier.width(48.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = chapter.title,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     },
                     selected = isSelected,
-                    onClick = { onChapterClick(chapter.startIndex) }
+                    onClick = { onChapterClick(chapter.startIndex) },
+                    badge = {
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
         }
