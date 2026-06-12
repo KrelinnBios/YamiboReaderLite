@@ -991,7 +991,11 @@ object PageJsScripts {
 
     fun getDarkModeSetJs(enable: Boolean, themeId: Int = 0): String {
         val rulesList = DARK_MODE_CSS_RULES_CLASSIC
-        val styleString = rulesList.joinToString(",\n") { "                '$it'" }
+        // 规则会被嵌进 JS 单引号字符串：必须转义反斜杠和单引号，
+        // 否则任何一条带 ' 的规则都会让整段注入脚本语法错误，暗黑切换静默失效。
+        val styleString = rulesList.joinToString(",\n") {
+            "                '${it.replace("\\", "\\\\").replace("'", "\\'")}'"
+        }
 
         return """
             (function() {
