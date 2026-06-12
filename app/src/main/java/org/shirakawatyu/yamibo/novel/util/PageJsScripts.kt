@@ -1001,11 +1001,13 @@ object PageJsScripts {
             (function() {
                 var styleId = 'yamibo-dark-mode';
                 var existing = document.getElementById(styleId);
-                // 个人空间页（个人主页/日志/相册等）是会员自己设计的（自定义背景和配色），
-                // 完全不启用暗黑模式，保持原样。
-                var isMemberSpace =
+                // 会员 DIY 空间页（从论坛点进的个人主页/日志/相册，电脑版模板）不启用暗黑模式；
+                // 但底栏「我的」是手机版个人中心（mobile=2 / mycenter=1），必须照常变深色。
+                var isMobileCenter = /mobile=2|mobile=yes|mycenter=1/.test(location.href);
+                var isMemberSpace = !isMobileCenter && (
                     (document.body && document.body.id === 'space') ||
-                    /home\.php\?mod=space|space-uid-\d+|blog-\d+/.test(location.href);
+                    /home\.php\?mod=space|space-uid-\d+|blog-\d+/.test(location.href)
+                );
                 var enable = $enable && !isMemberSpace;
                 if (!enable) {
                     if (existing) existing.remove();
