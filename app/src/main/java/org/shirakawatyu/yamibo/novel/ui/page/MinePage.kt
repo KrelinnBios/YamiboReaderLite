@@ -578,6 +578,19 @@ fun MinePage(
         )
     }
 
+    // 下拉小圆球跟随暗黑模式配色
+    LaunchedEffect(isDarkMode, swipeRefresh) {
+        swipeRefresh?.apply {
+            if (isDarkMode) {
+                setProgressBackgroundColorSchemeColor(0xFF223247.toInt())
+                setColorSchemeColors(0xFF4EA1FF.toInt())
+            } else {
+                setProgressBackgroundColorSchemeColor(0xFFFFFBE7.toInt())
+                setColorSchemeColors(0xFF551200.toInt())
+            }
+        }
+    }
+
     val rootHistoryIndex = remember { mineWebView.copyBackForwardList().currentIndex }
 
     fun resumeMineWebViewAfterChildPage() {
@@ -592,6 +605,15 @@ fun MinePage(
             mineWebView.evaluateJavascript(PageJsScripts.REMOVE_TRANSITION_STYLE_JS, null)
             mineWebView.evaluateJavascript(PageJsScripts.RELOAD_BROKEN_IMAGES_JS, null)
             mineWebView.evaluateJavascript(PageJsScripts.MINE_MANGA_REINJECT_JS, null)
+            // WebView 暂停期间 evaluateJavascript 可能被丢弃；恢复时补一次主题注入。
+            mineWebView.evaluateJavascript(
+                PageJsScripts.getThemeSetJs(
+                    GlobalData.isDarkMode.value,
+                    GlobalData.darkModeTheme.value,
+                    GlobalData.lightModeTheme.value
+                ),
+                null
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
