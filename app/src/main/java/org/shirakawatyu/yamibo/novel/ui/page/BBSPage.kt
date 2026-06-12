@@ -669,6 +669,16 @@ fun BBSPage(
             webView.evaluateJavascript(PageJsScripts.REMOVE_TRANSITION_STYLE_JS, null)
             webView.evaluateJavascript(PageJsScripts.RELOAD_BROKEN_IMAGES_JS, null)
             (webView.webViewClient as? BBSGlobalWebViewClient)?.forceInjectMangaJs(webView)
+            // WebView 暂停期间 evaluateJavascript 可能被丢弃；恢复时补一次主题注入，
+            // 否则在别的页切换暗黑模式后回到论坛页会停留在原色。
+            webView.evaluateJavascript(
+                PageJsScripts.getThemeSetJs(
+                    GlobalData.isDarkMode.value,
+                    GlobalData.darkModeTheme.value,
+                    GlobalData.lightModeTheme.value
+                ),
+                null
+            )
         } catch (e: Throwable) {
             e.printStackTrace()
         }
@@ -1028,6 +1038,32 @@ fun BBSPage(
         if (!BBSPageState.isLoading) {
             swipeRefresh?.isRefreshing = false
             isPullRefreshing = false
+        }
+    }
+
+    // 下拉刷新小圆球跟随暗黑模式配色
+    LaunchedEffect(isDarkMode, swipeRefresh) {
+        swipeRefresh?.let { layout ->
+            if (isDarkMode) {
+                layout.setProgressBackgroundColorSchemeColor(0xFF223247.toInt())
+                layout.setColorSchemeColors(0xFF4EA1FF.toInt())
+            } else {
+                layout.setProgressBackgroundColorSchemeColor(0xFFFFFFFF.toInt())
+                layout.setColorSchemeColors(0xFF551200.toInt())
+            }
+        }
+    }
+
+    // 下拉小圆球跟随暗黑模式配色
+    LaunchedEffect(isDarkMode, swipeRefresh) {
+        swipeRefresh?.apply {
+            if (isDarkMode) {
+                setProgressBackgroundColorSchemeColor(0xFF223247.toInt())
+                setColorSchemeColors(0xFF4EA1FF.toInt())
+            } else {
+                setProgressBackgroundColorSchemeColor(0xFFFFFBE7.toInt())
+                setColorSchemeColors(0xFF551200.toInt())
+            }
         }
     }
 
