@@ -9,6 +9,12 @@ on:
 permissions:
   contents: write
 
+# Run all JavaScript actions on Node.js 24 (Node 20 is deprecated on GitHub runners,
+# forced to Node 24 from 2026-06-16 and removed 2026-09-16). Belt-and-suspenders with
+# the pinned action versions below so no step falls back to the removed Node 20 runtime.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 concurrency:
   group: build-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -21,19 +27,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
@@ -84,7 +90,7 @@ jobs:
             "release/300 Lite.apk"
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: 300 Lite-${{ github.run_number }}
           path: release/300 Lite.apk
