@@ -38,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -72,6 +73,7 @@ import org.shirakawatyu.yamibo.novel.util.DarkThemeColors
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import java.net.URLEncoder
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun MangaHomePage(
     navController: NavController,
@@ -107,23 +109,17 @@ fun MangaHomePage(
         if (isDarkMode) classicDarkColors.primary.copy(alpha = 0.95f)
         else MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
 
+    var isRefreshing by remember { mutableStateOf(false) }
     LaunchedEffect(state.isLoading, state.isLoadingMore) {
         if (!state.isLoading && !state.isLoadingMore) {
-            bottomNavBarVM.finishRefresh("MangaHomePage")
+            isRefreshing = false
         }
     }
     LaunchedEffect(bottomNavBarVM) {
-        launch {
-            bottomNavBarVM.refreshEvent.collect { route ->
-                if (route == "MangaHomePage") mangaHomeVM.refresh()
-            }
-        }
-        launch {
-            bottomNavBarVM.goHomeEvent.collect { route ->
-                if (route == "MangaHomePage") {
-                    mangaHomeVM.clearSearch()
-                    listState.animateScrollToItem(0)
-                }
+        bottomNavBarVM.goHomeEvent.collect { route ->
+            if (route == "MangaHomePage") {
+                mangaHomeVM.clearSearch()
+                listState.animateScrollToItem(0)
             }
         }
     }
@@ -253,7 +249,14 @@ fun MangaHomePage(
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                mangaHomeVM.refresh()
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
             when {
                 state.isLoading && state.items.isEmpty() -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

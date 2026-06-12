@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -128,6 +129,7 @@ private const val EMPTY_STATE_CONFIRM_DELAY_MS = 1500L
  * @param favoriteVM 用于管理收藏数据的 ViewModel，默认通过 viewModel() 获取实例。
  * @param navController 导航控制器，用于跳转到其他页面。
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritePage(
     favoriteVM: FavoriteVM = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext)),
@@ -208,11 +210,6 @@ fun FavoritePage(
     val context = LocalContext.current
     val bottomNavBarVM: BottomNavBarVM =
         viewModel(viewModelStoreOwner = context as ComponentActivity)
-    LaunchedEffect(isRefreshing) {
-        if (!isRefreshing) {
-            bottomNavBarVM.finishRefresh("FavoritePage")
-        }
-    }
     var probingUrl by remember { mutableStateOf<String?>(null) }
     var probingJob by remember { mutableStateOf<Job?>(null) }
     BackHandler(enabled = probingUrl != null) {
@@ -312,20 +309,11 @@ fun FavoritePage(
     val isSearching = searchQuery.isNotBlank()
 
     LaunchedEffect(bottomNavBarVM, lazyListState) {
-        launch {
-            bottomNavBarVM.refreshEvent.collect { route ->
-                if (route == "FavoritePage") {
-                    favoriteVM.refreshList(showLoading = true, isSmartSync = false)
-                }
-            }
-        }
-        launch {
-            bottomNavBarVM.goHomeEvent.collect { route ->
-                if (route == "FavoritePage") {
-                    searchQuery = ""
-                    isSearchBarExpanded = false
-                    lazyListState.animateScrollToItem(0)
-                }
+        bottomNavBarVM.goHomeEvent.collect { route ->
+            if (route == "FavoritePage") {
+                searchQuery = ""
+                isSearchBarExpanded = false
+                lazyListState.animateScrollToItem(0)
             }
         }
     }
@@ -619,7 +607,11 @@ fun FavoritePage(
             }
         }
 
-        Box(modifier = Modifier.weight(1f)) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { favoriteVM.refreshList(showLoading = true, isSmartSync = false) },
+            modifier = Modifier.weight(1f)
+        ) {
 
             // 收藏列表
             LazyColumn(

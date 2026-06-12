@@ -226,5 +226,21 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === 鍙戝笘鏃堕棿/妤煎眰鍙?=== */",
     ".authi .mtit, .authi .mtime { color: #8099b2 !important; }",
     "/* === PhotoSwipe鎸夐挳 === */",
-    ".pswp__button, .pswp__button:hover, .pswp__button:active { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }"
+    ".pswp__button, .pswp__button:hover, .pswp__button:active { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }",
+    "/* === Portal / home page modules === */",
+    ".catenew, .catenew .content, .imgbox, .listbox { background: #0d141d !important; }",
+    ".catenew .area, .catenew .frame, .catenew .column, .catenew .block, .catenew .dxb_bc { background: transparent !important; }",
+    ".module { background: #182332 !important; border-color: #274766 !important; }",
+    ".module, .module li, .module p, .module .ytxt { color: #c7d8ea !important; }",
+    ".module .tit, .module .tit h2 { background: #121b27 !important; color: #edf4fb !important; border-color: #274766 !important; }",
+    ".module ul, .module li { background: #182332 !important; border-color: #223247 !important; }",
+    "/* === Portal links: light blue, not brown === */",
+    ".catenew a, .imgbox a, .listbox a, .module a, .xl a, .xl1 a, .slidebox a { color: #7dbdf2 !important; }",
+    ".module em, .xl em, .xl1 em { color: #8099b2 !important; }",
+    "/* === Top search bar === */",
+    "#search_mid { background: #182332 !important; border-color: #274766 !important; }",
+    "#scbar_type, #scbar_type.showmenu { color: #acbed1 !important; }",
+    "#scbar_txt { background: #223247 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "#scbar_txt::placeholder { color: #8099b2 !important; }",
+    "#scbar_btn { background: #274766 !important; border-color: #4b6a8f !important; }"
 )

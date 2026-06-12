@@ -137,6 +137,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil:2.6.0")
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
     implementation("me.saket.telephoto:zoomable-image-coil:0.6.2")
     implementation("com.github.qichuan:android-opencc:1.2.0")

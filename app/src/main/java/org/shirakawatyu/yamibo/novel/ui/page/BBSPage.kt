@@ -16,7 +16,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.widget.FrameLayout
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.annotation.RequiresApi
@@ -599,6 +599,7 @@ fun BBSPage(
     var timeoutJob by remember { mutableStateOf<Job?>(null) }
     var retryCount by remember { mutableIntStateOf(0) }
     var isPullRefreshing by remember { mutableStateOf(false) }
+    var swipeRefresh by remember { mutableStateOf<SwipeRefreshLayout?>(null) }
 
     var autoOpenMangaMode by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -853,6 +854,22 @@ fun BBSPage(
         }
     }
 
+    // 下拉刷新：重新加载当前页面（无可用 URL 时回到首页）
+    fun triggerBbsPullRefresh() {
+        isPullRefreshing = true
+        val curl = webView.url
+        if (!curl.isNullOrEmpty() && curl != "about:blank") {
+            BBSPageState.hasRequestedInitialLoad = true
+            BBSPageState.isLoading = true
+            BBSPageState.showLoadError = false
+            retryCount = 0
+            startLoadTimeout()
+            webView.reload()
+        } else {
+            startLoading(mobileIndexUrl)
+        }
+    }
+
     val isNetworkAvailable by remember {
         NetworkMonitor.observeNetwork(context)
     }.collectAsState(initial = false)
@@ -1004,38 +1021,11 @@ fun BBSPage(
             startLoading(mobileIndexUrl)
         }
     }
-    LaunchedEffect(Unit) {
-        bottomNavBarVM.refreshEvent.collect { route ->
-            if (route != "BBSPage") return@collect
-
-            isPullRefreshing = true
-            val curl = webView.url
-            if (!curl.isNullOrEmpty() && curl != "about:blank") {
-                BBSPageState.hasRequestedInitialLoad = true
-                BBSPageState.isLoading = true
-                BBSPageState.showLoadError = false
-                retryCount = 0
-
-                timeoutJob?.cancel()
-                timeoutJob = scope.launch {
-                    delay(10_000L)
-                    if (BBSPageState.isLoading) {
-                        webView.stopLoading()
-                        isPullRefreshing = false
-
-                        if (BBSPageState.isAutoRecoveringBeforeError) {
-                            BBSPageState.failRecoveryBeforeShowingError()
-                        } else {
-                            BBSPageState.isErrorState = true
-                            BBSPageState.isLoading = false
-                            BBSPageState.showLoadError = true
-                        }
-                    }
-                }
-                webView.reload()
-            } else {
-                startLoading(mobileIndexUrl)
-            }
+    // 加载结束时收起下拉刷新指示器
+    LaunchedEffect(BBSPageState.isLoading) {
+        if (!BBSPageState.isLoading) {
+            swipeRefresh?.isRefreshing = false
+            isPullRefreshing = false
         }
     }
 
@@ -1181,11 +1171,13 @@ fun BBSPage(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
-                    FrameLayout(context).apply {
+                    SwipeRefreshLayout(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        setOnRefreshListener { triggerBbsPullRefresh() }
+                        swipeRefresh = this
 
                         (webView.parent as? ViewGroup)?.removeView(webView)
 

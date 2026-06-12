@@ -14,7 +14,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
-import android.widget.FrameLayout
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -107,6 +107,12 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.MinePageVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.ReaderModeFAB
+import org.shirakawatyu.yamibo.novel.BuildConfig
+import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
+import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
+import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
+import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
+import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
 import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.AutoSignManager
@@ -283,12 +289,16 @@ fun MinePage(
     var timeoutJob by remember { mutableStateOf<Job?>(null) }
     var retryCount by remember { mutableIntStateOf(0) }
     var isPullRefreshing by remember { mutableStateOf(false) }
+    var swipeRefresh by remember { mutableStateOf<SwipeRefreshLayout?>(null) }
     var currentUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var pageTitle by remember { mutableStateOf("") }
     var autoOpenMangaMode by remember { mutableStateOf(false) }
     var savedMangaUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var needFallbackToHome by rememberSaveable { mutableStateOf(false) }
     var mineDialog by remember { mutableStateOf<MineDialogState>(MineDialogState.None) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var manualUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
+    var manualUpdateFailure by remember { mutableStateOf<String?>(null) }
 
     val canConvertToReader = remember(currentUrl, pageTitle) {
         ReaderModeDetector.canConvertToReaderMode(currentUrl, pageTitle)
@@ -542,6 +552,20 @@ fun MinePage(
 
         webView
     }
+
+    // 下拉刷新：重新加载当前页面（无可用 URL 时回到个人主页）
+    fun triggerMinePullRefresh() {
+        isPullRefreshing = true
+        isLoading = true
+        showLoadError = false
+        val curl = mineWebView.url
+        if (!curl.isNullOrEmpty() && curl != "about:blank" && !curl.contains("warmup=true")) {
+            mineWebView.reload()
+        } else {
+            startLoading(mineWebView, mineUrl)
+        }
+    }
+
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
     LaunchedEffect(isDarkMode) {
         mineWebView.evaluateJavascript(
@@ -665,19 +689,11 @@ fun MinePage(
         }
     }
 
-    LaunchedEffect(Unit) {
-        bottomNavBarVM.refreshEvent.collect { route ->
-            if (route == "MinePage") {
-                isPullRefreshing = true
-                isLoading = true
-                showLoadError = false
-                val curl = mineWebView.url
-                if (!curl.isNullOrEmpty() && curl != "about:blank" && !curl.contains("warmup=true")) {
-                    mineWebView.reload()
-                } else {
-                    startLoading(mineWebView, mineUrl)
-                }
-            }
+    // 加载结束时收起下拉刷新指示器
+    LaunchedEffect(isLoading) {
+        if (!isLoading) {
+            swipeRefresh?.isRefreshing = false
+            isPullRefreshing = false
         }
     }
 
@@ -1325,11 +1341,13 @@ fun MinePage(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    FrameLayout(ctx).apply {
+                    SwipeRefreshLayout(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        setOnRefreshListener { triggerMinePullRefresh() }
+                        swipeRefresh = this
                         (mineWebView.parent as? ViewGroup)?.removeView(mineWebView)
                         addView(
                             mineWebView,
@@ -1693,9 +1711,62 @@ fun MinePage(
                             TextButton(onClick = { mineDialog = MineDialogState.None }) {
                                 Text("关闭")
                             }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                enabled = !isCheckingUpdate,
+                                onClick = {
+                                    if (isCheckingUpdate) return@TextButton
+                                    isCheckingUpdate = true
+                                    scope.launch {
+                                        when (val result = AppUpdateManager.checkForUpdate()) {
+                                            AppUpdateCheckResult.NoUpdate ->
+                                                YamiboToast.show(
+                                                    message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
+                                                )
+
+                                            is AppUpdateCheckResult.UpdateAvailable -> {
+                                                mineDialog = MineDialogState.None
+                                                manualUpdateInfo = result.info
+                                            }
+
+                                            is AppUpdateCheckResult.Failed -> {
+                                                mineDialog = MineDialogState.None
+                                                manualUpdateFailure = result.reason
+                                            }
+                                        }
+                                        isCheckingUpdate = false
+                                    }
+                                }
+                            ) {
+                                if (isCheckingUpdate) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("检查中")
+                                } else {
+                                    Text("检查更新")
+                                }
+                            }
                         }
                     )
                 }
+            }
+
+            manualUpdateInfo?.let { info ->
+                AppUpdateDialog(
+                    info = info,
+                    onDismiss = { manualUpdateInfo = null }
+                )
+            }
+            manualUpdateFailure?.let { reason ->
+                AppUpdateFailureDialog(
+                    reason = reason,
+                    onDismiss = { manualUpdateFailure = null }
+                )
             }
 
         }
