@@ -80,8 +80,10 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === 甯栧瓙璇︽儏 - 鏍囬 === */",
     ".view_tit, .view_tit h1, .view_tit a, .view_tit em { background: #182332 !important; color: #edf4fb !important; }",
     "/* === 甯栧瓙璇︽儏 - 妤间富淇℃伅鏍?=== */",
-    ".pls, .pls div, .pls a { background: #121b27 !important; }",
+    "/* .pbr2/.pbg2 是用户侧栏的经验/积分彩条及轨道，排除以保持原色 */",
+    ".pls, .pls div:not(.pbr2):not(.pbg2), .pls a { background: #121b27 !important; }",
     ".pls, .pls a, .pls em, .pls span { color: #c7d8ea !important; }",
+    ".pls .pbg2 { background: rgba(255,255,255,0.10) !important; }",
     "/* === 甯栧瓙璇︽儏 - 甯栧瓙鍐呭瀹瑰櫒 === */",
     "/* .pbr/.pbg 是投票结果彩条及其轨道，颜色来自内联样式，必须排除以保持原色 */",
     ".plc, .plm, .plc div:not(.pbr):not(.pbg), .plm div:not(.pbr):not(.pbg) { background: #182332 !important; }",
@@ -272,7 +274,22 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* styles); only drop our dark panel boxing so the bars show cleanly. === */",
     "#poll table, #poll tbody, #poll tr, #poll td, #poll th, #poll .pcht { background: transparent !important; }",
     "/* 彩条轨道给一个微弱底色，深色背景下能看出每条的长度比例 */",
-    "#poll .pbg { background: rgba(255,255,255,0.10) !important; }"
+    "#poll .pbg { background: rgba(255,255,255,0.10) !important; }",
+    "/* === 电脑版帖子页：楼层分隔线 / 各类衬线统一深蓝 === */",
+    ".pg_viewthread .pi, .pg_viewthread .pil, .pg_viewthread .pti, .pg_viewthread .po, .pg_viewthread .pob, .pg_viewthread .pdbt, .pg_viewthread .psth, .pg_viewthread .sign, .pg_viewthread .plc, .pg_viewthread .pls, .pg_viewthread .pct, .pg_viewthread .pcb, .pg_viewthread .plhin, .pg_viewthread .pm2, .pg_viewthread .tns, .pg_viewthread .tns th, .pg_viewthread .tns td, .pg_viewthread .t_fsz, .pg_viewthread .ad { border-color: #274766 !important; }",
+    "/* === 评分区（rate）=== */",
+    ".rate, .ratc, .ratl, .ratl_l, .ratl th, .ratl td { background: #182332 !important; color: #c7d8ea !important; border-color: #274766 !important; }",
+    ".rate a, .ratl a { color: #7dbdf2 !important; }",
+    "/* === 点评 / 评论列表 === */",
+    ".cmmnt, .cm, .psti { background: #1f2c3d !important; color: #c7d8ea !important; border-color: #274766 !important; }",
+    ".cmmnt a, .cm a { color: #7dbdf2 !important; }",
+    "/* === 悬浮提示气泡 / 用户信息卡片弹窗 === */",
+    ".tip, .tip_c, .tip_4 { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    ".p_pop.blk, .bui, .p_pop.blk.bui { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "/* === 弹窗对话框（fwin）=== */",
+    ".fwin, .fwinmask .flb { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "/* === 快速回复区 === */",
+    ".fastre, #fastpost, .pgs.cl.mtm { background: #182332 !important; border-color: #274766 !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
