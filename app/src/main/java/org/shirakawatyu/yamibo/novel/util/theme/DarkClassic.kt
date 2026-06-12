@@ -233,11 +233,11 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".catenew, .catenew > .content, .listbox { background-color: #0d141d !important; }",
     ".listbox .module { background-color: #182332 !important; border-color: #274766 !important; }",
     ".listbox .module, .listbox .module li, .listbox .module p, .listbox .module .ytxt { color: #c7d8ea !important; }",
-    ".tit, .tit h2 { background-color: #121b27 !important; color: #edf4fb !important; border-color: #274766 !important; }",
-    ".xl ul, .xl li { background-color: #182332 !important; border-color: #223247 !important; }",
+    ".listbox .tit, .listbox .tit h2 { background-color: #121b27 !important; color: #edf4fb !important; border-color: #274766 !important; }",
+    ".listbox .module ul, .listbox .module li { background-color: #182332 !important; border-color: #223247 !important; }",
     "/* === Portal links: light blue, not brown === */",
-    ".catenew a, .listbox a, .xl a, .xl1 a { color: #7dbdf2 !important; }",
-    ".xl em, .xl1 em, .listbox .module em { color: #8099b2 !important; }",
+    ".catenew a, .listbox a { color: #7dbdf2 !important; }",
+    ".listbox .module em { color: #8099b2 !important; }",
     "/* === Top search bar === */",
     "#search_mid { background-color: #182332 !important; border-color: #274766 !important; }",
     "#scbar_type, #scbar_type.showmenu { color: #acbed1 !important; }",
@@ -248,7 +248,17 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "#nv_forum, #nv_home, #nv_portal, .ct2, .ct3, .mn, .sd, #uhd, .h, .tns, .pf_l, .xld, .xlda, .ml, .buddy, .fl, .fl_tb, .fl_row, .fl_g, .fl_i, .fl_by, #chart, .chart, .ptm, .pbm, .mbm { color: #c7d8ea !important; }",
     ".ct2 a, .ct3 a, .mn a, .sd a, #uhd a, .h a, .tns a, .pf_l a, .xld a, .xlda a, .ml a, .buddy a, .fl a, .fl_tb a, .fl_row a, .fl_g a, .fl_i a, .fl_by a, #chart a, .chart a { color: #7dbdf2 !important; }",
     ".ct2 .xg1, .ct3 .xg1, .fl .xg1, .fl_i, .fl_by, .tns th, .tns td, .pf_l li, .xld dd, .xlda dd { color: #95acc4 !important; }",
-    ".fl_tb, .fl_tb td, .fl_tb th, .fl_row, #uhd, .tns, .pf_l, .xld, .xlda { border-color: #274766 !important; }"
+    ".fl_tb, .fl_tb td, .fl_tb th, .fl_row, #uhd, .tns, .pf_l, .xld, .xlda { border-color: #274766 !important; }",
+    "/* === Member DIY space (个人主页, body#space) === */",
+    "/* The member designed this page themselves (custom background image + colors)， */",
+    "/* so don't force dark panels. Clearing background-color keeps every */",
+    "/* background-image (avatar/feed icons/album/music cover) intact thanks to the */",
+    "/* background -> background-color rewrite below. Text inherits the member's own */",
+    "/* #ct color (a custom #ct{color..!important} wins); uncustomized pages fall back */",
+    "/* to a readable light tone. === */",
+    "#space #ct, #space #ct * { background: transparent !important; }",
+    "#space #ct { color: #c7d8ea; }",
+    "#space #ct *:not(a):not(img) { color: inherit !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
