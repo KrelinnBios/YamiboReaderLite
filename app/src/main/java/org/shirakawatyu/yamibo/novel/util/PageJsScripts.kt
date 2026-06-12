@@ -1001,12 +1001,15 @@ object PageJsScripts {
             (function() {
                 var styleId = 'yamibo-dark-mode';
                 var existing = document.getElementById(styleId);
-                // 会员 DIY 空间页（从论坛点进的个人主页/日志/相册，电脑版模板）不启用暗黑模式；
-                // 但底栏「我的」是手机版个人中心（mobile=2 / mycenter=1），必须照常变深色。
+                // 会员 DIY 空间页（看别人的个人主页/日志/相册，body#space 模板或带具体 uid 的
+                // 空间 URL）不启用暗黑模式；自己的家园功能页（do=notice 提醒 / do=thread 我的
+                // 帖子 / mod=spacecp 个人资料 / BLOG 列表，均无 uid 参数）照常变深色。
+                // 底栏「我的」是手机版个人中心（mobile=2 / mycenter=1），必须照常变深色。
                 var isMobileCenter = /mobile=2|mobile=yes|mycenter=1/.test(location.href);
                 var isMemberSpace = !isMobileCenter && (
                     (document.body && document.body.id === 'space') ||
-                    /home\.php\?mod=space|space-uid-\d+|blog-\d+/.test(location.href)
+                    /space-uid-\d+|blog-\d+/.test(location.href) ||
+                    (/home\.php\?mod=(space|blog)\b/.test(location.href) && /[?&](uid|username)=/.test(location.href))
                 );
                 var enable = $enable && !isMemberSpace;
                 if (!enable) {
@@ -1035,6 +1038,9 @@ $styleString
     }
 
     fun injectDarkModeCssIntoHtml(html: String, themeId: Int = 0): String {
+        // 会员 DIY 空间模板的兜底守卫：URL 判不出来的场合按 HTML 内容判断，
+        // body#space（个人主页/日志/相册）保持会员自己的背景和配色。
+        if (html.contains("<body id=\"space\"")) return html
         val rulesList = DARK_MODE_CSS_RULES_CLASSIC
         val css = rulesList.joinToString("\n")
         val styleTag = "<style id=\"yamibo-dark-mode\">\n$css\n</style>"

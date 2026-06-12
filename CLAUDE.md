@@ -40,7 +40,7 @@
 - **写规则的硬约束**：
   - 文件末尾有全局 `background:` → `background-color:` 重写，所以规则里写 `background:` 即可，**绝不能盖掉 `background-image`**（轮播图、头像、会员自定义背景都靠它）。
   - 规则字符串里**不能出现单引号**（会炸掉 JS 注入的字符串拼接）。
-  - **个人空间页完全不启用暗黑模式**（个人主页/日志/相册等，URL 含 `home.php?mod=space`、`space-uid-N`、`blog-N`，或 `body#space`）：会员自己设计了背景和配色，保持原样。守卫在 `getDarkModeSetJs`（JS 注入路径）和 `proxyHtmlForDarkMode`（HTML 代理路径）两处，不要只改一处。
+  - **会员 DIY 空间页完全不启用暗黑模式**（看别人的个人主页/日志/相册：`space-uid-N`、`blog-N`、`mod=space`/`mod=blog` 且带 `uid=`/`username=` 参数，或 `body#space` 模板）：会员自己设计了背景和配色，保持原样。但自己的家园**功能页**（`do=notice` 提醒、`do=thread` 我的帖子、`mod=spacecp` 个人资料、BLOG 列表）没有 DIY，必须照常暗黑——不要把守卫改回 `home.php?mod=space` 子串匹配（会误伤 spacecp 等功能页）。守卫共三处，改动必须同步：`getDarkModeSetJs`（JS 注入路径）、`isMemberSpaceUrl`（HTML 代理 URL 判断）、`injectDarkModeCssIntoHtml`（按 HTML 内容 `body#space` 兜底）。
   - 投票区 `#poll` 保留原彩色（彩条和彩色计数都来自内联样式，`em` 全局规则已用 `:not(#poll em)` 排除）。
   - 链接深色统一浅蓝 `#7dbdf2`，不允许棕色。
 - 新页面发现没适配时：让用户提供该页 HTML 片段，按选择器精准补规则，**不要写大范围通配**。
