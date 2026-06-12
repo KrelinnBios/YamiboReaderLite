@@ -442,7 +442,14 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
         while (true) {
             val currentState = currentFetchState.get()
-            if (currentState == requestedState || currentState == FetchState.MANUAL) return
+            // 只有确实存在存活的拉取任务时才拦截重复刷新；
+            // 否则说明上一次刷新异常中断后状态泄漏（卡在 MANUAL），放行让新刷新接管，
+            // 避免下拉刷新从此永远无响应。
+            if ((currentState == requestedState || currentState == FetchState.MANUAL) &&
+                fetchJob?.isActive == true
+            ) {
+                return
+            }
             if (currentFetchState.compareAndSet(currentState, requestedState)) break
         }
 
@@ -461,6 +468,13 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     generation = currentGen
                 )
             }
+        }
+
+        // 看门狗：拉取链路 30 秒内没有正常收尾（如取 cookie 回调丢失、请求挂死）时强制释放，
+        // 防止 isRefreshing 永远为 true、刷新图标卡住。正常完成时此调用是幂等的空操作。
+        viewModelScope.launch {
+            delay(30_000L)
+            releaseStateIfCurrent(currentGen)
         }
     }
 
