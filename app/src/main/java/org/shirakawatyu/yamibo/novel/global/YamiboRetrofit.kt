@@ -294,6 +294,14 @@ class YamiboRetrofit {
             return builder.build()
         }
 
+        /** HTTP/2 流被服务器重置（stream was reset: PROTOCOL_ERROR 等）属于瞬时故障，重试一次通常即可恢复。 */
+        private fun isTransientStreamReset(e: IOException): Boolean {
+            val msg = e.message ?: return false
+            return msg.contains("stream was reset", ignoreCase = true) ||
+                    msg.contains("PROTOCOL_ERROR", ignoreCase = true) ||
+                    msg.contains("REFUSED_STREAM", ignoreCase = true)
+        }
+
         private fun proceedWithDnsRecovery(
             chain: okhttp3.Interceptor.Chain,
             request: Request
@@ -301,6 +309,16 @@ class YamiboRetrofit {
             return try {
                 chain.proceed(request)
             } catch (e: IOException) {
+                if (isTransientStreamReset(e) && request.method == "GET") {
+                    // 重试前丢弃可能已损坏的连接复用（OkHttp 会自动从连接池换新连接）
+                    try {
+                        return chain.proceed(request)
+                    } catch (retryError: IOException) {
+                        request.url.host.takeIf { it.contains("yamibo.com") }
+                            ?.let(sharedDns::invalidate)
+                        throw retryError
+                    }
+                }
                 request.url.host.takeIf { it.contains("yamibo.com") }?.let(sharedDns::invalidate)
                 throw e
             }
