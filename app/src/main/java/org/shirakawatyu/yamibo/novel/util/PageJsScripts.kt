@@ -1001,7 +1001,12 @@ object PageJsScripts {
             (function() {
                 var styleId = 'yamibo-dark-mode';
                 var existing = document.getElementById(styleId);
-                var enable = $enable;
+                // 个人空间页（个人主页/日志/相册等）是会员自己设计的（自定义背景和配色），
+                // 完全不启用暗黑模式，保持原样。
+                var isMemberSpace =
+                    (document.body && document.body.id === 'space') ||
+                    /home\.php\?mod=space|space-uid-\d+|blog-\d+/.test(location.href);
+                var enable = $enable && !isMemberSpace;
                 if (!enable) {
                     if (existing) existing.remove();
                     return;
