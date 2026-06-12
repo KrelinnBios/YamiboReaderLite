@@ -194,7 +194,7 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === 閫氱敤鏂囨湰瑕嗙洊 === */",
     "strong, b, .strong { color: #edf4fb !important; }",
     "sup, sub { color: #acbed1 !important; }",
-    "em { color: #c7d8ea !important; }",
+    "em:not(#poll em) { color: #c7d8ea !important; }",
     ".display, .pi { background: #182332 !important; }",
     "/* === 淇澶滈棿妯″紡澶村儚琚?DOM 灞傚彔瑕嗙洊 === */",
     ".plc .avatar { z-index: 10 !important; background: transparent !important; }",
@@ -258,7 +258,22 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* to a readable light tone. === */",
     "#space #ct, #space #ct * { background: transparent !important; }",
     "#space #ct { color: #c7d8ea; }",
-    "#space #ct *:not(a):not(img) { color: inherit !important; }"
+    "#space #ct *:not(a):not(img) { color: inherit !important; }",
+    "/* === Desktop viewthread (body.pg_viewthread) === */",
+    "/* Page-jump input on the right ('第几页') stayed the light theme color. */",
+    ".px, input.px, input.p_fre { background-color: #223247 !important; background-image: none !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "/* Pagination action buttons (返回列表 / 发新帖 / 回复) were theme-brown. */",
+    ".pgsbtn { background-color: #274766 !important; color: #c7d8ea !important; border-color: #4b6a8f !important; }",
+    "/* Remaining brown text / links on the thread page -> readable on dark. */",
+    ".pg_viewthread { color: #c7d8ea !important; }",
+    ".pg_viewthread a { color: #7dbdf2 !important; }",
+    ".pg_viewthread h1, .pg_viewthread .ts, .pg_viewthread .xst, .pg_viewthread .xi1 { color: #edf4fb !important; }",
+    ".pg_viewthread .pg a, .pg_viewthread .pg .nxt, .pg_viewthread .pg .prev { color: #c7d8ea !important; }",
+    ".pg_viewthread .pg strong { color: #ffffff !important; }",
+    ".pg_viewthread .pgsbtn { color: #c7d8ea !important; }",
+    "/* Poll / vote results: keep the colored bars (their colors come from inline */",
+    "/* styles); only drop our dark panel boxing so the bars show cleanly. === */",
+    "#poll table, #poll tbody, #poll tr, #poll td, #poll th, #poll .pbg, #poll .pcht { background: transparent !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
