@@ -395,8 +395,17 @@ class YamiboRetrofit {
                 false
             }
         }
-        /** 个人空间页（个人主页/日志/相册等）是会员自己设计的，不参与暗黑模式注入。 */
+        /**
+         * 会员 DIY 空间页（从论坛点进的个人主页/日志/相册，电脑版模板）不参与暗黑模式注入。
+         * 注意区分：底栏「我的」加载的是手机版个人中心（mobile=2 / mycenter=1，无 DIY），
+         * 必须照常应用暗黑模式。
+         */
         fun isMemberSpaceUrl(url: String): Boolean {
+            if (url.contains("mobile=2") || url.contains("mobile=yes") ||
+                url.contains("mycenter=1")
+            ) {
+                return false
+            }
             return url.contains("home.php?mod=space") ||
                     url.contains("home.php?mod=blog") ||
                     Regex("space-uid-\\d+|blog-\\d+").containsMatchIn(url)
