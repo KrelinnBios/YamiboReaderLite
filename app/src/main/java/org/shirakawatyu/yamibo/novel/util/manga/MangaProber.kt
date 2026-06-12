@@ -210,7 +210,6 @@ class MangaProber {
         val threadObj = variables.getJSONObject("thread") ?: return@withContext false
         val title = threadObj.getString("subject") ?: return@withContext false
         val threadAuthorId = threadObj.getString("authorid") ?: ""
-        val threadRequiresPermission = threadObj.getIntValue("readperm") > 0
 
         // --- 深度还原 WebView 的业务过滤逻辑 ---
         val forumName = variables.getJSONObject("forum")?.getString("name") ?: ""
@@ -233,7 +232,6 @@ class MangaProber {
         val urls = mutableListOf<String>()
         val seenFromMessage = mutableSetOf<String>()
         val combinedMessage = StringBuilder()
-        var hasProtectedAttachments = false
 
         // 极客优化：不仅看 1 楼，还要遍历整个首页。
         // 但严格校验 `authorid` 必须是楼主，解决楼主跨多层楼连载漫画的漏图问题，同时过滤水友回复。
@@ -264,9 +262,6 @@ class MangaProber {
             if (attachments != null) {
                 for (key in attachments.keys) {
                     val attachObj = attachments.getJSONObject(key) ?: continue
-                    if (attachObj.getIntValue("readperm") > 0) {
-                        hasProtectedAttachments = true
-                    }
                     val urlPrefix = attachObj.getString("url") ?: ""
                     val attachmentPath = attachObj.getString("attachment") ?: ""
 
@@ -283,7 +278,7 @@ class MangaProber {
             }
         }
 
-        if (urls.isNotEmpty() && !threadRequiresPermission && !hasProtectedAttachments) {
+        if (urls.isNotEmpty()) {
             val urlList = urls.toList()
 
             // 将纯正文拼接并套一层 <div class="message">，欺骗 MangaHtmlParser 提取全楼层的同页目录

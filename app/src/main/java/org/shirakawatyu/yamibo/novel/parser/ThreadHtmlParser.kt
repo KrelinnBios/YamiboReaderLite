@@ -199,8 +199,8 @@ object ThreadHtmlParser {
         val candidateText = document.select(
             "#messagetext, .showmessage, .alert_error, .nfl .f_c"
         ).joinToString(" ") { it.text().trim() }
-        val text = candidateText.ifBlank { document.body().text() }
-        return text.takeIf { content ->
+        if (candidateText.isBlank()) return null
+        return candidateText.takeIf { content ->
             phrases.any { phrase -> content.contains(phrase, ignoreCase = true) }
         }?.take(160)
     }
