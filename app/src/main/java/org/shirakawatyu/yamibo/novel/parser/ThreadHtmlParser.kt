@@ -23,6 +23,10 @@ data class ParsedMangaThreadPage(
 )
 
 object ThreadHtmlParser {
+    private const val SUBSTANTIVE_READER_TEXT_LENGTH = 240
+    private val chapterHeadingRegex = Regex(
+        """^(?:序章|楔子|引子|尾声|尾聲|后记|後記|番外|第[零〇一二三四五六七八九十百千万兩两\d]+(?:章|节|節|卷|篇|幕|话|話|回))(?=\s|$)"""
+    )
     private val ignoredImageParts = listOf(
         "smiley",
         "avatar",
@@ -43,10 +47,9 @@ object ThreadHtmlParser {
             ?: allMessages.firstNotNullOfOrNull(::extractMessageAuthorId)
             ?: extractAuthorId(document)
         val messages = filterAuthorMessages(allMessages, authorId)
+        val readerMessages = selectReaderMessages(messages)
 
-        val combinedHtml = messages.joinToString("") { source ->
-            val message = source.clone()
-            message.select(".locked-tip").remove()
+        val combinedHtml = readerMessages.joinToString("") { message ->
             val postId = message.id().removePrefix("postmessage_")
             """<div class="message" data-post-id="$postId">${message.html()}</div>"""
         }
@@ -122,6 +125,49 @@ object ThreadHtmlParser {
             messageAuthorId == null || messageAuthorId == authorId
         }
         return filtered.ifEmpty { messages }
+    }
+
+    private fun selectReaderMessages(messages: List<Element>): List<Element> {
+        if (messages.isEmpty()) return emptyList()
+
+        val candidates = messages.map { source ->
+            val message = source.clone()
+            message.select(".locked-tip, .pstatus, .quote").remove()
+            val normalizedText = message.wholeText()
+                .replace('\u00A0', ' ')
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            val lockedContentLength = message.select(".locked-content").text().trim().length
+            ReaderMessageCandidate(
+                message = message,
+                textLength = normalizedText.length,
+                hasChapterHeading = chapterHeadingRegex.containsMatchIn(normalizedText.take(80)),
+                hasSubstantiveLockedContent = lockedContentLength >= 80,
+                isThreadStarter = isThreadStarterMessage(source)
+            )
+        }
+
+        val hasStructuredInstallments = candidates.any { candidate ->
+            candidate.hasChapterHeading ||
+                candidate.hasSubstantiveLockedContent ||
+                candidate.textLength >= SUBSTANTIVE_READER_TEXT_LENGTH
+        }
+        if (!hasStructuredInstallments) return candidates.map(ReaderMessageCandidate::message)
+
+        return candidates.filter { candidate ->
+            candidate.hasChapterHeading ||
+                candidate.hasSubstantiveLockedContent ||
+                candidate.textLength >= SUBSTANTIVE_READER_TEXT_LENGTH ||
+                (candidate.isThreadStarter && candidate.textLength >= 10)
+        }.map(ReaderMessageCandidate::message)
+            .ifEmpty { candidates.map(ReaderMessageCandidate::message) }
+    }
+
+    private fun isThreadStarterMessage(message: Element): Boolean {
+        val postContainer = message.parents().firstOrNull { parent ->
+            parent.id().startsWith("post_")
+        } ?: return false
+        return postContainer.selectFirst("a[id^=postnum] em")?.text()?.trim() == "1"
     }
 
     private fun extractMessageAuthorId(message: Element): String? {
@@ -213,4 +259,12 @@ object ThreadHtmlParser {
         if (raw.startsWith("data:") || raw.startsWith("blob:")) return null
         return image.absUrl(attribute).ifBlank { raw }
     }
+
+    private data class ReaderMessageCandidate(
+        val message: Element,
+        val textLength: Int,
+        val hasChapterHeading: Boolean,
+        val hasSubstantiveLockedContent: Boolean,
+        val isThreadStarter: Boolean
+    )
 }
