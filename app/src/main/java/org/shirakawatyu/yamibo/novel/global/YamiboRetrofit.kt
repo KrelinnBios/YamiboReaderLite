@@ -135,10 +135,13 @@ class YamiboRetrofit {
             "${locale.language}-${locale.country},${locale.language};q=0.9,en-US;q=0.8,en;q=0.7"
         }
 
+        // keepalive 必须短于论坛服务器的空闲超时（nginx 通常 60~75 秒），
+        // 否则切回 App 时会复用已被服务器掐掉的半死连接，
+        // 表现为 stream was reset: PROTOCOL_ERROR / 断联需手动刷新。
         private val sharedConnectionPool = ConnectionPool(
             maxIdleConnections = 8,
-            keepAliveDuration = 5,
-            timeUnit = TimeUnit.MINUTES
+            keepAliveDuration = 50,
+            timeUnit = TimeUnit.SECONDS
         )
 
         private val sharedBootstrapClient by lazy {
@@ -306,22 +309,26 @@ class YamiboRetrofit {
             chain: okhttp3.Interceptor.Chain,
             request: Request
         ): okhttp3.Response {
-            return try {
-                chain.proceed(request)
-            } catch (e: IOException) {
-                if (isTransientStreamReset(e) && request.method == "GET") {
-                    // 重试前丢弃可能已损坏的连接复用（OkHttp 会自动从连接池换新连接）
-                    try {
-                        return chain.proceed(request)
-                    } catch (retryError: IOException) {
+            var lastError: IOException? = null
+            // GET 请求遇到瞬时流重置最多重试 2 次；
+            // 重试前清空空闲连接，确保不会再次复用已被服务器掐掉的坏连接。
+            repeat(3) { attempt ->
+                try {
+                    return chain.proceed(request)
+                } catch (e: IOException) {
+                    lastError = e
+                    val canRetry = attempt < 2 &&
+                            request.method == "GET" &&
+                            isTransientStreamReset(e)
+                    if (!canRetry) {
                         request.url.host.takeIf { it.contains("yamibo.com") }
                             ?.let(sharedDns::invalidate)
-                        throw retryError
+                        throw e
                     }
+                    sharedConnectionPool.evictAll()
                 }
-                request.url.host.takeIf { it.contains("yamibo.com") }?.let(sharedDns::invalidate)
-                throw e
             }
+            throw lastError ?: IOException("request failed")
         }
 
         fun proxyWebViewResource(request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
@@ -388,9 +395,17 @@ class YamiboRetrofit {
                 false
             }
         }
+        /** 个人空间页（个人主页/日志/相册等）是会员自己设计的，不参与暗黑模式注入。 */
+        fun isMemberSpaceUrl(url: String): Boolean {
+            return url.contains("home.php?mod=space") ||
+                    url.contains("home.php?mod=blog") ||
+                    Regex("space-uid-\\d+|blog-\\d+").containsMatchIn(url)
+        }
+
         fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
             val urlStr = request.url.toString()
             if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
+            if (isMemberSpaceUrl(urlStr)) return null
             return try {
                 val reqBuilder = okhttp3.Request.Builder().url(urlStr)
                 request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
