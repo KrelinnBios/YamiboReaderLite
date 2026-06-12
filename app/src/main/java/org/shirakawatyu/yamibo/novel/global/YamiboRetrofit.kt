@@ -396,7 +396,10 @@ class YamiboRetrofit {
             }
         }
         /**
-         * 会员 DIY 空间页（从论坛点进的个人主页/日志/相册，电脑版模板）不参与暗黑模式注入。
+         * 会员 DIY 空间页（看别人的个人主页/日志/相册，带具体 uid 的空间 URL）不参与暗黑
+         * 模式注入。自己的家园功能页（do=notice 提醒 / do=thread 我的帖子 / mod=spacecp
+         * 个人资料 / BLOG 列表，均无 uid 参数）必须照常注入。URL 判不出来的场合由
+         * injectDarkModeCssIntoHtml 按 HTML 内容（body#space）兜底。
          * 注意区分：底栏「我的」加载的是手机版个人中心（mobile=2 / mycenter=1，无 DIY），
          * 必须照常应用暗黑模式。
          */
@@ -406,9 +409,9 @@ class YamiboRetrofit {
             ) {
                 return false
             }
-            return url.contains("home.php?mod=space") ||
-                    url.contains("home.php?mod=blog") ||
-                    Regex("space-uid-\\d+|blog-\\d+").containsMatchIn(url)
+            if (Regex("space-uid-\\d+|blog-\\d+").containsMatchIn(url)) return true
+            return Regex("home\\.php\\?mod=(space|blog)\\b").containsMatchIn(url) &&
+                    Regex("[?&](uid|username)=").containsMatchIn(url)
         }
 
         fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {

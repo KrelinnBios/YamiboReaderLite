@@ -296,7 +296,6 @@ fun MinePage(
     var savedMangaUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var needFallbackToHome by rememberSaveable { mutableStateOf(false) }
     var mineDialog by remember { mutableStateOf<MineDialogState>(MineDialogState.None) }
-    var isCheckingUpdate by remember { mutableStateOf(false) }
     var manualUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
     var manualUpdateFailure by remember { mutableStateOf<String?>(null) }
 
@@ -1738,10 +1737,10 @@ fun MinePage(
                         },
                         dismissButton = {
                             TextButton(
-                                enabled = !isCheckingUpdate,
                                 onClick = {
-                                    if (isCheckingUpdate) return@TextButton
-                                    isCheckingUpdate = true
+                                    // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
+                                    mineDialog = MineDialogState.None
+                                    YamiboToast.show(message = "正在检查更新…")
                                     scope.launch {
                                         when (val result = AppUpdateManager.checkForUpdate()) {
                                             AppUpdateCheckResult.NoUpdate ->
@@ -1749,31 +1748,16 @@ fun MinePage(
                                                     message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
                                                 )
 
-                                            is AppUpdateCheckResult.UpdateAvailable -> {
-                                                mineDialog = MineDialogState.None
+                                            is AppUpdateCheckResult.UpdateAvailable ->
                                                 manualUpdateInfo = result.info
-                                            }
 
-                                            is AppUpdateCheckResult.Failed -> {
-                                                mineDialog = MineDialogState.None
+                                            is AppUpdateCheckResult.Failed ->
                                                 manualUpdateFailure = result.reason
-                                            }
                                         }
-                                        isCheckingUpdate = false
                                     }
                                 }
                             ) {
-                                if (isCheckingUpdate) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("检查中")
-                                } else {
-                                    Text("检查更新")
-                                }
+                                Text("检查更新")
                             }
                         }
                     )
