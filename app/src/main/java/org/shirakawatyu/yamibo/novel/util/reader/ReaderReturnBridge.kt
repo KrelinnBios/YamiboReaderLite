@@ -89,7 +89,8 @@ object ReaderReturnBridge {
             readerWebPage = currentView.coerceAtLeast(1),
             readerPageIndex = readerPageIndex.coerceAtLeast(0),
             cacheTitle = normalizeCacheTitle(cacheTitle),
-            originalPostUrl = targetUrl
+            // 原帖在 WebView 中打开时必须带 mobile=2，否则论坛会按 PC 端 cookie 渲染成电脑版。
+            originalPostUrl = forceMobileTemplate(targetUrl)
         ).also { context = it }
     }
 
@@ -131,6 +132,16 @@ object ReaderReturnBridge {
         if (pendingTid != null && currentTid != null && pendingTid != currentTid) return null
         pendingJump = null
         return pending
+    }
+
+    /** 给百合会论坛链接补上 mobile=2，强制走 Discuz 手机版模板（PC 端 cookie 也会被覆盖）。 */
+    fun forceMobileTemplate(url: String): String {
+        if (!url.contains("yamibo.com")) return url
+        if (Regex("[?&]mobile=").containsMatchIn(url)) return url
+        val base = url.substringBefore("#")
+        val fragment = url.substring(base.length)
+        val sep = if (base.contains("?")) "&" else "?"
+        return "$base${sep}mobile=2$fragment"
     }
 
     fun toAbsoluteBbsUrl(url: String): String {
