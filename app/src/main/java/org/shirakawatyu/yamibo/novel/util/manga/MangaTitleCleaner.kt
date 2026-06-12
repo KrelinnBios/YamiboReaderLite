@@ -34,7 +34,8 @@ class MangaTitleCleaner {
                         "[-—\\s]*Vol\\.?\\s*\\d+|" +
                         "[-—\\s]*Ch\\.?\\s*\\d+|" +
                         "[-—\\s]*(番外|特典|卷后附|卷彩页|附录|短篇|单行本|最终话|最終話|最终回|最終回|大结局)|" +
-                        "[-—\\s]+(前篇|中篇|后篇|上|中|下)|" +
+                        "(前篇|上篇|中篇|后篇|下篇)|" +
+                        "[-—\\s]+(上|中|下)|" +
                         "[-—\\s]*[(（]\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+\\s*[)）]|" +
                         "\\s*(?<!\\d)\\d+(?:\\.\\d+)?\\s*(?:[话話织回章节幕折更])?\\s*(?=[：:—\\-「【\\[(（《]|\\s|$)" +
                         ")"
@@ -276,11 +277,11 @@ class MangaTitleCleaner {
             val modPrefix = "(?<=[\\s\\-—_/(（\\[【话話回章节幕折更\\d]|^)"
             val modSuffix = "(?=[\\s)）\\]】!！？?。，~]*$)"
 
-            if (Regex("(?:前篇|${modPrefix}上)$modSuffix").containsMatchIn(cleanTitle)) subModifier =
+            if (Regex("(?:前篇|上篇|${modPrefix}上)$modSuffix").containsMatchIn(cleanTitle)) subModifier =
                 0.1f
             else if (Regex("(?:中篇|${modPrefix}中)$modSuffix").containsMatchIn(cleanTitle)) subModifier =
                 0.2f
-            else if (Regex("(?:后篇|${modPrefix}下)$modSuffix").containsMatchIn(cleanTitle)) subModifier =
+            else if (Regex("(?:后篇|下篇|${modPrefix}下)$modSuffix").containsMatchIn(cleanTitle)) subModifier =
                 0.3f
 
             val circleMap = mapOf(
