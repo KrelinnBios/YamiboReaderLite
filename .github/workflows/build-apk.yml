@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build debug APK
+    name: Build release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -41,29 +41,46 @@ jobs:
       - name: Grant Gradle wrapper permission
         run: chmod +x ./gradlew
 
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          missing=()
+          [ -z "$ANDROID_KEYSTORE_BASE64" ] && missing+=("ANDROID_KEYSTORE_BASE64")
+          [ -z "$ANDROID_KEY_ALIAS" ]       && missing+=("ANDROID_KEY_ALIAS")
+          [ -z "$ANDROID_KEY_PASSWORD" ]    && missing+=("ANDROID_KEY_PASSWORD")
+          [ -z "$ANDROID_STORE_PASSWORD" ]  && missing+=("ANDROID_STORE_PASSWORD")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ Missing required signing secrets: ${missing[*]}"
+            echo "Please add them in Settings → Secrets → Actions."
+            exit 1
+          fi
+
       - name: Restore signing keystore
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            mkdir -p .ci
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > .ci/yamibo-stable.jks
-          fi
+          mkdir -p .ci
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > .ci/yamibo-stable.jks
 
-      - name: Build debug APK
+      - name: Build release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/.ci/yamibo-stable.jks
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Prepare APK
         shell: bash
         run: |
           mkdir -p release
-          cp "app/build/outputs/apk/debug/300 Lite.apk" \
+          cp "app/build/outputs/apk/release/300 Lite.apk" \
             "release/300 Lite.apk"
 
       - name: Upload APK artifact
