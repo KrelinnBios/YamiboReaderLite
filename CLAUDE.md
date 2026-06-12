@@ -58,6 +58,7 @@
 
 ### CI / 发布
 - workflow 只出 release 签名包（`assembleRelease`），四个签名 secrets 缺一即 fail。
+- **release 触发时版本号从 tag 推导**（`APP_VERSION_NAME` = tag 去掉 `v` 前缀，`APP_VERSION_CODE` = `github.run_number`），tag 必须是 `v数字.数字…` 格式否则构建直接 fail。绝不能让发布包落回 build.gradle.kts 的默认版本号（1.0.0/3），否则应用内更新死循环。
 - Actions 已全部升级到 Node 24 版本（checkout@v5 / setup-java@v5 / setup-gradle@v5 / setup-android@v4 / upload-artifact@v5），并设 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`。不要降级。
 
 ## 其他约定
