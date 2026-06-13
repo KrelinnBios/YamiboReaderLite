@@ -76,6 +76,7 @@ fun BottomNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
+            .background(containerColor)
     ) {
         NavigationBar(
             modifier = Modifier

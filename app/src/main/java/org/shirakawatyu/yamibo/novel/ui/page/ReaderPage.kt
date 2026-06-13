@@ -1230,26 +1230,31 @@ private fun MainSettingsMenu(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(
-                onClick = onShowChapters,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 12.dp,
-                    vertical = 8.dp
-                )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    "目录",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                TextButton(
+                    onClick = onShowChapters,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 12.dp,
+                        vertical = 8.dp
+                    )
+                ) {
+                    Text(
+                        "目录",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
             }
-            Spacer(Modifier.width(50.dp))
             Box(
                 modifier = Modifier
+                    .weight(1.5f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(MaterialTheme.colorScheme.secondaryContainer)
                     .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -1259,23 +1264,30 @@ private fun MainSettingsMenu(
                     text = displayText,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(Modifier.width(50.dp))
-            TextButton(
-                onClick = onShowSpacingMenu,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 12.dp,
-                    vertical = 8.dp
-                )
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterEnd
             ) {
-                Text(
-                    "设置",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                TextButton(
+                    onClick = onShowSpacingMenu,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 12.dp,
+                        vertical = 8.dp
+                    )
+                ) {
+                    Text(
+                        "设置",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

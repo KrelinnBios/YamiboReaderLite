@@ -1577,7 +1577,7 @@ fun MinePage(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text("暗黑模式", fontSize = 15.sp)
                                         Text(
-                                            "使用经典黑蓝界面和论坛配色",
+                                            "使用经典黑蓝界面",
                                             fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1744,42 +1744,47 @@ fun MinePage(
                             }
                         },
                         confirmButton = {
-                            TextButton(onClick = { mineDialog = MineDialogState.None }) {
-                                Text("关闭")
-                            }
-                        },
-                        dismissButton = {
-                            Row {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 TextButton(
                                     onClick = { mineDialog = MineDialogState.Blocklist }
                                 ) {
                                     Text("黑名单")
                                 }
-                                TextButton(
-                                    onClick = {
-                                        // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
-                                        mineDialog = MineDialogState.None
-                                        YamiboToast.show(message = "正在检查更新…")
-                                        scope.launch {
-                                            when (val result = AppUpdateManager.checkForUpdate()) {
-                                                AppUpdateCheckResult.NoUpdate ->
-                                                    YamiboToast.show(
-                                                        message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
-                                                    )
+                                Row {
+                                    TextButton(
+                                        onClick = {
+                                            // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
+                                            mineDialog = MineDialogState.None
+                                            YamiboToast.show(message = "正在检查更新…")
+                                            scope.launch {
+                                                when (val result = AppUpdateManager.checkForUpdate()) {
+                                                    AppUpdateCheckResult.NoUpdate ->
+                                                        YamiboToast.show(
+                                                            message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
+                                                        )
 
-                                                is AppUpdateCheckResult.UpdateAvailable ->
-                                                    manualUpdateInfo = result.info
+                                                    is AppUpdateCheckResult.UpdateAvailable ->
+                                                        manualUpdateInfo = result.info
 
-                                                is AppUpdateCheckResult.Failed ->
-                                                    manualUpdateFailure = result.reason
+                                                    is AppUpdateCheckResult.Failed ->
+                                                        manualUpdateFailure = result.reason
+                                                }
                                             }
                                         }
+                                    ) {
+                                        Text("检查更新")
                                     }
-                                ) {
-                                    Text("检查更新")
+                                    TextButton(onClick = { mineDialog = MineDialogState.None }) {
+                                        Text("关闭")
+                                    }
                                 }
                             }
-                        }
+                        },
+                        dismissButton = {}
                     )
                 }
 

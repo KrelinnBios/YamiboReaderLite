@@ -536,10 +536,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     if (generation != fetchGeneration.get()) break
 
                     if (currentPage == 1) {
-                        withContext(Dispatchers.Main) {
-                            _uiState.update { it.copy(isRefreshing = false) }
-                        }
-
                         val count = variables.getString("count")?.toIntOrNull() ?: 0
                         val perpage = variables.getString("perpage")?.toIntOrNull() ?: 20
                         currentTotalPages = if (count > 0) {

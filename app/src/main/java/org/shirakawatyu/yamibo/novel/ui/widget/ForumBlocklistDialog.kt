@@ -88,6 +88,14 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                     }
                 }
 
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("搜索标题或 ID") }
+                )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterButton("全部", filter == "all") { filter = "all" }
                     FilterButton("主题", filter == ForumBlockedItem.TYPE_THREAD) {
@@ -97,14 +105,6 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                         filter = ForumBlockedItem.TYPE_POST
                     }
                 }
-
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("搜索标题或 ID") }
-                )
 
                 LazyColumn(
                     modifier = Modifier

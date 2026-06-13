@@ -1132,7 +1132,7 @@ $styleString
                         var text = state.dark ? '#b8c6d8' : '#66605a';
                         style.textContent =
                             '.yamibo-block-action{display:inline-block!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0 4px!important;margin:0!important;font:inherit!important;line-height:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
-                            '.authi>.yamibo-block-action{margin-left:6px!important;font-size:12px!important;font-weight:normal!important;}' +
+                            '.authi>.yamibo-block-action{margin-left:18px!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
                             '.yamibo-blocked-message a{font-size:12px!important;}';
