@@ -13,6 +13,8 @@
 ## 当前功能
 
 - 论坛浏览：账号登录、论坛 WebView 浏览、网页暗黑模式、自动签到、DNS 优化。
+- 链接直达：识别剪贴板或从外部应用打开的百合会帖子链接，一键在论坛 WebView 跳转到对应帖子。
+- 论坛屏蔽：在帖子/楼层/列表注入「屏蔽」按钮，按主题或楼层屏蔽他人内容（自己的内容不显示按钮），黑名单弹窗支持搜索与筛选。
 - 漫画发现：浏览和搜索中文漫画区、漫画图源区，生成、更新和管理本地漫画目录。
 - 漫画阅读：原生阅读器支持章节切换、进度记录、缓存、亮度调节和纵向/从左到右/从右到左三种阅读方向；识别失败时使用 WebView 兜底。
 - 小说阅读：原生阅读器支持字号、行距、页边距、横向/纵向翻页、正文图片、简繁转换、章节跳转、进度记录和页面缓存。
@@ -20,6 +22,7 @@
 - 浏览历史：记录帖子浏览历史，支持日期筛选、批量删除，并通过独立 WebView 打开历史帖子。
 - 缓存维护：维护小说页面缓存、漫画图片缓存、缓存统计、单项清理、全量清理和定期自动清理。
 - 应用更新：启动或手动检查 GitHub Release，支持下载、校验 APK、调起系统安装器，失败时提供 Releases 页面。
+- 崩溃兜底：全局崩溃处理器记录未捕获异常日志，并吞掉后台线程异常以减少整体闪退。
 
 ## 常用命令
 
@@ -65,6 +68,10 @@
 - 浏览历史由 `HistoryUtil` 管理；漫画目录由 `DirectoryRepository` 管理。
 - 设置使用 DataStore（`SettingsUtil` / `DataStoreUtil`）；不要另建 SharedPreferences 保存同类全局设置。阅读器自身已有兼容存储除外。
 - 应用更新统一走 `AppUpdateManager`；自动签到统一走 `AutoSignManager` / `AccountSyncManager`；缓存清理由 `CacheMaintenance` 统一协调。
+- 论坛屏蔽：数据与持久化在 `ForumBlocklistManager`；页面注入逻辑在 `PageJsScripts.getForumBlockerJs`（向论坛/个人中心 WebView 注入「屏蔽」按钮与隐藏占位）；JS↔原生桥接是 `ForumBlocklistJSInterface`（`AndroidForumBlocklist`，含 `block` / `unblock` / `setUid`）；管理弹窗是 `ForumBlocklistDialog`。
+- 当前登录 uid：`CurrentUserUtil` 持久化、`GlobalData.currentUid` 内存缓存，供屏蔽功能排除自己的内容。来源：收藏接口 `member_uid`（`FavoriteVM`）、桌面页 `discuz_uid`、手机版 `mycenter=1` 链接（页面脚本探测后经 `setUid` 回传）。
+- 链接直达：`YamiboPostLinkUtil` 统一识别/归一化帖子链接；剪贴板与外部 deep link 经 `GlobalData.pendingClipboardUrl` / `pendingDeepLinkUrl` 传给 `BBSPage` 加载。
+- 崩溃兜底：`CrashHandler` 在 `YamiboApplication.onCreate` 最先安装。
 
 ### 网络
 
@@ -86,13 +93,15 @@
 
 - 只有一套深色主题：经典蓝黑 `DarkThemeColors.CLASSIC`，主色 `#4EA1FF`、背景 `#0D141D`、面板 `#182332`。不引入多套深色主题。
 - 论坛网页深色规则全部位于 `util/theme/DarkClassic.kt`，加载时 HTML 代理注入（`proxyHtmlForDarkMode` + `injectThemeCssIntoHtml`）与运行时 JS 注入（`getThemeSetJs`）必须共用同一份 CSS。
+- 原色（浅色）模式**不再是零注入**：会注入一份**极小**的覆盖（`util/theme/LightClassic.kt` 的 `LIGHT_MODE_CSS_RULES_CLASSIC`），目前**仅**统一正文链接颜色。同样走 `injectThemeCssIntoHtml` / `getThemeSetJs` 两条路径，不要往里塞与"链接统一"无关的规则，浅色模式整体应保持论坛原样。
 - CSS 规则字符串末尾会统一执行 `background:` → `background-color:` 重写。规则中可以写 `background:`，但**绝不能覆盖站点的 `background-image`**，轮播图、头像和会员自定义背景依赖它。
 - CSS 规则字符串中**不能出现单引号**，否则会破坏 JS 注入字符串拼接。
 - 会员 DIY 空间页完全不启用暗黑模式：看别人的个人主页、日志或相册时，URL 命中 `space-uid-N`、`blog-N`，或 `mod=space` / `mod=blog` 且带 `uid=` / `username=` 参数，或页面为 `body#space` 模板时保持原样。
 - 底栏“我的”加载的是手机版个人中心（`mobile=2` / `mobile=yes` / `mycenter=1`），自己的家园功能页（如 `do=notice`、`do=thread`、`mod=spacecp`、BLOG 列表）也没有会员 DIY，必须正常启用暗黑模式；不要退化为简单匹配 `home.php?mod=space`，否则会误伤这些功能页。
-- 会员空间守卫共三处，改动必须同步：`getDarkModeSetJs`（JS 注入）、`isMemberSpaceUrl`（HTML 代理 URL 判断）、`injectDarkModeCssIntoHtml`（按 `body#space` 兜底）。
+- 会员空间守卫统一由 `util/theme/MemberSpaceGuard` 提供（`jsExpression()` 给 JS 注入、`isMemberSpaceHtml()` 给 HTML 代理兜底）；深色与浅色注入（`getDarkModeSetJs` / `getLightModeSetJs` / `injectDarkModeCssIntoHtml` / `injectLightModeCssIntoHtml`）以及 `YamiboRetrofit` 的 HTML 代理 URL 判断都必须共用它，改判断逻辑要一处改、各处一致。
 - 投票区 `#poll` 的彩条以及用户侧栏的经验/积分彩条依赖内联颜色，必须保留原色；不要用大范围 `.plc div` / `.pls div` 规则覆盖 `.pbr`、`.pbg`、`.pbr2`、`.pbg2`。
-- 深色链接统一使用浅蓝 `#7dbdf2`，不允许改成棕色。
+- 深色链接统一使用浅蓝 `#7dbdf2`，不允许改成棕色；浅色（原色）模式下正文链接统一为站点默认链接色 `#6E2B19`。
+- 链接颜色统一要覆盖到链接内部的 `font[color]` / 内联 `color` 子元素（楼主常把链接套多种颜色），但只改文字色、绝不动 `background-image`。
 - 新页面未适配时，先让用户提供真实 HTML 片段，再按选择器精准补规则；不要凭空猜测或添加大范围通配。
 
 ### 交互
@@ -117,6 +126,21 @@
 - 小说缓存以规范化 URL 及兼容别名为索引；清理单本缓存时必须覆盖同帖 URL 的兼容形式。
 - 漫画缓存统计依赖实际图片 URL 集合；清理单项时优先精确淘汰对应 URL，不要无条件清空全局 Coil 缓存。
 
+### 论坛屏蔽
+
+- 只屏蔽**别人**的内容：自己发布的主题/楼层（含 1 楼）不显示「屏蔽」按钮。判断依据是当前登录 uid 与该主题/楼层作者 uid 比对；`view=me` 或自己 `mod=space&do=thread/reply/favorite` 的"我的空间列表页"整页跳过，不依赖行内作者链接（部分模板该页不带作者头像链接）。
+- uid 必须**登录后尽早拿到并本地持久化**（`CurrentUserUtil`），注入屏蔽脚本时作为 `selfUid` 回传给页面。手机版帖子页本身不带任何自身 uid 标识，必须靠提前存好的值。
+- 列表页「屏蔽」按钮用普通的 `.threadlist_foot li` 容器，与浏览/回复数按钮对齐，不要单独重置样式；帖子页按钮与用户名之间用四个不可断空格（`String.fromCharCode(160,...)`）保持间距。
+
+### 链接直达
+
+- 帖子链接的识别与归一化统一走 `YamiboPostLinkUtil`：强制 `bbs.yamibo.com` + `mobile=2`，排除图片、首页等非帖子链接；剪贴板检测只在切回前台/启动时读当前剪贴板。
+- 跳转必须经 `BBSPage` 的 `startLoading`（会置 `hasRequestedInitialLoad` 等状态），**不要用裸 `webView.loadUrl`**，否则会与首页初始加载抢加载、表现为"停在论坛首页没反应"。
+
+### 崩溃兜底
+
+- `CrashHandler` 在 `YamiboApplication.onCreate` **最先**安装。后台线程未捕获异常记录后吞掉以避免整体闪退；主线程异常仍交还系统默认处理器（此时无法安全恢复）。崩溃日志写入 `getExternalFilesDir/crash`，仅保留最新若干份。
+
 ### CI / 发布
 
 - workflow 只构建 release 签名包（`assembleRelease`），四个签名 secrets 缺一即失败。
@@ -127,7 +151,7 @@
 ## 测试与修改原则
 
 - 优先沿用现有类、状态流和工具函数，不要在 Composable 中复制网络、缓存或持久化逻辑。
-- 修改 URL 归一化、Cookie、会话、HTML 解析、阅读器返回链接、图片加载策略或应用更新解析时，应补充或更新 `app/src/test` 下的对应单元测试。
+- 修改 URL 归一化、Cookie、会话、HTML 解析、阅读器返回链接、图片加载策略、应用更新解析、帖子链接识别（`YamiboPostLinkUtil`）或屏蔽数据（`ForumBlocklistManager`）时，应补充或更新 `app/src/test` 下的对应单元测试。
 - UI、WebView 生命周期和网络恢复通常无法由 JVM 单元测试完整覆盖，编译通过后仍需说明实机验证点。
 - 不要顺手升级 Gradle、AGP、Kotlin、Compose 或网络依赖；依赖升级必须是明确任务，并单独验证兼容性。
 - 不要提交构建产物、签名材料、`.env`、`local.properties` 或临时抓取页面。
