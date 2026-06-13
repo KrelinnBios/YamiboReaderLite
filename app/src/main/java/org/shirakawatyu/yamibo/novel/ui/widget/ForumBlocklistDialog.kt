@@ -3,11 +3,14 @@ package org.shirakawatyu.yamibo.novel.ui.widget
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -63,13 +66,17 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
         textContentColor = MaterialTheme.colorScheme.onSurface,
         title = { Text("黑名单", fontSize = 18.sp) },
         text = {
+            // 搜索框与筛选按钮共用同一高度，保证视觉对齐。
+            val controlHeight = 42.dp
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // 紧凑搜索框：用 DecorationBox 自定义更小的内边距，整体比默认输入框矮一截。
                 val searchInteraction = remember { MutableInteractionSource() }
                 BasicTextField(
                     value = search,
                     onValueChange = { search = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(controlHeight),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface
@@ -96,21 +103,26 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                     }
                 )
 
-                // 全部 / 主题 / 楼层：等宽大按钮，平铺占满整行。
+                // 全部 / 主题 / 楼层：等宽按钮，平铺占满整行，高度与搜索框一致。
+                // 未选中无背景，选中项变蓝色。
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterButton("全部", filter == "all", Modifier.weight(1f)) { filter = "all" }
+                    FilterButton(
+                        "全部",
+                        filter == "all",
+                        Modifier.weight(1f).height(controlHeight)
+                    ) { filter = "all" }
                     FilterButton(
                         "主题",
                         filter == ForumBlockedItem.TYPE_THREAD,
-                        Modifier.weight(1f)
+                        Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_THREAD }
                     FilterButton(
                         "楼层",
                         filter == ForumBlockedItem.TYPE_POST,
-                        Modifier.weight(1f)
+                        Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_POST }
                 }
 
@@ -196,6 +208,7 @@ private fun FilterButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    // 未选中：透明无背景；选中：填充主色（深色主题下为蓝色）。
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -203,21 +216,31 @@ private fun FilterButton(
         color = if (selected) {
             MaterialTheme.colorScheme.primary
         } else {
-            MaterialTheme.colorScheme.surfaceVariant
+            androidx.compose.ui.graphics.Color.Transparent
         },
         contentColor = if (selected) {
             MaterialTheme.colorScheme.onPrimary
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        border = if (selected) {
+            null
+        } else {
+            androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline
+            )
         }
     ) {
-        Text(
-            text = label,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            textAlign = TextAlign.Center,
-            fontSize = 15.sp
-        )
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp
+            )
+        }
     }
 }
