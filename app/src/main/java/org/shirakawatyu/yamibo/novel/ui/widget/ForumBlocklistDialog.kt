@@ -1,8 +1,10 @@
 package org.shirakawatyu.yamibo.novel.ui.widget
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,10 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,19 +30,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlockedItem
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForumBlocklistDialog(onDismiss: () -> Unit) {
     val blockedItems by ForumBlocklistManager.items.collectAsState()
-    var input by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
-    var inputError by remember { mutableStateOf(false) }
 
     val visibleItems = remember(blockedItems, search, filter) {
         val keyword = search.trim()
@@ -57,53 +64,54 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
         title = { Text("黑名单", fontSize = 18.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = {
-                            input = it
-                            inputError = false
-                        },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        isError = inputError,
-                        label = { Text("帖子/楼层链接或 ID") }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val item = ForumBlocklistManager.parseInput(input)
-                            if (item == null) {
-                                inputError = true
-                            } else {
-                                ForumBlocklistManager.add(item.type, item.id, item.title)
-                                input = ""
-                            }
-                        }
-                    ) {
-                        Text("添加")
-                    }
-                }
-
-                OutlinedTextField(
+                // 紧凑搜索框：用 DecorationBox 自定义更小的内边距，整体比默认输入框矮一截。
+                val searchInteraction = remember { MutableInteractionSource() }
+                BasicTextField(
                     value = search,
                     onValueChange = { search = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("搜索标题或 ID") }
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    interactionSource = searchInteraction,
+                    decorationBox = { innerTextField ->
+                        OutlinedTextFieldDefaults.DecorationBox(
+                            value = search,
+                            innerTextField = innerTextField,
+                            enabled = true,
+                            singleLine = true,
+                            visualTransformation = VisualTransformation.None,
+                            interactionSource = searchInteraction,
+                            placeholder = {
+                                Text(
+                                    "搜索标题或 ID",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterButton("全部", filter == "all") { filter = "all" }
-                    FilterButton("主题", filter == ForumBlockedItem.TYPE_THREAD) {
-                        filter = ForumBlockedItem.TYPE_THREAD
-                    }
-                    FilterButton("楼层", filter == ForumBlockedItem.TYPE_POST) {
-                        filter = ForumBlockedItem.TYPE_POST
-                    }
+                // 全部 / 主题 / 楼层：等宽大按钮，平铺占满整行。
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterButton("全部", filter == "all", Modifier.weight(1f)) { filter = "all" }
+                    FilterButton(
+                        "主题",
+                        filter == ForumBlockedItem.TYPE_THREAD,
+                        Modifier.weight(1f)
+                    ) { filter = ForumBlockedItem.TYPE_THREAD }
+                    FilterButton(
+                        "楼层",
+                        filter == ForumBlockedItem.TYPE_POST,
+                        Modifier.weight(1f)
+                    ) { filter = ForumBlockedItem.TYPE_POST }
                 }
 
                 LazyColumn(
@@ -182,17 +190,34 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun FilterButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+private fun FilterButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primary
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            MaterialTheme.colorScheme.surfaceVariant
         },
-        fontSize = 13.sp
-    )
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            textAlign = TextAlign.Center,
+            fontSize = 15.sp
+        )
+    }
 }
