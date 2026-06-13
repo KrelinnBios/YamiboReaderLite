@@ -14,6 +14,7 @@ import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.TtlDnsCache
+import org.shirakawatyu.yamibo.novel.util.theme.MemberSpaceGuard
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
@@ -398,20 +399,14 @@ class YamiboRetrofit {
         /**
          * 会员 DIY 空间页（看别人的个人主页/日志/相册，带具体 uid 的空间 URL）不参与暗黑
          * 模式注入。自己的家园功能页（do=notice 提醒 / do=thread 我的帖子 / mod=spacecp
-         * 个人资料 / BLOG 列表，均无 uid 参数）必须照常注入。URL 判不出来的场合由
+         * 个人资料 / home.php BLOG 列表）必须照常注入；home.php?mod=blog 属于日志空间
+         * 路径，应保持原样。URL 判不出来的场合由
          * injectDarkModeCssIntoHtml 按 HTML 内容（body#space）兜底。
          * 注意区分：底栏「我的」加载的是手机版个人中心（mobile=2 / mycenter=1，无 DIY），
          * 必须照常应用暗黑模式。
          */
         fun isMemberSpaceUrl(url: String): Boolean {
-            if (url.contains("mobile=2") || url.contains("mobile=yes") ||
-                url.contains("mycenter=1")
-            ) {
-                return false
-            }
-            if (Regex("space-uid-\\d+|blog-\\d+").containsMatchIn(url)) return true
-            return Regex("home\\.php\\?mod=(space|blog)\\b").containsMatchIn(url) &&
-                    Regex("[?&](uid|username)=").containsMatchIn(url)
+            return MemberSpaceGuard.isMemberSpaceUrl(url)
         }
 
         fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {

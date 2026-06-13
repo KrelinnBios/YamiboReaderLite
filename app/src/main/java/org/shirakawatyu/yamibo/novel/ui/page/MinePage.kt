@@ -107,6 +107,7 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.MinePageVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.ReaderModeFAB
+import org.shirakawatyu.yamibo.novel.ui.widget.ForumBlocklistDialog
 import org.shirakawatyu.yamibo.novel.BuildConfig
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
@@ -124,6 +125,7 @@ import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
+import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.reader.LocalCacheUtil
@@ -242,6 +244,7 @@ private fun isSameHistoryTargetUrl(actualUrl: String?, targetUrl: String?): Bool
 private sealed interface MineDialogState {
     object None : MineDialogState
     object Settings : MineDialogState
+    object Blocklist : MineDialogState
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, ExperimentalCoilApi::class)
@@ -1535,6 +1538,8 @@ fun MinePage(
                     val isAutoClearCacheEnabled by
                     GlobalData.isAutoClearCacheEnabled.collectAsState()
                     val isAutoSignInEnabled = GlobalData.isAutoSignInEnabled.value
+                    val isForumBlocklistEnabled by
+                    ForumBlocklistManager.enabled.collectAsState()
                     var cacheSizeBytes by remember { mutableStateOf(0L) }
                     var isClearingCache by remember { mutableStateOf(false) }
 
@@ -1613,6 +1618,25 @@ fun MinePage(
                                             GlobalData.isDnsOptimizationEnabled.value = enabled
                                             SettingsUtil.saveDnsOptimizationEnabled(enabled)
                                         },
+                                        colors = yamiboSwitchColors()
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("屏蔽帖子", fontSize = 15.sp)
+                                        Text(
+                                            "在论坛列表和帖子页显示屏蔽按钮",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isForumBlocklistEnabled,
+                                        onCheckedChange = ForumBlocklistManager::setEnabled,
                                         colors = yamiboSwitchColors()
                                     )
                                 }
@@ -1725,30 +1749,43 @@ fun MinePage(
                             }
                         },
                         dismissButton = {
-                            TextButton(
-                                onClick = {
-                                    // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
-                                    mineDialog = MineDialogState.None
-                                    YamiboToast.show(message = "正在检查更新…")
-                                    scope.launch {
-                                        when (val result = AppUpdateManager.checkForUpdate()) {
-                                            AppUpdateCheckResult.NoUpdate ->
-                                                YamiboToast.show(
-                                                    message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
-                                                )
+                            Row {
+                                TextButton(
+                                    onClick = { mineDialog = MineDialogState.Blocklist }
+                                ) {
+                                    Text("黑名单")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
+                                        mineDialog = MineDialogState.None
+                                        YamiboToast.show(message = "正在检查更新…")
+                                        scope.launch {
+                                            when (val result = AppUpdateManager.checkForUpdate()) {
+                                                AppUpdateCheckResult.NoUpdate ->
+                                                    YamiboToast.show(
+                                                        message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
+                                                    )
 
-                                            is AppUpdateCheckResult.UpdateAvailable ->
-                                                manualUpdateInfo = result.info
+                                                is AppUpdateCheckResult.UpdateAvailable ->
+                                                    manualUpdateInfo = result.info
 
-                                            is AppUpdateCheckResult.Failed ->
-                                                manualUpdateFailure = result.reason
+                                                is AppUpdateCheckResult.Failed ->
+                                                    manualUpdateFailure = result.reason
+                                            }
                                         }
                                     }
+                                ) {
+                                    Text("检查更新")
                                 }
-                            ) {
-                                Text("检查更新")
                             }
                         }
+                    )
+                }
+
+                MineDialogState.Blocklist -> {
+                    ForumBlocklistDialog(
+                        onDismiss = { mineDialog = MineDialogState.Settings }
                     )
                 }
             }

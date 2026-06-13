@@ -101,6 +101,7 @@ import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
+import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.network.NetworkMonitor
@@ -161,6 +162,18 @@ class NativeMangaJSInterface {
     }
 }
 
+class ForumBlocklistJSInterface {
+    @JavascriptInterface
+    fun block(type: String, id: String, title: String) {
+        ForumBlocklistManager.add(type, id, title)
+    }
+
+    @JavascriptInterface
+    fun unblock(type: String, id: String) {
+        ForumBlocklistManager.remove(type, id)
+    }
+}
+
 class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient() {
     private val contentImageCount = AtomicInteger(0)
     private var activeMainFrameUrl: String? = null
@@ -184,6 +197,18 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
 
     fun forceInjectMangaJs(webView: WebView) {
         webView.evaluateJavascript(PageJsScripts.BBS_MANGA_REINJECT_JS, null)
+        injectForumBlocker(webView)
+    }
+
+    private fun injectForumBlocker(webView: WebView?) {
+        webView?.evaluateJavascript(
+            PageJsScripts.getForumBlockerJs(
+                enabled = ForumBlocklistManager.enabled.value,
+                itemsJson = ForumBlocklistManager.itemsJson(),
+                isDark = GlobalData.isDarkMode.value
+            ),
+            null
+        )
     }
 
     private fun isBbsHomeUrl(url: String): Boolean {
@@ -361,6 +386,7 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         super.onPageCommitVisible(view, url)
         view?.evaluateJavascript(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS, null)
+        injectForumBlocker(view)
 
         if (GlobalData.isDarkMode.value || GlobalData.lightModeTheme.value > 0) {
             view?.evaluateJavascript(
@@ -606,13 +632,23 @@ fun BBSPage(
     var autoOpenMangaMode by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
+    val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
+    val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
 
-    LaunchedEffect(isDarkMode) {
+    LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems) {
         webView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
                 GlobalData.darkModeTheme.value,
                 GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+        webView.evaluateJavascript(
+            PageJsScripts.getForumBlockerJs(
+                enabled = isForumBlocklistEnabled,
+                itemsJson = ForumBlocklistManager.itemsJson(forumBlockedItems),
+                isDark = isDarkMode
             ),
             null
         )
@@ -679,6 +715,14 @@ fun BBSPage(
                 ),
                 null
             )
+            webView.evaluateJavascript(
+                PageJsScripts.getForumBlockerJs(
+                    enabled = ForumBlocklistManager.enabled.value,
+                    itemsJson = ForumBlocklistManager.itemsJson(),
+                    isDark = GlobalData.isDarkMode.value
+                ),
+                null
+            )
         } catch (e: Throwable) {
             e.printStackTrace()
         }
@@ -740,6 +784,7 @@ fun BBSPage(
             }
         }
     }
+    val forumBlocklistApi = remember { ForumBlocklistJSInterface() }
     val bottomNavBarVM: BottomNavBarVM =
         viewModel(viewModelStoreOwner = LocalContext.current as ComponentActivity)
     val mangaDirVM: MangaDirectoryVM = viewModel(
@@ -1230,6 +1275,7 @@ fun BBSPage(
                         webView.addJavascriptInterface(fullscreenApi, "AndroidFullscreen")
                         webView.addJavascriptInterface(nativeMangaApi, "NativeMangaApi")
                         webView.addJavascriptInterface(searchNavApi, "AndroidSearchNav")
+                        webView.addJavascriptInterface(forumBlocklistApi, "AndroidForumBlocklist")
                         BBSPageState.markBbsContainerMounted()
                     }
                 },
