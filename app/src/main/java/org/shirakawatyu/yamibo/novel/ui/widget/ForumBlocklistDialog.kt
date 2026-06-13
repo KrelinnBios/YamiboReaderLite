@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -22,7 +21,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,13 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlockedItem
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 
@@ -47,7 +46,6 @@ import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 @Composable
 fun ForumBlocklistDialog(onDismiss: () -> Unit) {
     val blockedItems by ForumBlocklistManager.items.collectAsState()
-    val isDarkMode by GlobalData.isDarkMode.collectAsState()
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
 
@@ -105,8 +103,8 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                     }
                 )
 
-                // 全部 / 主题 / 楼层：等宽按钮，平铺占满整行，高度与搜索框一致。
-                // 未选中无背景，选中项变蓝色。
+                // 全部 / 主题 / 楼层：等宽纯文本按钮，平铺占满整行，高度与搜索框一致。
+                // 无底色，选中项仅改变文字颜色。
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -114,19 +112,16 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                     FilterButton(
                         "全部",
                         filter == "all",
-                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = "all" }
                     FilterButton(
                         "主题",
                         filter == ForumBlockedItem.TYPE_THREAD,
-                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_THREAD }
                     FilterButton(
                         "楼层",
                         filter == ForumBlockedItem.TYPE_POST,
-                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_POST }
                 }
@@ -210,40 +205,26 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
 private fun FilterButton(
     label: String,
     selected: Boolean,
-    isDarkMode: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    // 原色模式：棕色选中底配弹窗底色文字；暗黑模式：蓝色选中底配白字。
-    // 未选中项始终使用当前主题的普通文字色和透明背景。
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            androidx.compose.ui.graphics.Color.Transparent
-        },
-        contentColor = if (selected) {
-            if (isDarkMode) {
-                MaterialTheme.colorScheme.onPrimary
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
+    // 纯文本按钮：无底色。选中时文字用主题色（原色棕 / 暗黑蓝）并加粗，未选中为普通文字色。
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                textAlign = TextAlign.Center,
-                fontSize = 14.sp
-            )
-        }
+        Text(
+            text = label,
+            textAlign = TextAlign.Center,
+            fontSize = 14.sp,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
