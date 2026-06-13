@@ -1263,6 +1263,19 @@ $styleString
                         return !!uid && !!state.currentUid && String(uid) === String(state.currentUid);
                     }
 
+                    // 当前是不是“我自己”的空间列表页（我的主题/回复/收藏）。这类页面整页都是自己的内容，
+                    // 不管行内有没有作者链接，都不应出现屏蔽按钮。
+                    function isOwnSpaceListPage() {
+                        var href = location.href || '';
+                        if (/[?&]view=me(&|$)/i.test(href)) return true;
+                        if (/mod=space/i.test(href) && /[?&]do=(thread|reply|favorite)/i.test(href)) {
+                            var m = href.match(/[?&]uid=(\d+)/i);
+                            if (!m) return true;
+                            if (isOwnUid(m[1])) return true;
+                        }
+                        return false;
+                    }
+
                     function getPostPid(post) {
                         var match = String(post.id || '').match(/(?:pid|post_)(\d+)/i);
                         if (match) return match[1];
@@ -1315,10 +1328,18 @@ $styleString
 
                     function syncListPage(map) {
                         var rows = document.querySelectorAll('.threadlist li.list, .threadlist li.list_top');
+                        // 我自己的空间列表页（我的主题/回复/收藏）整页都是自己的内容，不加屏蔽按钮，
+                        // 并清掉历史上误加的，避免依赖行内作者链接（部分模板该页不带作者头像链接）。
+                        var ownSpace = isOwnSpaceListPage();
                         for (var i = 0; i < rows.length; i++) {
                             var row = rows[i];
                             var tid = getRowTid(row);
                             if (!tid) continue;
+                            if (ownSpace) {
+                                var ownSpaceHolder = row.querySelector('.yamibo-block-li');
+                                if (ownSpaceHolder) ownSpaceHolder.remove();
+                                continue;
+                            }
                             // 自己发布的主题不显示屏蔽按钮（也清掉历史上误加的）。
                             if (isOwnUid(getRowAuthorUid(row))) {
                                 var ownHolder = row.querySelector('.yamibo-block-li');
