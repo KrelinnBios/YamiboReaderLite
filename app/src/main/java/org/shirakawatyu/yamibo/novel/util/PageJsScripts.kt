@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_CLASSIC
+import org.shirakawatyu.yamibo.novel.util.theme.MemberSpaceGuard
 
 object PageJsScripts {
 
@@ -991,6 +992,7 @@ object PageJsScripts {
 
     fun getDarkModeSetJs(enable: Boolean, themeId: Int = 0): String {
         val rulesList = DARK_MODE_CSS_RULES_CLASSIC
+        val memberSpaceUrlExpression = MemberSpaceGuard.jsExpression()
         // 规则会被嵌进 JS 单引号字符串：必须转义反斜杠和单引号，
         // 否则任何一条带 ' 的规则都会让整段注入脚本语法错误，暗黑切换静默失效。
         val styleString = rulesList.joinToString(",\n") {
@@ -1003,14 +1005,11 @@ object PageJsScripts {
                 var existing = document.getElementById(styleId);
                 // 会员 DIY 空间页（看别人的个人主页/日志/相册，body#space 模板或带具体 uid 的
                 // 空间 URL）不启用暗黑模式；自己的家园功能页（do=notice 提醒 / do=thread 我的
-                // 帖子 / mod=spacecp 个人资料 / BLOG 列表，均无 uid 参数）照常变深色。
+                // 帖子 / mod=spacecp 个人资料 / home.php BLOG 列表）照常变深色；
+                // home.php?mod=blog 是日志空间路径，必须保持会员自定义样式。
                 // 底栏「我的」是手机版个人中心（mobile=2 / mycenter=1），必须照常变深色。
-                var isMobileCenter = /mobile=2|mobile=yes|mycenter=1/.test(location.href);
-                var isMemberSpace = !isMobileCenter && (
-                    (document.body && document.body.id === 'space') ||
-                    /space-uid-\d+|blog-\d+/.test(location.href) ||
-                    (/home\.php\?mod=(space|blog)\b/.test(location.href) && /[?&](uid|username)=/.test(location.href))
-                );
+                var isMemberSpace = (document.body && document.body.id === 'space') ||
+                    ($memberSpaceUrlExpression);
                 var enable = $enable && !isMemberSpace;
                 if (!enable) {
                     if (existing) existing.remove();
@@ -1040,7 +1039,7 @@ $styleString
     fun injectDarkModeCssIntoHtml(html: String, themeId: Int = 0): String {
         // 会员 DIY 空间模板的兜底守卫：URL 判不出来的场合按 HTML 内容判断，
         // body#space（个人主页/日志/相册）保持会员自己的背景和配色。
-        if (html.contains("<body id=\"space\"")) return html
+        if (MemberSpaceGuard.isMemberSpaceHtml(html)) return html
         val rulesList = DARK_MODE_CSS_RULES_CLASSIC
         val css = rulesList.joinToString("\n")
         val styleTag = "<style id=\"yamibo-dark-mode\">\n$css\n</style>"
@@ -1068,6 +1067,301 @@ $styleString
             isDark -> injectDarkModeCssIntoHtml(html, darkThemeId)
             else -> html
         }
+    }
+
+    fun getForumBlockerJs(enabled: Boolean, itemsJson: String, isDark: Boolean): String {
+        val itemsLiteral = jsStringLiteral(itemsJson)
+        return """
+            (function() {
+                var incomingItems = [];
+                try { incomingItems = JSON.parse($itemsLiteral); } catch (e) {}
+
+                if (!window.__yamiboForumBlocker) {
+                    var state = {
+                        enabled: true,
+                        dark: false,
+                        items: [],
+                        syncing: false,
+                        timer: null
+                    };
+
+                    function itemKey(type, id) {
+                        return String(type) + ':' + String(id);
+                    }
+
+                    function blockedMap() {
+                        var map = {};
+                        for (var i = 0; i < state.items.length; i++) {
+                            var item = state.items[i] || {};
+                            map[itemKey(item.type, item.id)] = item;
+                        }
+                        return map;
+                    }
+
+                    function restoreElement(element) {
+                        if (!element || element.getAttribute('data-yamibo-block-hidden') !== '1') return;
+                        var oldDisplay = element.getAttribute('data-yamibo-old-display');
+                        element.style.display = oldDisplay || '';
+                        element.removeAttribute('data-yamibo-old-display');
+                        element.removeAttribute('data-yamibo-block-hidden');
+                    }
+
+                    function hideElement(element) {
+                        if (!element || element.getAttribute('data-yamibo-block-hidden') === '1') return;
+                        element.setAttribute('data-yamibo-old-display', element.style.display || '');
+                        element.setAttribute('data-yamibo-block-hidden', '1');
+                        element.style.setProperty('display', 'none', 'important');
+                    }
+
+                    function cleanup() {
+                        var hidden = document.querySelectorAll('[data-yamibo-block-hidden="1"]');
+                        for (var i = 0; i < hidden.length; i++) restoreElement(hidden[i]);
+                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-blocked-message');
+                        for (var j = 0; j < generated.length; j++) generated[j].remove();
+                    }
+
+                    function ensureStyle() {
+                        var style = document.getElementById('yamibo-forum-blocker-style');
+                        if (!style) {
+                            style = document.createElement('style');
+                            style.id = 'yamibo-forum-blocker-style';
+                            (document.head || document.documentElement).appendChild(style);
+                        }
+                        var background = state.dark ? '#182332' : '#f5f2ea';
+                        var border = state.dark ? '#2b4058' : '#ded6c7';
+                        var text = state.dark ? '#b8c6d8' : '#66605a';
+                        style.textContent =
+                            '.yamibo-block-action{display:inline-block!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0 4px!important;margin:0!important;font:inherit!important;line-height:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
+                            '.authi>.yamibo-block-action{margin-left:6px!important;font-size:12px!important;font-weight:normal!important;}' +
+                            '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
+                            '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
+                            '.yamibo-blocked-message a{font-size:12px!important;}';
+                    }
+
+                    function getTid(rawUrl) {
+                        var value = String(rawUrl || '');
+                        var match = value.match(/thread-(\d+)/i);
+                        if (match) return match[1];
+                        match = value.match(/[?&]tid=(\d+)/i);
+                        return match ? match[1] : null;
+                    }
+
+                    function getCurrentTid() {
+                        return getTid(location.href);
+                    }
+
+                    function getRowTid(row) {
+                        var link = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
+                        return link ? getTid(link.href || link.getAttribute('href')) : null;
+                    }
+
+                    function getPostPid(post) {
+                        var match = String(post.id || '').match(/(?:pid|post_)(\d+)/i);
+                        if (match) return match[1];
+                        var dataPid = post.getAttribute('data-pid');
+                        if (dataPid && /^\d+$/.test(dataPid)) return dataPid;
+                        var postNum = post.querySelector('[id^="postnum"]');
+                        match = postNum ? String(postNum.id).match(/postnum(\d+)/i) : null;
+                        return match ? match[1] : null;
+                    }
+
+                    function ensurePlaceholder(target, type, id, label) {
+                        if (!target || !target.parentNode) return;
+                        var selector = '.yamibo-blocked-message[data-type="' + type + '"][data-id="' + id + '"]';
+                        var existing = target.parentNode.querySelector(selector);
+                        if (existing) return;
+                        var message = document.createElement(
+                            target.parentNode.tagName === 'UL' ? 'li' : 'div'
+                        );
+                        message.className = 'yamibo-blocked-message';
+                        message.setAttribute('data-type', type);
+                        message.setAttribute('data-id', id);
+                        message.appendChild(document.createTextNode(label + '已被屏蔽 '));
+                        var undo = document.createElement('a');
+                        undo.href = 'javascript:;';
+                        undo.className = 'xi2 yamibo-unblock-action';
+                        undo.setAttribute('data-type', type);
+                        undo.setAttribute('data-id', id);
+                        undo.textContent = '取消屏蔽';
+                        message.appendChild(undo);
+                        target.parentNode.insertBefore(message, target);
+                    }
+
+                    function removePlaceholder(target, type, id) {
+                        if (!target || !target.parentNode) return;
+                        var selector = '.yamibo-blocked-message[data-type="' + type + '"][data-id="' + id + '"]';
+                        var message = target.parentNode.querySelector(selector);
+                        if (message) message.remove();
+                    }
+
+                    function makeAction(type, id, title, blocked) {
+                        var action = document.createElement('a');
+                        action.href = 'javascript:;';
+                        action.className = 'xi2 yamibo-block-action';
+                        action.setAttribute('data-type', type);
+                        action.setAttribute('data-id', id);
+                        action.setAttribute('data-title', title || '');
+                        action.textContent = blocked ? '取消屏蔽' : '屏蔽';
+                        return action;
+                    }
+
+                    function syncListPage(map) {
+                        var rows = document.querySelectorAll('.threadlist li.list, .threadlist li.list_top');
+                        for (var i = 0; i < rows.length; i++) {
+                            var row = rows[i];
+                            var tid = getRowTid(row);
+                            if (!tid) continue;
+                            var key = itemKey('thread', tid);
+                            var isBlocked = !!map[key];
+                            var action = row.querySelector('.yamibo-block-action[data-type="thread"]');
+                            if (!action) {
+                                var foot = row.querySelector('.threadlist_foot ul');
+                                if (foot) {
+                                    var holder = document.createElement('li');
+                                    holder.className = 'yamibo-block-action';
+                                    holder.style.padding = '0';
+                                    var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
+                                    var title = titleLink ? String(titleLink.textContent || '').trim() : '';
+                                    action = makeAction('thread', tid, title, isBlocked);
+                                    holder.appendChild(action);
+                                    foot.appendChild(holder);
+                                }
+                            } else {
+                                action.textContent = isBlocked ? '取消屏蔽' : '屏蔽';
+                            }
+
+                            if (isBlocked) {
+                                hideElement(row);
+                                ensurePlaceholder(row, 'thread', tid, '该主题');
+                            } else {
+                                restoreElement(row);
+                                removePlaceholder(row, 'thread', tid);
+                            }
+                        }
+                    }
+
+                    function syncPostPage(map) {
+                        var currentTid = getCurrentTid();
+                        var threadContainer = document.querySelector('#postlist, .viewthread');
+                        var threadBlocked = currentTid && !!map[itemKey('thread', currentTid)];
+                        if (threadContainer) {
+                            if (threadBlocked) {
+                                hideElement(threadContainer);
+                                ensurePlaceholder(threadContainer, 'thread', currentTid, '该主题');
+                                return;
+                            }
+                            restoreElement(threadContainer);
+                            removePlaceholder(threadContainer, 'thread', currentTid);
+                        }
+
+                        var posts = document.querySelectorAll('[id^="pid"], .plc[data-pid]');
+                        for (var i = 0; i < posts.length; i++) {
+                            var post = posts[i];
+                            var pid = getPostPid(post);
+                            if (!pid) continue;
+                            var isBlocked = !!map[itemKey('post', pid)];
+                            var action = post.querySelector('.yamibo-block-action[data-type="post"]');
+                            if (!action) {
+                                var auth = post.querySelector('.authi');
+                                var userLink = auth ? auth.querySelector('a') : null;
+                                if (auth && userLink) {
+                                    action = makeAction(
+                                        'post',
+                                        pid,
+                                        (document.title || '') + ' · 楼层 ' + pid,
+                                        isBlocked
+                                    );
+                                    userLink.insertAdjacentElement('afterend', action);
+                                }
+                            } else {
+                                action.textContent = isBlocked ? '取消屏蔽' : '屏蔽';
+                            }
+
+                            if (isBlocked) {
+                                hideElement(post);
+                                ensurePlaceholder(post, 'post', pid, '该楼层');
+                            } else {
+                                restoreElement(post);
+                                removePlaceholder(post, 'post', pid);
+                            }
+                        }
+                    }
+
+                    function sync() {
+                        if (state.syncing) return;
+                        state.syncing = true;
+                        try {
+                            ensureStyle();
+                            if (!state.enabled) {
+                                cleanup();
+                                return;
+                            }
+                            var map = blockedMap();
+                            syncListPage(map);
+                            syncPostPage(map);
+                        } finally {
+                            state.syncing = false;
+                        }
+                    }
+
+                    function scheduleSync() {
+                        if (state.timer) clearTimeout(state.timer);
+                        state.timer = setTimeout(function() {
+                            state.timer = null;
+                            sync();
+                        }, 80);
+                    }
+
+                    function updateLocal(type, id, title, shouldBlock) {
+                        var key = itemKey(type, id);
+                        var next = [];
+                        for (var i = 0; i < state.items.length; i++) {
+                            var item = state.items[i];
+                            if (itemKey(item.type, item.id) !== key) next.push(item);
+                        }
+                        if (shouldBlock) next.push({ type: type, id: String(id), title: title || '' });
+                        state.items = next;
+                        sync();
+                    }
+
+                    document.addEventListener('click', function(event) {
+                        var unblock = event.target.closest ? event.target.closest('.yamibo-unblock-action') : null;
+                        var action = unblock || (event.target.closest ? event.target.closest('.yamibo-block-action[data-type][data-id]') : null);
+                        if (!action) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        var type = action.getAttribute('data-type');
+                        var id = action.getAttribute('data-id');
+                        var title = action.getAttribute('data-title') || '';
+                        var map = blockedMap();
+                        var shouldBlock = unblock ? false : !map[itemKey(type, id)];
+                        updateLocal(type, id, title, shouldBlock);
+                        if (window.AndroidForumBlocklist) {
+                            if (shouldBlock && window.AndroidForumBlocklist.block) {
+                                window.AndroidForumBlocklist.block(type, id, title);
+                            } else if (!shouldBlock && window.AndroidForumBlocklist.unblock) {
+                                window.AndroidForumBlocklist.unblock(type, id);
+                            }
+                        }
+                    }, true);
+
+                    var observer = new MutationObserver(scheduleSync);
+                    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+
+                    window.__yamiboForumBlocker = {
+                        update: function(enabledValue, itemsValue, darkValue) {
+                            state.enabled = !!enabledValue;
+                            state.items = Array.isArray(itemsValue) ? itemsValue : [];
+                            state.dark = !!darkValue;
+                            sync();
+                        },
+                        sync: sync
+                    };
+                }
+
+                window.__yamiboForumBlocker.update($enabled, incomingItems, $isDark);
+            })();
+        """.trimIndent()
     }
 
     val SEARCH_DIRECT_NAV_JS = """

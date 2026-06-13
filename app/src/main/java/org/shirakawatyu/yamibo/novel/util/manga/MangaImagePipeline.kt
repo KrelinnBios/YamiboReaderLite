@@ -170,18 +170,33 @@ object MangaImagePipeline {
         }.distinct()
 
         val ownerKey = "handoff:${ordered.firstOrNull().orEmpty().hashCode()}:${System.nanoTime()}"
+        val firstUrl = ordered.first()
+        val firstLoad = ensureDiskCached(
+            context = context.applicationContext,
+            url = firstUrl,
+            headers = headers,
+            ownerKey = ownerKey,
+            source = Source.HANDOFF_HOT,
+            memory = true,
+            explicitCookie = cookie
+        )
 
-        ordered.forEachIndexed { index, imgUrl ->
-            val hot = index <= 2
-            ensureDiskCached(
-                context = context.applicationContext,
-                url = imgUrl,
-                headers = headers,
-                ownerKey = ownerKey,
-                source = if (hot) Source.HANDOFF_HOT else Source.HANDOFF_COLD,
-                memory = hot,
-                explicitCookie = cookie
-            )
+        // 大图章节先把首张图完整送到缓存，再放行后续预取。
+        // 否则 3~5 MB 图片会同时占满同一 host 的连接和下行带宽，首屏反而最慢。
+        pipelineScope.launch {
+            runCatching { firstLoad.await() }
+            ordered.drop(1).forEachIndexed { index, imgUrl ->
+                val hot = index < 2
+                ensureDiskCached(
+                    context = context.applicationContext,
+                    url = imgUrl,
+                    headers = headers,
+                    ownerKey = ownerKey,
+                    source = if (hot) Source.HANDOFF_HOT else Source.HANDOFF_COLD,
+                    memory = hot,
+                    explicitCookie = cookie
+                )
+            }
         }
     }
 
@@ -286,15 +301,32 @@ object MangaImagePipeline {
 
         ownerUrlKeys[ownerKey] = desiredKeys
 
-        specs.sortedBy { it.rank }.forEach { spec ->
-            ensureDiskCached(
-                context = context.applicationContext,
-                url = spec.url,
-                ownerKey = ownerKey,
-                source = spec.source,
-                memory = spec.memory,
-                explicitCookie = cookie
-            )
+        val visibleLoad = synchronized(lock) {
+            inFlight[cacheKey(urls[currentIndex])]?.deferred
+        }
+
+        fun startWindowPrefetch() {
+            specs.sortedBy { it.rank }.forEach { spec ->
+                ensureDiskCached(
+                    context = context.applicationContext,
+                    url = spec.url,
+                    ownerKey = ownerKey,
+                    source = spec.source,
+                    memory = spec.memory,
+                    explicitCookie = cookie
+                )
+            }
+        }
+
+        if (visibleLoad != null && !visibleLoad.isCompleted) {
+            pipelineScope.launch {
+                runCatching { visibleLoad.await() }
+                if (ownerLastIndex[ownerKey] == currentIndex) {
+                    startWindowPrefetch()
+                }
+            }
+        } else {
+            startWindowPrefetch()
         }
     }
 

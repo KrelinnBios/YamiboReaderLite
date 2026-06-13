@@ -22,6 +22,7 @@ import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.CacheMaintenance
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
+import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import java.io.File
 
 class YamiboApplication : Application(), ImageLoaderFactory {
@@ -41,6 +42,7 @@ class YamiboApplication : Application(), ImageLoaderFactory {
         globalCacheDir = applicationContext.cacheDir
 
         GlobalData.dataStore = applicationContext.dataStore
+        ForumBlocklistManager.initialize()
 
         try {
             PageJsScripts.copyLinkIconSvg = applicationContext.assets
