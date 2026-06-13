@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import org.shirakawatyu.yamibo.novel.util.theme.DARK_MODE_CSS_RULES_CLASSIC
+import org.shirakawatyu.yamibo.novel.util.theme.LIGHT_MODE_CSS_RULES_CLASSIC
 import org.shirakawatyu.yamibo.novel.util.theme.MemberSpaceGuard
 
 object PageJsScripts {
@@ -1063,11 +1064,29 @@ $styleString
     }
 
     fun getLightModeSetJs(enable: Boolean, themeId: Int = 0): String {
+        val styleString = LIGHT_MODE_CSS_RULES_CLASSIC.joinToString(",\n") {
+            "                '${it.replace("\\", "\\\\").replace("'", "\\'")}'"
+        }
+        val memberSpaceUrlExpression = MemberSpaceGuard.jsExpression()
         return """
             (function() {
                 var styleId = 'yamibo-light-mode';
                 var existing = document.getElementById(styleId);
+                // 会员 DIY 空间（个人主页/日志/相册）保持原样，不做链接统一。
+                var isMemberSpace = (document.body && document.body.id === 'space') ||
+                    ($memberSpaceUrlExpression);
+                var enable = $enable && !isMemberSpace;
+                if (!enable) {
+                    if (existing) existing.remove();
+                    return;
+                }
                 if (existing) existing.remove();
+                var style = document.createElement('style');
+                style.id = styleId;
+                style.innerHTML = [
+$styleString
+                ].join('\n');
+                (document.body || document.documentElement).appendChild(style);
             })();
         """.trimIndent()
     }
@@ -1089,19 +1108,28 @@ $styleString
     }
 
     fun injectLightModeCssIntoHtml(html: String, themeId: Int = 0): String {
-        return html
+        if (MemberSpaceGuard.isMemberSpaceHtml(html)) return html
+        val css = LIGHT_MODE_CSS_RULES_CLASSIC.joinToString("\n")
+        val styleTag = "<style id=\"yamibo-light-mode\">\n$css\n</style>"
+        return when {
+            html.contains("</head>") -> html.replace("</head>", "$styleTag</head>")
+            html.contains("<head>") -> html.replace("<head>", "<head>$styleTag")
+            html.contains("<html>") -> html.replace("<html>", "<html><head>$styleTag</head>")
+            html.contains("<body") -> html.replace("<body", "$styleTag<body")
+            else -> "$styleTag$html"
+        }
     }
 
     fun getThemeSetJs(isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
         val darkJs = getDarkModeSetJs(isDark, darkThemeId)
-        val lightJs = getLightModeSetJs(false, lightThemeId)
+        val lightJs = getLightModeSetJs(!isDark, lightThemeId)
         return "$darkJs\n$lightJs"
     }
 
     fun injectThemeCssIntoHtml(html: String, isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
         return when {
             isDark -> injectDarkModeCssIntoHtml(html, darkThemeId)
-            else -> html
+            else -> injectLightModeCssIntoHtml(html, lightThemeId)
         }
     }
 
@@ -1118,7 +1146,8 @@ $styleString
                         dark: false,
                         items: [],
                         syncing: false,
-                        timer: null
+                        timer: null,
+                        currentUid: null
                     };
 
                     function itemKey(type, id) {
@@ -1197,6 +1226,42 @@ $styleString
                         return link ? getTid(link.href || link.getAttribute('href')) : null;
                     }
 
+                    function getUidFromHref(href) {
+                        var value = String(href || '');
+                        var match = value.match(/space-uid-(\d+)/i);
+                        if (match) return match[1];
+                        match = value.match(/[?&]uid=(\d+)/i);
+                        return match ? match[1] : null;
+                    }
+
+                    // 当前登录用户 uid：桌面版用 discuz_uid，手机版用底部「个人中心」链接(mycenter=1)。
+                    function getCurrentUid() {
+                        if (window.discuz_uid && /^\d+$/.test(String(window.discuz_uid))) {
+                            return String(window.discuz_uid);
+                        }
+                        var selfLink = document.querySelector('a[href*="mycenter=1"]');
+                        if (selfLink) {
+                            var uid = getUidFromHref(selfLink.getAttribute('href') || selfLink.href);
+                            if (uid) return uid;
+                        }
+                        return null;
+                    }
+
+                    function getRowAuthorUid(row) {
+                        var link = row.querySelector('a[href*="space-uid-"], a[href*="mod=space"]');
+                        return link ? getUidFromHref(link.getAttribute('href') || link.href) : null;
+                    }
+
+                    function getPostAuthorUid(post) {
+                        var auth = post.querySelector('.authi');
+                        var link = auth ? auth.querySelector('a[href*="space-uid-"], a[href*="mod=space"]') : null;
+                        return link ? getUidFromHref(link.getAttribute('href') || link.href) : null;
+                    }
+
+                    function isOwnUid(uid) {
+                        return !!uid && !!state.currentUid && String(uid) === String(state.currentUid);
+                    }
+
                     function getPostPid(post) {
                         var match = String(post.id || '').match(/(?:pid|post_)(\d+)/i);
                         if (match) return match[1];
@@ -1253,6 +1318,12 @@ $styleString
                             var row = rows[i];
                             var tid = getRowTid(row);
                             if (!tid) continue;
+                            // 自己发布的主题不显示屏蔽按钮（也清掉历史上误加的）。
+                            if (isOwnUid(getRowAuthorUid(row))) {
+                                var ownHolder = row.querySelector('.yamibo-block-li');
+                                if (ownHolder) ownHolder.remove();
+                                continue;
+                            }
                             var key = itemKey('thread', tid);
                             var isBlocked = !!map[key];
                             var action = row.querySelector('.yamibo-block-action[data-type="thread"]');
@@ -1302,6 +1373,12 @@ $styleString
                             var post = posts[i];
                             var pid = getPostPid(post);
                             if (!pid) continue;
+                            // 自己发布的楼层（含主题楼）不显示屏蔽按钮（也清掉历史上误加的）。
+                            if (isOwnUid(getPostAuthorUid(post))) {
+                                var ownPostAction = post.querySelector('.yamibo-block-action[data-type="post"]');
+                                if (ownPostAction) ownPostAction.remove();
+                                continue;
+                            }
                             var isBlocked = !!map[itemKey('post', pid)];
                             var action = post.querySelector('.yamibo-block-action[data-type="post"]');
                             if (!action) {
@@ -1342,6 +1419,10 @@ $styleString
                                 cleanup();
                                 return;
                             }
+                            // 缓存当前登录 uid：手机版帖子页不带任何自身标识，但论坛列表/个人中心页带
+                            // mycenter 链接。脚本常驻于同一 WebView，先在列表页拿到 uid 后，进入帖子页仍可用。
+                            var detectedUid = getCurrentUid();
+                            if (detectedUid) state.currentUid = detectedUid;
                             var map = blockedMap();
                             syncListPage(map);
                             syncPostPage(map);
