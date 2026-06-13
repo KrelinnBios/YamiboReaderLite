@@ -205,6 +205,11 @@ fun HistoryPage(navController: NavController) {
     val pageBackground = MaterialTheme.colorScheme.background
     val topBarColor = MaterialTheme.colorScheme.primary
     val topBarContentColor = MaterialTheme.colorScheme.onPrimary
+    // 搜索框背景色：暗黑模式下与历史记录卡片（tertiary）一致，浅色模式保持 surfaceVariant。
+    val searchBoxContainerColor = darkModeColor(
+        light = MaterialTheme.colorScheme.surfaceVariant,
+        dark = MaterialTheme.colorScheme.tertiary
+    )
 
     // 将搜索词按空格分词，实现组合搜索
     val searchTerms = remember(searchQuery) {
@@ -623,8 +628,10 @@ fun HistoryPage(navController: NavController) {
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    // 暗黑模式下搜索框背景与历史记录卡片保持一致（tertiary = #223247），
+                    // 浅色模式维持原有 surfaceVariant。
+                    focusedContainerColor = searchBoxContainerColor,
+                    unfocusedContainerColor = searchBoxContainerColor,
                     focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                 )

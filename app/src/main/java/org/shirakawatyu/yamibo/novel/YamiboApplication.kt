@@ -20,6 +20,7 @@ import org.shirakawatyu.yamibo.novel.util.manga.FastScrollDebounceInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.NetworkPreWarmer
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.CacheMaintenance
+import org.shirakawatyu.yamibo.novel.util.CrashHandler
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
@@ -38,6 +39,7 @@ class YamiboApplication : Application(), ImageLoaderFactory {
     @OptIn(ExperimentalCoilApi::class)
     override fun onCreate() {
         super.onCreate()
+        CrashHandler.install(this)
         application = this
         globalCacheDir = applicationContext.cacheDir
 
