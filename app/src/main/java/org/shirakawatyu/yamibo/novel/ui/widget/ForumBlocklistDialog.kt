@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlockedItem
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 
@@ -46,6 +47,7 @@ import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 @Composable
 fun ForumBlocklistDialog(onDismiss: () -> Unit) {
     val blockedItems by ForumBlocklistManager.items.collectAsState()
+    val isDarkMode by GlobalData.isDarkMode.collectAsState()
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
 
@@ -112,16 +114,19 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
                     FilterButton(
                         "全部",
                         filter == "all",
+                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = "all" }
                     FilterButton(
                         "主题",
                         filter == ForumBlockedItem.TYPE_THREAD,
+                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_THREAD }
                     FilterButton(
                         "楼层",
                         filter == ForumBlockedItem.TYPE_POST,
+                        isDarkMode,
                         Modifier.weight(1f).height(controlHeight)
                     ) { filter = ForumBlockedItem.TYPE_POST }
                 }
@@ -205,12 +210,12 @@ fun ForumBlocklistDialog(onDismiss: () -> Unit) {
 private fun FilterButton(
     label: String,
     selected: Boolean,
+    isDarkMode: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    // 选中项的主题色底色在三个按钮之间切换；未选中无底色。
-    // 选中时文字用 onPrimary（与“清理缓存”等填充按钮一致），保证在主题色底色上清晰可读；
-    // 未选中时为普通文字色。
+    // 原色模式：棕色选中底配弹窗底色文字；暗黑模式：蓝色选中底配白字。
+    // 未选中项始终使用当前主题的普通文字色和透明背景。
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -221,7 +226,11 @@ private fun FilterButton(
             androidx.compose.ui.graphics.Color.Transparent
         },
         contentColor = if (selected) {
-            MaterialTheme.colorScheme.onPrimary
+            if (isDarkMode) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         } else {
             MaterialTheme.colorScheme.onSurface
         }
