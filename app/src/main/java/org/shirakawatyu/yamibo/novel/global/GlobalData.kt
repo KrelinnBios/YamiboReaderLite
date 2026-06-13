@@ -20,6 +20,8 @@ class GlobalData {
         var dataStore: DataStore<Preferences>? = null
         var displayMetrics: DisplayMetrics? = null
         var currentCookie: String = ""
+        // 当前登录用户 uid，用于屏蔽功能排除自己发布的帖子/楼层。登录后本地持久化。
+        var currentUid by mutableStateOf("")
         var isAppInitialized by mutableStateOf(false)
         val cookieFlow: Flow<String> by lazy {
             CookieUtil.getCookieFlow()
