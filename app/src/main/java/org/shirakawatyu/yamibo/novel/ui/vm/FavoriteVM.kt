@@ -449,6 +449,13 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             if ((currentState == requestedState || currentState == FetchState.MANUAL) &&
                 fetchJob?.isActive == true
             ) {
+                // 已有拉取在途（常见于返回前台触发的 showLoading=false 全量同步占用了 MANUAL 状态）。
+                // 此时若是用户手动下拉刷新（showLoading=true），不能被静默去重——否则下拉指示器
+                // 不会进入旋转态，看起来就是“图标不转、刷新没反应”。让指示器转起来跟随这次在途拉取
+                // 一起收尾即可：在途任务的 generation 未变，完成时会调用 releaseStateIfCurrent 关闭它。
+                if (showLoading) {
+                    _uiState.update { it.copy(isRefreshing = true) }
+                }
                 return
             }
             if (currentFetchState.compareAndSet(currentState, requestedState)) break

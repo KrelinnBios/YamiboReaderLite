@@ -1152,7 +1152,7 @@ $styleString
                     function cleanup() {
                         var hidden = document.querySelectorAll('[data-yamibo-block-hidden="1"]');
                         for (var i = 0; i < hidden.length; i++) restoreElement(hidden[i]);
-                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-blocked-message');
+                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-block-li, .yamibo-blocked-message');
                         for (var j = 0; j < generated.length; j++) generated[j].remove();
                     }
 
@@ -1167,8 +1167,14 @@ $styleString
                         var border = state.dark ? '#2b4058' : '#ded6c7';
                         var text = state.dark ? '#b8c6d8' : '#66605a';
                         style.textContent =
-                            '.yamibo-block-action{display:inline-block!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0 4px!important;margin:0!important;font:inherit!important;line-height:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
-                            '.authi>.yamibo-block-action{margin-left:18px!important;font-size:12px!important;font-weight:normal!important;}' +
+                            // 基础重置只作用于按钮本身的 <a>，保持极简，让它在不同容器里自然继承排版。
+                            'a.yamibo-block-action{background:transparent!important;border:0!important;box-shadow:none!important;font:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
+                            // 列表页：容器 <li> 不加任何样式类，直接复用站点 .threadlist_foot li 的胶囊样式
+                            // （float:left、内边距、圆角、深色边框），从而与浏览数/回复数按钮完全对齐。
+                            // 内部 <a> 保持纯内联文本，字号随 foot 继承，和数字“95/12”同一基线。
+                            '.threadlist_foot li.yamibo-block-li a.yamibo-block-action{display:inline!important;padding:0!important;margin:0!important;line-height:inherit!important;}' +
+                            // 帖子页：按钮在用户名后内联显示，间距由前面插入的四个不可断空格决定，这里清零边距。
+                            '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
                             '.yamibo-blocked-message a{font-size:12px!important;}';
@@ -1253,9 +1259,10 @@ $styleString
                             if (!action) {
                                 var foot = row.querySelector('.threadlist_foot ul');
                                 if (foot) {
+                                    // 用普通的 foot <li> 作为容器，让屏蔽按钮与旁边的浏览/回复数
+                                    // 按钮（同为 .threadlist_foot li）保持同样的对齐与外观，不再单独重置样式。
                                     var holder = document.createElement('li');
-                                    holder.className = 'yamibo-block-action';
-                                    holder.style.padding = '0';
+                                    holder.className = 'yamibo-block-li';
                                     var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
                                     var title = titleLink ? String(titleLink.textContent || '').trim() : '';
                                     action = makeAction('thread', tid, title, isBlocked);
@@ -1307,7 +1314,10 @@ $styleString
                                         (document.title || '') + ' · 楼层 ' + pid,
                                         isBlocked
                                     );
+                                    // 先插入按钮，再在用户名与按钮之间补四个不可断空格（普通空格会被 HTML 折叠成一个），
+                                    // 使屏蔽文字按钮与用户名保持四个空格的距离。
                                     userLink.insertAdjacentElement('afterend', action);
+                                    userLink.insertAdjacentText('afterend', String.fromCharCode(160, 160, 160, 160));
                                 }
                             } else {
                                 action.textContent = isBlocked ? '取消屏蔽' : '屏蔽';
