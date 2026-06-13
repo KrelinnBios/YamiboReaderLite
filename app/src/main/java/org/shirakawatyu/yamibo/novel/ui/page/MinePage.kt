@@ -509,6 +509,7 @@ fun MinePage(
             }
         }
     }
+    val forumBlocklistApi = remember { ForumBlocklistJSInterface() }
 
     val mineWebView = remember(fromHistory, historyTargetUrl) {
         val isNew = minePageVM.cachedWebView == null
@@ -540,6 +541,7 @@ fun MinePage(
                     webView.removeJavascriptInterface("AboutApi")
                     webView.removeJavascriptInterface("HistoryApi")
                     webView.removeJavascriptInterface("AndroidSearchNav")
+                    webView.removeJavascriptInterface("AndroidForumBlocklist")
                 } catch (_: Exception) {
                 }
             }
@@ -549,6 +551,7 @@ fun MinePage(
             webView.addJavascriptInterface(historyApi, "HistoryApi")
             webView.addJavascriptInterface(searchNavApi, "AndroidSearchNav")
         }
+        webView.addJavascriptInterface(forumBlocklistApi, "AndroidForumBlocklist")
         webView.webChromeClient = webChromeClient
 
         webView
@@ -568,12 +571,34 @@ fun MinePage(
     }
 
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
-    LaunchedEffect(isDarkMode) {
+    val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
+    val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
+
+    fun injectForumBlocker(view: WebView?) {
+        view?.evaluateJavascript(
+            PageJsScripts.getForumBlockerJs(
+                enabled = ForumBlocklistManager.enabled.value,
+                itemsJson = ForumBlocklistManager.itemsJson(),
+                isDark = GlobalData.isDarkMode.value
+            ),
+            null
+        )
+    }
+
+    LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems) {
         mineWebView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
                 GlobalData.darkModeTheme.value,
                 GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+        mineWebView.evaluateJavascript(
+            PageJsScripts.getForumBlockerJs(
+                enabled = isForumBlocklistEnabled,
+                itemsJson = ForumBlocklistManager.itemsJson(forumBlockedItems),
+                isDark = isDarkMode
             ),
             null
         )
@@ -615,6 +640,7 @@ fun MinePage(
                 ),
                 null
             )
+            injectForumBlocker(mineWebView)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -1142,6 +1168,7 @@ fun MinePage(
 
                 // 使用外部提取的特定于 MinePage 的脚本常量
                 view?.evaluateJavascript(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS, null)
+                injectForumBlocker(view)
 
                 if (GlobalData.isDarkMode.value || GlobalData.lightModeTheme.value > 0) {
                     view?.evaluateJavascript(
@@ -1199,6 +1226,7 @@ fun MinePage(
                 val isMineRoot = url != null && (url == mineUrl || url.contains("mycenter=1")) && !url.contains("mod=logging")
                 val toggleHeaderJs = getToggleHeaderJs(isMineRoot)
                 view?.evaluateJavascript(toggleHeaderJs, null)
+                injectForumBlocker(view)
             }
 
             override fun onReceivedError(
@@ -1538,8 +1566,6 @@ fun MinePage(
                     val isAutoClearCacheEnabled by
                     GlobalData.isAutoClearCacheEnabled.collectAsState()
                     val isAutoSignInEnabled = GlobalData.isAutoSignInEnabled.value
-                    val isForumBlocklistEnabled by
-                    ForumBlocklistManager.enabled.collectAsState()
                     var cacheSizeBytes by remember { mutableStateOf(0L) }
                     var isClearingCache by remember { mutableStateOf(false) }
 

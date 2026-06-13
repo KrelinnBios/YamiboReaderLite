@@ -649,9 +649,45 @@ object PageJsScripts {
                     homeLink.href = 'home.php?mod=space&do=profile&mycenter=1&mobile=2';
                 }
             };
+            var fixMineMessageBadge = function() {
+                var style = document.getElementById('yamibo-mine-message-layout');
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = 'yamibo-mine-message-layout';
+                    (document.head || document.documentElement).appendChild(style);
+                }
+                style.textContent =
+                    '.yamibo-mine-message-link,.yamibo-mine-message-item{white-space:nowrap!important;}' +
+                    '.yamibo-mine-message-badge{display:inline-block!important;float:none!important;position:static!important;margin:0 0 0 4px!important;vertical-align:middle!important;white-space:nowrap!important;line-height:inherit!important;}';
+
+                var links = document.querySelectorAll(
+                    'a[href*="do=pm"],a[href*="do%3Dpm"],a[href*="do=notice"],a[href*="do%3Dnotice"]'
+                );
+                for (var i = 0; i < links.length; i++) {
+                    var link = links[i];
+                    link.classList.add('yamibo-mine-message-link');
+                    var container = link.parentElement;
+                    if (container) container.classList.add('yamibo-mine-message-item');
+
+                    var scope = container || link;
+                    var candidates = scope.querySelectorAll('em,span,i,b,strong');
+                    for (var j = 0; j < candidates.length; j++) {
+                        var candidate = candidates[j];
+                        var text = String(candidate.textContent || '').replace(/\s+/g, '').toLowerCase();
+                        var className = String(candidate.className || '').toLowerCase();
+                        if (text === 'new' || className.indexOf('prompt_news') !== -1 || className === 'new') {
+                            candidate.classList.add('yamibo-mine-message-badge');
+                        }
+                    }
+                }
+            };
             rewriteHomeLink();
+            fixMineMessageBadge();
             if (!window._mineHomeLinkObserver) {
-                window._mineHomeLinkObserver = new MutationObserver(rewriteHomeLink);
+                window._mineHomeLinkObserver = new MutationObserver(function() {
+                    rewriteHomeLink();
+                    fixMineMessageBadge();
+                });
                 window._mineHomeLinkObserver.observe(document.body, { childList: true, subtree: true });
             }
             
