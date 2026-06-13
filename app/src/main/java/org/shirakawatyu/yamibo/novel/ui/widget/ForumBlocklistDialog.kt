@@ -208,7 +208,8 @@ private fun FilterButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    // 未选中：透明无背景；选中：填充主色（深色主题下为蓝色）。
+    // 选中项的主题色底色在三个按钮之间切换；未选中无底色。
+    // 文字颜色保持恒定，不随选中状态改变（底色只负责高亮，不影响文字颜色）。
     Surface(
         onClick = onClick,
         modifier = modifier,
@@ -218,19 +219,7 @@ private fun FilterButton(
         } else {
             androidx.compose.ui.graphics.Color.Transparent
         },
-        contentColor = if (selected) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        border = if (selected) {
-            null
-        } else {
-            androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline
-            )
-        }
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
