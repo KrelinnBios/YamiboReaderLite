@@ -1133,8 +1133,9 @@ $styleString
         }
     }
 
-    fun getForumBlockerJs(enabled: Boolean, itemsJson: String, isDark: Boolean): String {
+    fun getForumBlockerJs(enabled: Boolean, itemsJson: String, isDark: Boolean, selfUid: String = ""): String {
         val itemsLiteral = jsStringLiteral(itemsJson)
+        val selfUidLiteral = jsStringLiteral(selfUid)
         return """
             (function() {
                 var incomingItems = [];
@@ -1236,7 +1237,7 @@ $styleString
 
                     // 当前登录用户 uid：桌面版用 discuz_uid，手机版用底部「个人中心」链接(mycenter=1)。
                     function getCurrentUid() {
-                        if (window.discuz_uid && /^\d+$/.test(String(window.discuz_uid))) {
+                        if (window.discuz_uid && /^[1-9]\d*$/.test(String(window.discuz_uid))) {
                             return String(window.discuz_uid);
                         }
                         var selfLink = document.querySelector('a[href*="mycenter=1"]');
@@ -1415,14 +1416,20 @@ $styleString
                         state.syncing = true;
                         try {
                             ensureStyle();
+                            // 缓存当前登录 uid：手机版帖子页不带任何自身标识，但论坛列表/个人中心页带
+                            // mycenter 链接。无论屏蔽开关是否开启都要捕获，确保登录完成后立即持久化。
+                            var detectedUid = getCurrentUid();
+                            if (detectedUid) {
+                                state.currentUid = detectedUid;
+                                // 回传给 App 端持久化，下次启动/冷进帖子页也能直接用。
+                                if (window.AndroidForumBlocklist && window.AndroidForumBlocklist.setUid) {
+                                    try { window.AndroidForumBlocklist.setUid(detectedUid); } catch (e) {}
+                                }
+                            }
                             if (!state.enabled) {
                                 cleanup();
                                 return;
                             }
-                            // 缓存当前登录 uid：手机版帖子页不带任何自身标识，但论坛列表/个人中心页带
-                            // mycenter 链接。脚本常驻于同一 WebView，先在列表页拿到 uid 后，进入帖子页仍可用。
-                            var detectedUid = getCurrentUid();
-                            if (detectedUid) state.currentUid = detectedUid;
                             var map = blockedMap();
                             syncListPage(map);
                             syncPostPage(map);
@@ -1476,17 +1483,21 @@ $styleString
                     if (document.body) observer.observe(document.body, { childList: true, subtree: true });
 
                     window.__yamiboForumBlocker = {
-                        update: function(enabledValue, itemsValue, darkValue) {
+                        update: function(enabledValue, itemsValue, darkValue, uidValue) {
                             state.enabled = !!enabledValue;
                             state.items = Array.isArray(itemsValue) ? itemsValue : [];
                             state.dark = !!darkValue;
+                            // App 端持久化的 uid 优先；为空时保留已有缓存，交给页面内探测兜底。
+                            if (uidValue && /^[1-9]\d*$/.test(String(uidValue))) {
+                                state.currentUid = String(uidValue);
+                            }
                             sync();
                         },
                         sync: sync
                     };
                 }
 
-                window.__yamiboForumBlocker.update($enabled, incomingItems, $isDark);
+                window.__yamiboForumBlocker.update($enabled, incomingItems, $isDark, $selfUidLiteral);
             })();
         """.trimIndent()
     }
