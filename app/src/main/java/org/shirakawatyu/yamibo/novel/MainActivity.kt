@@ -125,8 +125,10 @@ import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AutoSignManager
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
+import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.SignTrigger
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.network.NetworkMonitor
 import java.net.URLDecoder
@@ -256,9 +258,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleDeepLink(intent: Intent?) {
         if (intent?.action != Intent.ACTION_VIEW) return
-        val uri = intent.data ?: return
-        val url = uri.toString()
-        if (!url.contains("bbs.yamibo.com") && !url.contains("m.yamibo.com")) return
+        val url = YamiboPostLinkUtil.normalizePostUrl(intent.dataString) ?: return
         GlobalData.pendingDeepLinkUrl.value = url
     }
 
@@ -534,6 +534,7 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 SettingsUtil.getDnsOptimizationMode { GlobalData.dnsOptimizationMode.value = it }
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
                 SettingsUtil.getDarkMode { GlobalData.isDarkMode.value = it }
+                CurrentUserUtil.load()
                 GlobalData.darkModeTheme.value = 0
                 GlobalData.lightModeTheme.value = 0
                 GlobalData.isAppInitialized = true
@@ -614,32 +615,37 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
         }
     }
 
-    // 剪贴板检测：切回前台时检查是否复制了百合会链接
+    // 剪贴板检测：首次进入或切回前台时检查是否复制了百合会帖子链接
     DisposableEffect(lifecycleOwner, isAppInitialized) {
         if (!isAppInitialized) return@DisposableEffect onDispose {}
 
-        val clipboardObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && !showClipboardHint) {
-                coroutineScope.launch {
-                    delay(300L)
-                    if (showClipboardHint) return@launch
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return@launch
-                    val desc = cm.primaryClipDescription ?: return@launch
-                    if (!desc.hasMimeType("text/plain")) return@launch
-                    val text = cm.primaryClip?.getItemAt(0)?.text?.toString()
-                    if (text == null || text.contains(Regex("""<[a-zA-Z/][^>]*>"""))) return@launch
-                    val urlRegex = Regex("""https?://(?:bbs\.|m\.)?yamibo\.com/(?:forum\.php\?mod=viewthread&tid=\d+[^\s]*|thread-\d+-\d+-\d+\.html)""")
-                    val matched = text.let { urlRegex.find(it)?.value }
-                        ?.replace(Regex("""&highlight=[^&\s]*"""), "")
-                    val imageUrlPattern = Regex("""/data/attachment/|\.(jpg|jpeg|png|webp|gif|bmp)(\?|$)""", RegexOption.IGNORE_CASE)
-                    if (matched != null && !imageUrlPattern.containsMatchIn(matched) && matched != GlobalData.lastClipboardUrl) {
-                        detectedClipboardUrl = matched
-                        showClipboardHint = true
-                    }
+        fun inspectClipboard() {
+            if (showClipboardHint) return
+            coroutineScope.launch {
+                delay(300L)
+                if (showClipboardHint) return@launch
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as? android.content.ClipboardManager ?: return@launch
+                val item = clipboard.primaryClip?.takeIf { it.itemCount > 0 }
+                    ?.getItemAt(0) ?: return@launch
+                val text = item.text?.toString()
+                    ?: item.uri?.toString()
+                    ?: item.coerceToText(context)?.toString()
+                val matched = YamiboPostLinkUtil.extractPostUrl(text)
+                if (matched != null && matched != GlobalData.lastClipboardUrl) {
+                    detectedClipboardUrl = matched
+                    showClipboardHint = true
                 }
             }
         }
+
+        val clipboardObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) inspectClipboard()
+        }
         lifecycleOwner.lifecycle.addObserver(clipboardObserver)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            inspectClipboard()
+        }
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(clipboardObserver)
