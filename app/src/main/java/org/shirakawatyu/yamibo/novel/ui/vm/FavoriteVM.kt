@@ -29,6 +29,7 @@ import org.shirakawatyu.yamibo.novel.ui.state.FavoriteState
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.CacheMaintenance
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
+import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteDeleteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.TombstoneQueueUtil
@@ -515,6 +516,8 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 val variables = json.getJSONObject("Variables")
                     ?: throw Exception("Missing Variables")
                 prefetchFormHash = variables.getString("formhash") ?: prefetchFormHash
+                // 登录态接口会带 member_uid，顺手存下当前用户 uid（屏蔽功能用来排除自己的内容）。
+                CurrentUserUtil.save(variables.getString("member_uid"))
                 val list = variables.getJSONArray("list")
                 val pageList = mutableListOf<Favorite>()
 
