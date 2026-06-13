@@ -100,7 +100,9 @@ import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
+import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
@@ -172,6 +174,11 @@ class ForumBlocklistJSInterface {
     fun unblock(type: String, id: String) {
         ForumBlocklistManager.remove(type, id)
     }
+
+    @JavascriptInterface
+    fun setUid(uid: String) {
+        CurrentUserUtil.save(uid)
+    }
 }
 
 class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient() {
@@ -205,7 +212,8 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
             PageJsScripts.getForumBlockerJs(
                 enabled = ForumBlocklistManager.enabled.value,
                 itemsJson = ForumBlocklistManager.itemsJson(),
-                isDark = GlobalData.isDarkMode.value
+                isDark = GlobalData.isDarkMode.value,
+                selfUid = GlobalData.currentUid
             ),
             null
         )
@@ -634,8 +642,9 @@ fun BBSPage(
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
     val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
     val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
+    val currentUid = GlobalData.currentUid
 
-    LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems) {
+    LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems, currentUid) {
         webView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
@@ -648,7 +657,8 @@ fun BBSPage(
             PageJsScripts.getForumBlockerJs(
                 enabled = isForumBlocklistEnabled,
                 itemsJson = ForumBlocklistManager.itemsJson(forumBlockedItems),
-                isDark = isDarkMode
+                isDark = isDarkMode,
+                selfUid = currentUid
             ),
             null
         )
@@ -719,7 +729,8 @@ fun BBSPage(
                 PageJsScripts.getForumBlockerJs(
                     enabled = ForumBlocklistManager.enabled.value,
                     itemsJson = ForumBlocklistManager.itemsJson(),
-                    isDark = GlobalData.isDarkMode.value
+                    isDark = GlobalData.isDarkMode.value,
+                    selfUid = GlobalData.currentUid
                 ),
                 null
             )
@@ -809,11 +820,6 @@ fun BBSPage(
     }
 
     val pendingUrl by GlobalData.pendingClipboardUrl.collectAsState()
-    LaunchedEffect(pendingUrl) {
-        val url = pendingUrl ?: return@LaunchedEffect
-        webView.loadUrl(url)
-        GlobalData.pendingClipboardUrl.value = null
-    }
 
     LaunchedEffect(BBSPageState.isLoading) {
         if (!BBSPageState.isLoading && autoOpenMangaMode) {
@@ -1059,8 +1065,18 @@ fun BBSPage(
             }
         }
     }
-    LaunchedEffect(isSelected, webView) {
+    LaunchedEffect(isSelected, webView, pendingUrl) {
         if (!isSelected) return@LaunchedEffect
+
+        val directUrl = YamiboPostLinkUtil.normalizePostUrl(pendingUrl)
+        if (directUrl != null) {
+            GlobalData.pendingClipboardUrl.value = null
+            startLoading(directUrl)
+            return@LaunchedEffect
+        }
+        if (pendingUrl != null) {
+            GlobalData.pendingClipboardUrl.value = null
+        }
 
         val currentWebViewUrl = try {
             webView.url
