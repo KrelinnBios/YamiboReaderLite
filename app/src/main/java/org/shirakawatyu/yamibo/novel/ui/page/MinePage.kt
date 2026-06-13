@@ -579,7 +579,8 @@ fun MinePage(
             PageJsScripts.getForumBlockerJs(
                 enabled = ForumBlocklistManager.enabled.value,
                 itemsJson = ForumBlocklistManager.itemsJson(),
-                isDark = GlobalData.isDarkMode.value
+                isDark = GlobalData.isDarkMode.value,
+                selfUid = GlobalData.currentUid
             ),
             null
         )
@@ -598,7 +599,8 @@ fun MinePage(
             PageJsScripts.getForumBlockerJs(
                 enabled = isForumBlocklistEnabled,
                 itemsJson = ForumBlocklistManager.itemsJson(forumBlockedItems),
-                isDark = isDarkMode
+                isDark = isDarkMode,
+                selfUid = GlobalData.currentUid
             ),
             null
         )
