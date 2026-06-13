@@ -51,6 +51,53 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun directorySearchUsesBookNameInsteadOfCombinedFilters() {
+        assertEquals(
+            "DrunkenMyBoss",
+            MangaTitleCleaner.getDirectoryForumSearchKeyword(
+                cleanBookName = "DrunkenMyBoss",
+                rawTitle = "[个人汉化][BBTan] DrunkenMyBoss 第一话",
+                configuredKeywords = "BBTan 个人汉化"
+            )
+        )
+    }
+
+    @Test
+    fun directoryCandidateKeepsAllBookMatchesAndSupportsAliases() {
+        assertTrue(
+            MangaTitleCleaner.matchesDirectoryCandidate(
+                rawText = "[合作汉化][BBTan] DrunkenMyBoss 第四十七话+后记",
+                cleanBookName = "DrunkenMyBoss",
+                configuredKeywords = "个人汉化 BBTan"
+            )
+        )
+        assertTrue(
+            MangaTitleCleaner.matchesDirectoryCandidate(
+                rawText = "[某汉化组] 酒醉上司 第2话",
+                cleanBookName = "DrunkenMyBoss",
+                configuredKeywords = "酒醉上司"
+            )
+        )
+        assertFalse(
+            MangaTitleCleaner.matchesDirectoryCandidate(
+                rawText = "[BBTan] 完全不同的作品 第1话",
+                cleanBookName = "DrunkenMyBoss",
+                configuredKeywords = "酒醉上司"
+            )
+        )
+    }
+
+    @Test
+    fun threadStyleFavoriteUrlExtractsTid() {
+        assertEquals(
+            "546273",
+            MangaTitleCleaner.extractTidFromUrl(
+                "https://bbs.yamibo.com/thread-546273-1-1.html"
+            )
+        )
+    }
+
+    @Test
     fun koreanTitleWithUpperPartSuffixKeepsBookNameAndChapterOrder() {
         val title =
             "[个人汉化][Willow（윌로우）]장마에서 살아남는 방법（从梅雨中活下来的方法）上篇"

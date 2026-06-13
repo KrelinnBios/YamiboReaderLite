@@ -1476,7 +1476,10 @@ fun NativeMangaPage(
                 val displayChapters = directory?.chapters
                     ?.filter {
                         selectedGroup.isBlank() ||
-                                it.rawTitle.contains(selectedGroup, ignoreCase = true)
+                                MangaTitleCleaner.matchesTranslationGroup(
+                                    it.rawTitle,
+                                    selectedGroup
+                                )
                     }
                     ?.map {
                     MangaChapter(
@@ -1520,11 +1523,9 @@ fun NativeMangaPage(
                     isUpdating = mangaDirVM.isUpdatingDirectory,
                     onDismiss = { showChapterList = false; showUi = false },
                     onTitleEdit = { newTitle, newAuthor, newTranslationGroup ->
-                        val newSearchKeyword =
-                            if (newAuthor.isNotBlank()) "$newAuthor $newTitle".trim() else newTitle.trim()
                         mangaDirVM.updateDirectoryInfo(
                             newTitle.trim(),
-                            newSearchKeyword,
+                            newAuthor.trim(),
                             newTranslationGroup,
                             currentTid
                         )

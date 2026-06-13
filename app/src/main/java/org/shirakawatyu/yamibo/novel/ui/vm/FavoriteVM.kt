@@ -33,6 +33,7 @@ import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteDeleteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.TombstoneQueueUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
+import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.reader.LocalCacheUtil
 import org.shirakawatyu.yamibo.novel.util.updateCheck.AutoUpdateCheckScheduler
 import org.shirakawatyu.yamibo.novel.bean.OtherUpdateCheckProfile
@@ -260,7 +261,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     }
 
     private suspend fun probeFavoriteTypeSuspend(favorite: Favorite): TypeProbeResult? {
-        val tid = Regex("tid=(\\d+)").find(favorite.url)?.groupValues?.get(1)
+        val tid = MangaTitleCleaner.extractTidFromUrl(favorite.url)
         if (tid == null) {
             return TypeProbeResult(
                 type = 3,

@@ -230,6 +230,41 @@ class MangaTitleCleaner {
                 ?: rawQuery.trim().take(40)
         }
 
+        fun getDirectoryForumSearchKeyword(
+            cleanBookName: String,
+            rawTitle: String,
+            configuredKeywords: String?
+        ): String {
+            val bookKeyword = getForumSearchKeyword(cleanBookName)
+                .takeIf { normalizeSearchText(it).length >= 2 }
+            if (bookKeyword != null) return bookKeyword
+
+            val configuredKeyword = configuredKeywords
+                ?.takeIf(String::isNotBlank)
+                ?.let(::getForumSearchKeyword)
+                ?.takeIf { normalizeSearchText(it).length >= 2 }
+            return configuredKeyword ?: getSearchKeyword(rawTitle)
+        }
+
+        fun matchesDirectoryCandidate(
+            rawText: String,
+            cleanBookName: String,
+            configuredKeywords: String?
+        ): Boolean {
+            if (cleanBookName.isNotBlank() && matchesSearchQuery(rawText, cleanBookName)) {
+                return true
+            }
+
+            val normalizedBookName = normalizeSearchText(cleanBookName)
+            return configuredKeywords
+                .orEmpty()
+                .split(Regex("[\\s【】\\[\\]（）()《》「」『』·・,，、/／|｜]+"))
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .filterNot { normalizeSearchText(it) == normalizedBookName }
+                .any { matchesSearchQuery(rawText, it) }
+        }
+
         private fun normalizeSearchText(value: String): String =
             Normalizer.normalize(value, Normalizer.Form.NFKC)
                 .lowercase()

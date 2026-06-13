@@ -413,18 +413,38 @@ class DirectoryRepository private constructor(private val context: Context) {
 
                 if (newChapters.isEmpty()) {
                     searchPerformed = true
-                    val res = performSearch(firstRawTitle, exactKeyword, sourceFid)
+                    val res = performSearch(
+                        rawTitle = firstRawTitle,
+                        cleanBookName = currentDir.cleanBookName,
+                        configuredKeywords = exactKeyword,
+                        sourceFid = sourceFid
+                    )
                     if (res.isFailure) return@withContext Result.failure(res.exceptionOrNull()!!)
                     newChapters.addAll(res.getOrNull()!!)
                 }
             } else {
                 searchPerformed = true
-                val res = performSearch(firstRawTitle, exactKeyword, sourceFid)
+                val res = performSearch(
+                    rawTitle = firstRawTitle,
+                    cleanBookName = currentDir.cleanBookName,
+                    configuredKeywords = exactKeyword,
+                    sourceFid = sourceFid
+                )
                 if (res.isFailure) return@withContext Result.failure(res.exceptionOrNull()!!)
                 newChapters.addAll(res.getOrNull()!!)
             }
 
-            val verifiedNewChapters = filterChaptersBySourceFid(newChapters, sourceFid)
+            // 搜索接口已经通过 srchfid[] 限定版区，不再逐帖请求 API 二次确认。
+            // 旧逻辑会在帖子详情请求临时失败时丢掉对应章节，导致目录随机缺话。
+            val verifiedNewChapters = if (searchPerformed) {
+                newChapters.distinctBy { it.tid }
+            } else {
+                filterChaptersBySourceFid(
+                    chapters = newChapters,
+                    sourceFid = sourceFid,
+                    keepUnresolved = true
+                )
+            }
             val latestSnapshot = loadDirectory(currentDir.cleanBookName) ?: currentDir
             val targetGroup = latestSnapshot.translationGroup.orEmpty()
             val existingCandidates = if (targetGroup.isBlank()) {
@@ -469,16 +489,18 @@ class DirectoryRepository private constructor(private val context: Context) {
 
     private suspend fun performSearch(
         rawTitle: String,
-        exactKeyword: String? = null,
+        cleanBookName: String,
+        configuredKeywords: String? = null,
         sourceFid: String?
     ): Result<List<MangaChapterItem>> {
         val safeSourceFid = sourceFid
             ?.takeIf { it in MANGA_FIDS }
             ?: return Result.failure(Exception("无法确认当前漫画所属版区，请重新打开原帖后再更新"))
-        val safeKeyword = exactKeyword
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: MangaTitleCleaner.getSearchKeyword(rawTitle)
+        val forumKeyword = MangaTitleCleaner.getDirectoryForumSearchKeyword(
+            cleanBookName = cleanBookName,
+            rawTitle = rawTitle,
+            configuredKeywords = configuredKeywords
+        )
 
         val profileJson = JSON.parseObject(mangaApi.getForumDisplay(safeSourceFid, 1).string())
         val formHash = profileJson.getJSONObject("Variables")?.getString("formhash")
@@ -487,7 +509,7 @@ class DirectoryRepository private constructor(private val context: Context) {
         val firstPageHtml = mangaApi.searchForum(
             formHash = formHash,
             fids = listOf(safeSourceFid),
-            keyword = safeKeyword
+            keyword = forumKeyword
         ).string()
         if (MangaHtmlParser.isFloodControlOrError(firstPageHtml)) return Result.failure(Exception("触发论坛防灌水限制，请稍后再试"))
 
@@ -507,7 +529,13 @@ class DirectoryRepository private constructor(private val context: Context) {
         val matchedItems = allItems
             .asSequence()
             .filterNot { MangaTitleCleaner.isAdministrativeThread(it.rawTitle) }
-            .filter { MangaTitleCleaner.matchesSearchQuery(it.rawTitle, safeKeyword) }
+            .filter {
+                MangaTitleCleaner.matchesDirectoryCandidate(
+                    rawText = "${it.rawTitle} ${it.authorName.orEmpty()}",
+                    cleanBookName = cleanBookName,
+                    configuredKeywords = configuredKeywords
+                )
+            }
             .distinctBy { it.tid }
             .toList()
 

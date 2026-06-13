@@ -229,46 +229,17 @@ fun FavoritePage(
     val openMangaFavorite: (Favorite) -> Unit =
         remember(context, navController, coroutineScope) {
             { favorite ->
-                val targetUrl = favorite.lastMangaUrl ?: favorite.url
+                val targetUrl = favorite.lastMangaUrl
+                    ?.takeIf { MangaTitleCleaner.extractTidFromUrl(it) != null }
+                    ?: favorite.url
                 val encodedTarget = java.net.URLEncoder.encode(targetUrl, "utf-8")
                 val encodedOriginal = java.net.URLEncoder.encode(favorite.url, "utf-8")
                 probingUrl = targetUrl
                 probingJob = coroutineScope.launch {
-                    MangaProber().probeUrl(
-                        context = context,
-                        url = targetUrl,
-                        forceRefresh = true,
-                        onSuccess = { urls, title, html ->
-                            val normalizedUrls = urls
-                                .map { it.trim() }
-                                .filter { it.isNotBlank() }
-                                .distinct()
-                            val targetIndex = favorite.lastPage.coerceIn(
-                                0,
-                                maxOf(0, normalizedUrls.size - 1)
-                            )
-
-                            MangaImagePipeline.handoffPrefetch(
-                                context = context.applicationContext,
-                                urls = normalizedUrls,
-                                clickedIndex = targetIndex
-                            )
-
-                            GlobalData.tempMangaUrls = normalizedUrls
-                            GlobalData.tempHtml = html
-                            GlobalData.tempTitle = title
-                            GlobalData.tempMangaIndex = targetIndex
-
-                            navController.navigate(
-                                "NativeMangaPage?url=$encodedTarget&originalUrl=$encodedOriginal"
-                            )
-                            coroutineScope.launch {
-                                delay(300)
-                                probingUrl = null
-                                probingJob = null
-                            }
-                        },
-                        onFallback = {
+                    var navigationHandled = false
+                    val openFallback = {
+                        if (!navigationHandled) {
+                            navigationHandled = true
                             navController.navigate(
                                 "MangaWebPage/$encodedTarget/$encodedOriginal" +
                                         "?fastForward=false&initialPage=${favorite.lastPage}"
@@ -276,7 +247,59 @@ fun FavoritePage(
                             probingUrl = null
                             probingJob = null
                         }
-                    )
+                    }
+
+                    try {
+                        MangaProber().probeUrl(
+                            context = context,
+                            url = targetUrl,
+                            forceRefresh = true,
+                            onSuccess = probeSuccess@{ urls, title, html ->
+                                if (navigationHandled) return@probeSuccess
+                                val normalizedUrls = urls
+                                    .map { it.trim() }
+                                    .filter { it.isNotBlank() }
+                                    .distinct()
+                                if (normalizedUrls.isEmpty()) {
+                                    openFallback()
+                                    return@probeSuccess
+                                }
+
+                                navigationHandled = true
+                                val targetIndex = favorite.lastPage.coerceIn(
+                                    0,
+                                    normalizedUrls.lastIndex
+                                )
+
+                                MangaImagePipeline.handoffPrefetch(
+                                    context = context.applicationContext,
+                                    urls = normalizedUrls,
+                                    clickedIndex = targetIndex
+                                )
+
+                                GlobalData.tempMangaUrls = normalizedUrls
+                                GlobalData.tempHtml = html
+                                GlobalData.tempTitle = title
+                                GlobalData.tempMangaIndex = targetIndex
+
+                                navController.navigate(
+                                    "NativeMangaPage?url=$encodedTarget&originalUrl=$encodedOriginal"
+                                )
+                                probingUrl = null
+                                probingJob = null
+                            },
+                            onFallback = openFallback
+                        )
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Throwable) {
+                        openFallback()
+                    } finally {
+                        if (!navigationHandled) {
+                            probingUrl = null
+                            probingJob = null
+                        }
+                    }
                 }
             }
         }
@@ -724,14 +747,12 @@ fun FavoritePage(
                                 } else {
                                     probingUrl = item.url
                                     probingJob = coroutineScope.launch {
-                                        val resolvedType = favoriteVM.resolveFavoriteTypeForOpen(item)
-                                        if (resolvedType == 2) {
-                                            openByType(resolvedType)
-                                        } else {
-                                            probingUrl = null
-                                            openByType(resolvedType)
-                                            probingJob = null
-                                        }
+                                        val resolvedType = runCatching {
+                                            favoriteVM.resolveFavoriteTypeForOpen(item)
+                                        }.getOrDefault(3)
+                                        probingUrl = null
+                                        probingJob = null
+                                        openByType(resolvedType)
                                     }
                                 }
                             }

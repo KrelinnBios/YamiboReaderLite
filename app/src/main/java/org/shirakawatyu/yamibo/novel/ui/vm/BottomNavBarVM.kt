@@ -45,7 +45,7 @@ class BottomNavBarVM : ViewModel() {
                         currentRoute?.startsWith("ReaderWebPage") == true ||
                         currentRoute?.startsWith("OtherWebPage") == true
             val returnedToExistingDestination =
-                isTransientWebRoute && navController.popBackStack(targetRoute, inclusive = false)
+                navController.popBackStack(targetRoute, inclusive = false)
 
             if (!returnedToExistingDestination) {
                 navController.navigate(targetRoute) {
