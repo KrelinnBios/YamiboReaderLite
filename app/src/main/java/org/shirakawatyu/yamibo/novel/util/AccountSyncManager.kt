@@ -3,6 +3,7 @@ package org.shirakawatyu.yamibo.novel.util
 import android.content.Context
 import kotlinx.coroutines.delay
 import org.shirakawatyu.yamibo.novel.global.GlobalData
+import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 
 object AccountSyncManager {
     private var previousAuthHash: Int? = null
@@ -27,6 +28,7 @@ object AccountSyncManager {
             authStateFlow.value = currentHash
             if (currentHash != null) {
                 GlobalData.currentCookie = currentCookie
+                ForumBlocklistManager.syncRemote(force = true)
                 if (GlobalData.isAutoSignInEnabled.value) {
                     val needsSign = AutoSignManager.needsSignIn()
                     if (needsSign) {
@@ -34,6 +36,8 @@ object AccountSyncManager {
                         AutoSignManager.checkAndSignIfNeeded(context, force = false)
                     }
                 }
+            } else {
+                ForumBlocklistManager.clearSyncedUsers()
             }
             return
         }
@@ -44,6 +48,7 @@ object AccountSyncManager {
             if (currentHash != null) {
                 GlobalData.currentCookie = currentCookie
                 CookieUtil.saveCookie(currentCookie)
+                ForumBlocklistManager.syncRemote(force = true)
                 AutoSignManager.resetQuota()
                 if (GlobalData.isAutoSignInEnabled.value) {
                     delay(3000L)
@@ -52,7 +57,13 @@ object AccountSyncManager {
             } else {
                 GlobalData.currentCookie = ""
                 CookieUtil.saveCookie("")
+                ForumBlocklistManager.clearSyncedUsers()
             }
+            return
+        }
+
+        if (currentHash != null) {
+            ForumBlocklistManager.syncRemote()
         }
     }
 }
