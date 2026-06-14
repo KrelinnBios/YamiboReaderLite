@@ -22,7 +22,7 @@
 - 底栏交互：下拉刷新当前页面，点击底栏图标回到对应板块主页。
 - 论坛浏览：登录账号浏览百合会论坛，支持自动签到和 DNS 网络优化。
 - 链接直达：复制百合会帖子链接后回到应用即可一键打开，也支持从其他应用直接用本应用打开帖子链接。
-- 论坛屏蔽：屏蔽指定主题或楼层，黑名单支持搜索与按主题、楼层筛选。
+- 论坛屏蔽：屏蔽指定主题、楼层或用户，黑名单支持搜索与按主题、楼层筛选。
 - 漫画发现：浏览和搜索中文漫画区、漫画图源区，整理并更新漫画目录。
 - 漫画阅读：原生阅读器，支持章节切换、进度记录、亮度调节和三种阅读方向。
 - 小说阅读：原生阅读器，支持字号、行距、页边距、翻页方式、正文图片和简繁转换。
@@ -42,20 +42,20 @@
 ## 截图
 
 <p align="center">
-  <img src="screenshots/1.jpg" width="19%" alt="漫画首页">
-  <img src="screenshots/2.jpg" width="19%" alt="收藏页面">
-  <img src="screenshots/3.jpg" width="19%" alt="收藏菜单">
-  <img src="screenshots/4.jpg" width="19%" alt="论坛首页">
-  <img src="screenshots/5.jpg" width="19%" alt="浏览历史">
+  <img src="screenshots/1.png" width="19%" alt="漫画发现">
+  <img src="screenshots/2.png" width="19%" alt="漫画目录编辑">
+  <img src="screenshots/3.png" width="19%" alt="收藏管理">
+  <img src="screenshots/4.png" width="19%" alt="小说阅读">
+  <img src="screenshots/5.png" width="19%" alt="浏览历史">
 </p>
 
 
 <p align="center">
-  <img src="screenshots/6.jpg" width="19%" alt="漫画阅读">
-  <img src="screenshots/7.jpg" width="19%" alt="小说阅读">
-  <img src="screenshots/8.jpg" width="19%" alt="论坛屏蔽">
-  <img src="screenshots/9.jpg" width="19%" alt="黑名单">
-  <img src="screenshots/10.jpg" width="19%" alt="应用设置">
+  <img src="screenshots/6.png" width="19%" alt="论坛浏览">
+  <img src="screenshots/7.png" width="19%" alt="论坛屏蔽">
+  <img src="screenshots/8.png" width="19%" alt="个人中心">
+  <img src="screenshots/9.png" width="19%" alt="应用设置">
+  <img src="screenshots/10.png" width="19%" alt="黑名单">
 </p>
 
 

@@ -1216,8 +1216,9 @@ $styleString
                             '.yamibo-block-choice-backdrop{position:fixed!important;inset:0!important;z-index:2147483646!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:16px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-menu{width:min(420px,100%)!important;background:' + menuBackground + '!important;color:' + menuText + '!important;border:1px solid ' + border + '!important;border-radius:8px!important;box-shadow:0 10px 32px rgba(0,0,0,.28)!important;padding:14px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-title{font-size:16px!important;font-weight:600!important;line-height:24px!important;margin:0 0 4px!important;color:' + menuText + '!important;}' +
-                            '.yamibo-block-choice-subtitle{font-size:12px!important;line-height:18px!important;margin:0 0 12px!important;color:' + menuMuted + '!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}' +
-                            '.yamibo-block-choice-button{display:block!important;width:100%!important;height:42px!important;margin:8px 0 0!important;padding:0 12px!important;border:1px solid ' + border + '!important;border-radius:6px!important;background:' + menuButton + '!important;background-image:none!important;color:' + menuText + '!important;box-shadow:none!important;text-shadow:none!important;font-size:14px!important;text-align:center!important;}' +
+                            '.yamibo-block-choice-subtitle{font-size:12px!important;line-height:18px!important;margin:0 0 10px!important;color:' + menuMuted + '!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}' +
+                            '.yamibo-block-choice-actions{display:flex!important;flex-wrap:nowrap!important;gap:8px!important;margin:0!important;}' +
+                            '.yamibo-block-choice-button{flex:1 1 0!important;min-width:0!important;height:38px!important;margin:0!important;padding:0 6px!important;border:1px solid ' + border + '!important;border-radius:6px!important;background:' + menuButton + '!important;background-image:none!important;color:' + menuText + '!important;box-shadow:none!important;text-shadow:none!important;font-size:13px!important;line-height:36px!important;text-align:center!important;white-space:nowrap!important;}' +
                             '.yamibo-block-choice-button-primary{background:' + menuPrimary + '!important;color:#fff!important;}' +
                             '.yamibo-block-choice-button-cancel{background:transparent!important;color:' + menuMuted + '!important;}';
                     }
@@ -1575,12 +1576,15 @@ $styleString
                         subtitle.textContent = authorName ? ('用户：' + authorName) : (title || ('ID ' + id));
                         menu.appendChild(subtitle);
 
+                        var actions = document.createElement('div');
+                        actions.className = 'yamibo-block-choice-actions';
+
                         var contentButton = document.createElement('button');
                         contentButton.type = 'button';
                         contentButton.className = 'yamibo-block-choice-button yamibo-block-choice-button-primary';
                         contentButton.setAttribute('data-yamibo-block-choice', 'content');
                         contentButton.textContent = type === 'thread' ? '屏蔽主题' : '屏蔽楼层';
-                        menu.appendChild(contentButton);
+                        actions.appendChild(contentButton);
 
                         if (authorUid && authorName && !isOwnUid(authorUid)) {
                             var userButton = document.createElement('button');
@@ -1588,7 +1592,7 @@ $styleString
                             userButton.className = 'yamibo-block-choice-button';
                             userButton.setAttribute('data-yamibo-block-choice', 'user');
                             userButton.textContent = '屏蔽用户';
-                            menu.appendChild(userButton);
+                            actions.appendChild(userButton);
                         }
 
                         var cancelButton = document.createElement('button');
@@ -1596,7 +1600,9 @@ $styleString
                         cancelButton.className = 'yamibo-block-choice-button yamibo-block-choice-button-cancel';
                         cancelButton.setAttribute('data-yamibo-block-choice', 'cancel');
                         cancelButton.textContent = '取消';
-                        menu.appendChild(cancelButton);
+                        actions.appendChild(cancelButton);
+
+                        menu.appendChild(actions);
 
                         backdrop.appendChild(menu);
                         document.body.appendChild(backdrop);
