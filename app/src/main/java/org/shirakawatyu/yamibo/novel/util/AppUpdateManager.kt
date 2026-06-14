@@ -6,13 +6,17 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import com.alibaba.fastjson2.JSON
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.shirakawatyu.yamibo.novel.BuildConfig
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import java.io.File
 import java.io.IOException
@@ -42,6 +46,10 @@ object AppUpdateManager {
     private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     private const val MAX_APK_SIZE_BYTES = 512L * 1024L * 1024L
 
+    // 自动检查的最小间隔：GitHub 未认证接口限流约每小时 60 次，频繁启动会触发 403。
+    private val lastAutoCheckKey = longPreferencesKey("last_auto_update_check_ms")
+    private const val AUTO_CHECK_MIN_INTERVAL_MS = 6L * 60 * 60 * 1000
+
     private val client by lazy {
         OkHttpClient.Builder()
             .dns(YamiboRetrofit.okHttpClient.dns)
@@ -51,6 +59,25 @@ object AppUpdateManager {
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
+    }
+
+    /**
+     * 启动时的自动检查：带节流。距上次自动检查不足 [AUTO_CHECK_MIN_INTERVAL_MS] 时返回 null（跳过），
+     * 避免频繁启动把 GitHub 未认证接口的限流额度用尽（403）。无论成功失败都记录检查时间。
+     * 失败由调用方静默处理；需要明确反馈时走用户手动的 [checkForUpdate]。
+     */
+    suspend fun checkForUpdateAuto(): AppUpdateCheckResult? = withContext(Dispatchers.IO) {
+        val store = GlobalData.dataStore
+        if (store != null) {
+            val last = runCatching {
+                store.data.firstOrNull()?.get(lastAutoCheckKey)
+            }.getOrNull() ?: 0L
+            if (System.currentTimeMillis() - last < AUTO_CHECK_MIN_INTERVAL_MS) {
+                return@withContext null
+            }
+            runCatching { store.edit { it[lastAutoCheckKey] = System.currentTimeMillis() } }
+        }
+        checkForUpdate()
     }
 
     suspend fun checkForUpdate(): AppUpdateCheckResult = withContext(Dispatchers.IO) {
@@ -66,9 +93,12 @@ object AppUpdateManager {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return@withContext AppUpdateCheckResult.Failed(
-                        "GitHub 返回 HTTP ${response.code}"
-                    )
+                    val reason = when (response.code) {
+                        403, 429 -> "GitHub 接口暂时不可用（${response.code}，通常是短时间内请求过于频繁触发限流），请稍后再试或前往 Releases 页面手动查看"
+                        404 -> "仓库暂无正式发布版本"
+                        else -> "GitHub 返回 HTTP ${response.code}"
+                    }
+                    return@withContext AppUpdateCheckResult.Failed(reason)
                 }
 
                 val json = response.body?.string().orEmpty()

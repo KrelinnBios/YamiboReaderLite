@@ -110,7 +110,6 @@ import org.shirakawatyu.yamibo.novel.ui.page.OtherWebPage
 import org.shirakawatyu.yamibo.novel.ui.page.ReaderPage
 import org.shirakawatyu.yamibo.novel.ui.page.ReaderWebPage
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
-import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
 import org.shirakawatyu.yamibo.novel.ui.state.BBSPageState
 import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.ui.theme._300文学Theme
@@ -546,7 +545,6 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
     var showClipboardHint by remember { mutableStateOf(false) }
     var detectedClipboardUrl by remember { mutableStateOf("") }
     var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
-    var appUpdateFailure by remember { mutableStateOf<String?>(null) }
     var hasCheckedAppUpdate by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(
@@ -560,10 +558,13 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
             !hasCheckedAppUpdate
         ) {
             hasCheckedAppUpdate = true
-            when (val result = AppUpdateManager.checkForUpdate()) {
+            // 自动检查：节流 + 静默。失败（网络/限流 403 等）不打扰用户，
+            // 需要明确结果时由设置页「检查更新」手动触发。
+            when (val result = AppUpdateManager.checkForUpdateAuto()) {
+                null -> Unit
                 AppUpdateCheckResult.NoUpdate -> Unit
                 is AppUpdateCheckResult.UpdateAvailable -> appUpdateInfo = result.info
-                is AppUpdateCheckResult.Failed -> appUpdateFailure = result.reason
+                is AppUpdateCheckResult.Failed -> Unit
             }
         }
     }
@@ -1519,12 +1520,6 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                     AppUpdateDialog(
                         info = info,
                         onDismiss = { appUpdateInfo = null }
-                    )
-                }
-                appUpdateFailure?.let { reason ->
-                    AppUpdateFailureDialog(
-                        reason = reason,
-                        onDismiss = { appUpdateFailure = null }
                     )
                 }
 
