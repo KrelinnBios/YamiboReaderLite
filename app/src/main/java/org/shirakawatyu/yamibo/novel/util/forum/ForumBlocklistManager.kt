@@ -23,7 +23,11 @@ data class ForumBlockedItem @JSONCreator constructor(
     @JSONField(name = "id")
     val id: String = "",
     @JSONField(name = "title")
-    val title: String = ""
+    val title: String = "",
+    @JSONField(name = "authorUid")
+    val authorUid: String = "",
+    @JSONField(name = "authorName")
+    val authorName: String = ""
 ) {
     companion object {
         const val TYPE_THREAD = "thread"
@@ -62,9 +66,17 @@ object ForumBlocklistManager {
         }
     }
 
-    fun add(type: String, id: String, title: String = "") {
+    fun add(
+        type: String,
+        id: String,
+        title: String = "",
+        authorUid: String = "",
+        authorName: String = ""
+    ) {
         val normalizedType = normalizeType(type) ?: return
         val normalizedId = id.trim().takeIf { it.matches(Regex("\\d+")) } ?: return
+        val normalizedAuthorUid = authorUid.trim().takeIf { it.matches(Regex("\\d+")) }.orEmpty()
+        val normalizedAuthorName = authorName.trim()
         scope.launch {
             writeMutex.withLock {
                 val current = _items.value
@@ -74,7 +86,9 @@ object ForumBlocklistManager {
                 val next = current + ForumBlockedItem(
                     type = normalizedType,
                     id = normalizedId,
-                    title = title.trim().ifBlank { fallbackTitle }
+                    title = title.trim().ifBlank { fallbackTitle },
+                    authorUid = normalizedAuthorUid,
+                    authorName = normalizedAuthorName
                 )
                 persistItems(next)
             }

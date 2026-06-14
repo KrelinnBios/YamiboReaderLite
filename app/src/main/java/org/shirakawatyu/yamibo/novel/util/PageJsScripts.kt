@@ -1315,15 +1315,28 @@ $styleString
                         if (message) message.remove();
                     }
 
-                    function makeAction(type, id, title, blocked) {
+                    function makeAction(type, id, title, blocked, authorUid, authorName) {
                         var action = document.createElement('a');
                         action.href = 'javascript:;';
                         action.className = 'xi2 yamibo-block-action';
                         action.setAttribute('data-type', type);
                         action.setAttribute('data-id', id);
                         action.setAttribute('data-title', title || '');
+                        action.setAttribute('data-author-uid', authorUid || '');
+                        action.setAttribute('data-author-name', authorName || '');
                         action.textContent = blocked ? '取消屏蔽' : '屏蔽';
                         return action;
+                    }
+
+                    // 从行/楼层里尽量取作者用户名（带文字的「空间链接」）。
+                    function getAuthorName(scope) {
+                        if (!scope) return '';
+                        var links = scope.querySelectorAll('a[href*="space-uid-"], a[href*="mod=space"]');
+                        for (var i = 0; i < links.length; i++) {
+                            var text = String(links[i].textContent || '').trim();
+                            if (text) return text;
+                        }
+                        return '';
                     }
 
                     function syncListPage(map) {
@@ -1358,7 +1371,7 @@ $styleString
                                     holder.className = 'yamibo-block-li';
                                     var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
                                     var title = titleLink ? String(titleLink.textContent || '').trim() : '';
-                                    action = makeAction('thread', tid, title, isBlocked);
+                                    action = makeAction('thread', tid, title, isBlocked, getRowAuthorUid(row), getAuthorName(row));
                                     holder.appendChild(action);
                                     foot.appendChild(holder);
                                 }
@@ -1411,7 +1424,9 @@ $styleString
                                         'post',
                                         pid,
                                         (document.title || '') + ' · 楼层 ' + pid,
-                                        isBlocked
+                                        isBlocked,
+                                        getPostAuthorUid(post),
+                                        String(userLink.textContent || '').trim()
                                     );
                                     // 先插入按钮，再在用户名与按钮之间补四个不可断空格（普通空格会被 HTML 折叠成一个），
                                     // 使屏蔽文字按钮与用户名保持四个空格的距离。
@@ -1467,14 +1482,20 @@ $styleString
                         }, 80);
                     }
 
-                    function updateLocal(type, id, title, shouldBlock) {
+                    function updateLocal(type, id, title, shouldBlock, authorUid, authorName) {
                         var key = itemKey(type, id);
                         var next = [];
                         for (var i = 0; i < state.items.length; i++) {
                             var item = state.items[i];
                             if (itemKey(item.type, item.id) !== key) next.push(item);
                         }
-                        if (shouldBlock) next.push({ type: type, id: String(id), title: title || '' });
+                        if (shouldBlock) next.push({
+                            type: type,
+                            id: String(id),
+                            title: title || '',
+                            authorUid: authorUid || '',
+                            authorName: authorName || ''
+                        });
                         state.items = next;
                         sync();
                     }
@@ -1488,12 +1509,14 @@ $styleString
                         var type = action.getAttribute('data-type');
                         var id = action.getAttribute('data-id');
                         var title = action.getAttribute('data-title') || '';
+                        var authorUid = action.getAttribute('data-author-uid') || '';
+                        var authorName = action.getAttribute('data-author-name') || '';
                         var map = blockedMap();
                         var shouldBlock = unblock ? false : !map[itemKey(type, id)];
-                        updateLocal(type, id, title, shouldBlock);
+                        updateLocal(type, id, title, shouldBlock, authorUid, authorName);
                         if (window.AndroidForumBlocklist) {
                             if (shouldBlock && window.AndroidForumBlocklist.block) {
-                                window.AndroidForumBlocklist.block(type, id, title);
+                                window.AndroidForumBlocklist.block(type, id, title, authorUid, authorName);
                             } else if (!shouldBlock && window.AndroidForumBlocklist.unblock) {
                                 window.AndroidForumBlocklist.unblock(type, id);
                             }

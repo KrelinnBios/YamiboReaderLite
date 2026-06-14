@@ -171,6 +171,11 @@ class ForumBlocklistJSInterface {
     }
 
     @JavascriptInterface
+    fun block(type: String, id: String, title: String, authorUid: String, authorName: String) {
+        ForumBlocklistManager.add(type, id, title, authorUid, authorName)
+    }
+
+    @JavascriptInterface
     fun unblock(type: String, id: String) {
         ForumBlocklistManager.remove(type, id)
     }

@@ -88,6 +88,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import com.alibaba.fastjson2.JSON
@@ -1818,7 +1819,19 @@ fun MinePage(
 
                 MineDialogState.Blocklist -> {
                     ForumBlocklistDialog(
-                        onDismiss = { mineDialog = MineDialogState.Settings }
+                        onDismiss = { mineDialog = MineDialogState.Settings },
+                        onOpenPost = { url ->
+                            mineDialog = MineDialogState.None
+                            GlobalData.pendingClipboardUrl.value = url
+                            GlobalData.lastClipboardUrl = url
+                            navController.navigate("BBSPage") {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
             }
