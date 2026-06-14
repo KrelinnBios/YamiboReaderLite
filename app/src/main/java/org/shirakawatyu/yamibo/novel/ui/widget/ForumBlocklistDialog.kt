@@ -54,10 +54,17 @@ import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 
 /** 由屏蔽项构造可跳转的原帖链接（统一经 YamiboPostLinkUtil 归一化为 bbs + mobile=2）。 */
 private fun blockedItemPostUrl(item: ForumBlockedItem): String? {
-    val raw = if (item.type == ForumBlockedItem.TYPE_THREAD) {
-        "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=${item.id}"
-    } else {
-        "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&pid=${item.id}"
+    if (item.type == ForumBlockedItem.TYPE_USER) {
+        return "https://bbs.yamibo.com/home.php?mod=space&uid=${item.id}&do=profile&mobile=2"
+    }
+    val raw = when (item.type) {
+        ForumBlockedItem.TYPE_THREAD ->
+            "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=${item.id}"
+
+        ForumBlockedItem.TYPE_POST ->
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&pid=${item.id}"
+
+        else -> return null
     }
     return YamiboPostLinkUtil.normalizePostUrl(raw)
 }
@@ -117,7 +124,7 @@ fun ForumBlocklistDialog(
                             interactionSource = searchInteraction,
                             placeholder = {
                                 Text(
-                                    "搜索标题 / 用户名 / ID",
+                                    "输入帖子标题、用户名或用户 ID",
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -127,7 +134,7 @@ fun ForumBlocklistDialog(
                     }
                 )
 
-                // 全部 / 主题 / 楼层：与漫画首页一致的胶囊分段选择器。
+                // 全部 / 主题 / 楼层 / 用户：与漫画首页一致的胶囊分段选择器。
                 SectionSegmentedTabs(
                     selected = filter,
                     onSelect = { filter = it },
@@ -155,6 +162,7 @@ fun ForumBlocklistDialog(
                             key = { "${it.type}:${it.id}" }
                         ) { item ->
                             val authorLine = when {
+                                item.type == ForumBlockedItem.TYPE_USER -> "UID ${item.id}"
                                 item.authorName.isNotBlank() && item.authorUid.isNotBlank() ->
                                     "${item.authorName}（UID ${item.authorUid}）"
                                 item.authorName.isNotBlank() -> item.authorName
@@ -171,7 +179,12 @@ fun ForumBlocklistDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (item.type == ForumBlockedItem.TYPE_THREAD) "主题" else "楼层",
+                                    text = when (item.type) {
+                                        ForumBlockedItem.TYPE_THREAD -> "主题"
+                                        ForumBlockedItem.TYPE_POST -> "楼层"
+                                        ForumBlockedItem.TYPE_USER -> "用户"
+                                        else -> ""
+                                    },
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -221,7 +234,7 @@ fun ForumBlocklistDialog(
     )
 }
 
-/** 全部 / 主题 / 楼层 胶囊分段选择器，配色与漫画首页版区切换一致。 */
+/** 全部 / 主题 / 楼层 / 用户胶囊分段选择器，配色与漫画首页版区切换一致。 */
 @Composable
 private fun SectionSegmentedTabs(
     selected: String,
@@ -250,7 +263,8 @@ private fun SectionSegmentedTabs(
     val tabs = listOf(
         "全部" to "all",
         "主题" to ForumBlockedItem.TYPE_THREAD,
-        "楼层" to ForumBlockedItem.TYPE_POST
+        "楼层" to ForumBlockedItem.TYPE_POST,
+        "用户" to ForumBlockedItem.TYPE_USER
     )
 
     Row(
