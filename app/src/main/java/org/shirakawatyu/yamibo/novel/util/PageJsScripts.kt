@@ -1182,7 +1182,7 @@ $styleString
                     function cleanup() {
                         var hidden = document.querySelectorAll('[data-yamibo-block-hidden="1"]');
                         for (var i = 0; i < hidden.length; i++) restoreElement(hidden[i]);
-                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-block-li, .yamibo-blocked-message');
+                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-block-li, .yamibo-blocked-message, .yamibo-block-choice-backdrop');
                         for (var j = 0; j < generated.length; j++) generated[j].remove();
                     }
 
@@ -1196,6 +1196,11 @@ $styleString
                         var background = state.dark ? '#182332' : '#f5f2ea';
                         var border = state.dark ? '#2b4058' : '#ded6c7';
                         var text = state.dark ? '#b8c6d8' : '#66605a';
+                        var menuBackground = state.dark ? '#182332' : '#fffbe7';
+                        var menuText = state.dark ? '#edf4fb' : '#4f2418';
+                        var menuMuted = state.dark ? '#95acc4' : '#7b6259';
+                        var menuButton = state.dark ? '#223247' : '#f5ead2';
+                        var menuPrimary = state.dark ? '#31577a' : '#6e2b19';
                         style.textContent =
                             // 基础重置只作用于按钮本身的 <a>，保持极简，让它在不同容器里自然继承排版。
                             'a.yamibo-block-action{background:transparent!important;border:0!important;box-shadow:none!important;font:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
@@ -1207,7 +1212,14 @@ $styleString
                             '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
-                            '.yamibo-blocked-message a{font-size:12px!important;}';
+                            '.yamibo-blocked-message a{font-size:12px!important;}' +
+                            '.yamibo-block-choice-backdrop{position:fixed!important;inset:0!important;z-index:2147483646!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:16px!important;box-sizing:border-box!important;}' +
+                            '.yamibo-block-choice-menu{width:min(420px,100%)!important;background:' + menuBackground + '!important;color:' + menuText + '!important;border:1px solid ' + border + '!important;border-radius:8px!important;box-shadow:0 10px 32px rgba(0,0,0,.28)!important;padding:14px!important;box-sizing:border-box!important;}' +
+                            '.yamibo-block-choice-title{font-size:16px!important;font-weight:600!important;line-height:24px!important;margin:0 0 4px!important;color:' + menuText + '!important;}' +
+                            '.yamibo-block-choice-subtitle{font-size:12px!important;line-height:18px!important;margin:0 0 12px!important;color:' + menuMuted + '!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}' +
+                            '.yamibo-block-choice-button{display:block!important;width:100%!important;height:42px!important;margin:8px 0 0!important;padding:0 12px!important;border:1px solid ' + border + '!important;border-radius:6px!important;background:' + menuButton + '!important;background-image:none!important;color:' + menuText + '!important;box-shadow:none!important;text-shadow:none!important;font-size:14px!important;text-align:center!important;}' +
+                            '.yamibo-block-choice-button-primary{background:' + menuPrimary + '!important;color:#fff!important;}' +
+                            '.yamibo-block-choice-button-cancel{background:transparent!important;color:' + menuMuted + '!important;}';
                     }
 
                     function getTid(rawUrl) {
@@ -1263,6 +1275,11 @@ $styleString
                         return !!uid && !!state.currentUid && String(uid) === String(state.currentUid);
                     }
 
+                    function getBlockedUser(map, uid) {
+                        if (!uid) return null;
+                        return map[itemKey('user', uid)] || null;
+                    }
+
                     // 当前是不是“我自己”的空间列表页（我的主题/回复/收藏）。这类页面整页都是自己的内容，
                     // 不管行内有没有作者链接，都不应出现屏蔽按钮。
                     function isOwnSpaceListPage() {
@@ -1286,9 +1303,15 @@ $styleString
                         return match ? match[1] : null;
                     }
 
-                    function ensurePlaceholder(target, type, id, label) {
-                        if (!target || !target.parentNode) return;
+                    function placeholderSelector(type, id, instanceId) {
                         var selector = '.yamibo-blocked-message[data-type="' + type + '"][data-id="' + id + '"]';
+                        if (instanceId) selector += '[data-instance="' + instanceId + '"]';
+                        return selector;
+                    }
+
+                    function ensurePlaceholder(target, type, id, label, instanceId) {
+                        if (!target || !target.parentNode) return;
+                        var selector = placeholderSelector(type, id, instanceId);
                         var existing = target.parentNode.querySelector(selector);
                         if (existing) return;
                         var message = document.createElement(
@@ -1297,6 +1320,7 @@ $styleString
                         message.className = 'yamibo-blocked-message';
                         message.setAttribute('data-type', type);
                         message.setAttribute('data-id', id);
+                        if (instanceId) message.setAttribute('data-instance', instanceId);
                         message.appendChild(document.createTextNode(label + '已被屏蔽 '));
                         var undo = document.createElement('a');
                         undo.href = 'javascript:;';
@@ -1308,9 +1332,9 @@ $styleString
                         target.parentNode.insertBefore(message, target);
                     }
 
-                    function removePlaceholder(target, type, id) {
+                    function removePlaceholder(target, type, id, instanceId) {
                         if (!target || !target.parentNode) return;
-                        var selector = '.yamibo-blocked-message[data-type="' + type + '"][data-id="' + id + '"]';
+                        var selector = placeholderSelector(type, id, instanceId);
                         var message = target.parentNode.querySelector(selector);
                         if (message) message.remove();
                     }
@@ -1353,14 +1377,17 @@ $styleString
                                 if (ownSpaceHolder) ownSpaceHolder.remove();
                                 continue;
                             }
+                            var authorUid = getRowAuthorUid(row);
+                            var authorName = getAuthorName(row);
                             // 自己发布的主题不显示屏蔽按钮（也清掉历史上误加的）。
-                            if (isOwnUid(getRowAuthorUid(row))) {
+                            if (isOwnUid(authorUid)) {
                                 var ownHolder = row.querySelector('.yamibo-block-li');
                                 if (ownHolder) ownHolder.remove();
                                 continue;
                             }
                             var key = itemKey('thread', tid);
                             var isBlocked = !!map[key];
+                            var blockedUser = getBlockedUser(map, authorUid);
                             var action = row.querySelector('.yamibo-block-action[data-type="thread"]');
                             if (!action) {
                                 var foot = row.querySelector('.threadlist_foot ul');
@@ -1371,7 +1398,7 @@ $styleString
                                     holder.className = 'yamibo-block-li';
                                     var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
                                     var title = titleLink ? String(titleLink.textContent || '').trim() : '';
-                                    action = makeAction('thread', tid, title, isBlocked, getRowAuthorUid(row), getAuthorName(row));
+                                    action = makeAction('thread', tid, title, isBlocked, authorUid, authorName);
                                     holder.appendChild(action);
                                     foot.appendChild(holder);
                                 }
@@ -1380,11 +1407,17 @@ $styleString
                             }
 
                             if (isBlocked) {
+                                if (authorUid) removePlaceholder(row, 'user', authorUid, 'thread-' + tid);
                                 hideElement(row);
                                 ensurePlaceholder(row, 'thread', tid, '该主题');
+                            } else if (blockedUser) {
+                                removePlaceholder(row, 'thread', tid);
+                                hideElement(row);
+                                ensurePlaceholder(row, 'user', authorUid, '该用户的主题', 'thread-' + tid);
                             } else {
                                 restoreElement(row);
                                 removePlaceholder(row, 'thread', tid);
+                                if (authorUid) removePlaceholder(row, 'user', authorUid, 'thread-' + tid);
                             }
                         }
                     }
@@ -1408,13 +1441,16 @@ $styleString
                             var post = posts[i];
                             var pid = getPostPid(post);
                             if (!pid) continue;
+                            var authorUid = getPostAuthorUid(post);
+                            var authorName = getAuthorName(post.querySelector('.authi') || post);
                             // 自己发布的楼层（含主题楼）不显示屏蔽按钮（也清掉历史上误加的）。
-                            if (isOwnUid(getPostAuthorUid(post))) {
+                            if (isOwnUid(authorUid)) {
                                 var ownPostAction = post.querySelector('.yamibo-block-action[data-type="post"]');
                                 if (ownPostAction) ownPostAction.remove();
                                 continue;
                             }
                             var isBlocked = !!map[itemKey('post', pid)];
+                            var blockedUser = getBlockedUser(map, authorUid);
                             var action = post.querySelector('.yamibo-block-action[data-type="post"]');
                             if (!action) {
                                 var auth = post.querySelector('.authi');
@@ -1425,8 +1461,8 @@ $styleString
                                         pid,
                                         (document.title || '') + ' · 楼层 ' + pid,
                                         isBlocked,
-                                        getPostAuthorUid(post),
-                                        String(userLink.textContent || '').trim()
+                                        authorUid,
+                                        authorName || String(userLink.textContent || '').trim()
                                     );
                                     // 先插入按钮，再在用户名与按钮之间补四个不可断空格（普通空格会被 HTML 折叠成一个），
                                     // 使屏蔽文字按钮与用户名保持四个空格的距离。
@@ -1438,11 +1474,17 @@ $styleString
                             }
 
                             if (isBlocked) {
+                                if (authorUid) removePlaceholder(post, 'user', authorUid, 'post-' + pid);
                                 hideElement(post);
                                 ensurePlaceholder(post, 'post', pid, '该楼层');
+                            } else if (blockedUser) {
+                                removePlaceholder(post, 'post', pid);
+                                hideElement(post);
+                                ensurePlaceholder(post, 'user', authorUid, '该用户的楼层', 'post-' + pid);
                             } else {
                                 restoreElement(post);
                                 removePlaceholder(post, 'post', pid);
+                                if (authorUid) removePlaceholder(post, 'user', authorUid, 'post-' + pid);
                             }
                         }
                     }
@@ -1500,27 +1542,136 @@ $styleString
                         sync();
                     }
 
-                    document.addEventListener('click', function(event) {
-                        var unblock = event.target.closest ? event.target.closest('.yamibo-unblock-action') : null;
-                        var action = unblock || (event.target.closest ? event.target.closest('.yamibo-block-action[data-type][data-id]') : null);
-                        if (!action) return;
-                        event.preventDefault();
-                        event.stopPropagation();
-                        var type = action.getAttribute('data-type');
-                        var id = action.getAttribute('data-id');
+                    function closeBlockChoiceMenu() {
+                        var backdrop = document.querySelector('.yamibo-block-choice-backdrop');
+                        if (backdrop) backdrop.remove();
+                    }
+
+                    function showBlockChoiceMenu(action) {
+                        closeBlockChoiceMenu();
+                        var type = action.getAttribute('data-type') || '';
+                        var id = action.getAttribute('data-id') || '';
                         var title = action.getAttribute('data-title') || '';
                         var authorUid = action.getAttribute('data-author-uid') || '';
                         var authorName = action.getAttribute('data-author-name') || '';
-                        var map = blockedMap();
-                        var shouldBlock = unblock ? false : !map[itemKey(type, id)];
-                        updateLocal(type, id, title, shouldBlock, authorUid, authorName);
-                        if (window.AndroidForumBlocklist) {
-                            if (shouldBlock && window.AndroidForumBlocklist.block) {
-                                window.AndroidForumBlocklist.block(type, id, title, authorUid, authorName);
-                            } else if (!shouldBlock && window.AndroidForumBlocklist.unblock) {
-                                window.AndroidForumBlocklist.unblock(type, id);
-                            }
+
+                        var backdrop = document.createElement('div');
+                        backdrop.className = 'yamibo-block-choice-backdrop';
+                        var menu = document.createElement('div');
+                        menu.className = 'yamibo-block-choice-menu';
+                        menu.setAttribute('data-content-type', type);
+                        menu.setAttribute('data-content-id', id);
+                        menu.setAttribute('data-content-title', title);
+                        menu.setAttribute('data-author-uid', authorUid);
+                        menu.setAttribute('data-author-name', authorName);
+
+                        var heading = document.createElement('div');
+                        heading.className = 'yamibo-block-choice-title';
+                        heading.textContent = '选择屏蔽方式';
+                        menu.appendChild(heading);
+
+                        var subtitle = document.createElement('div');
+                        subtitle.className = 'yamibo-block-choice-subtitle';
+                        subtitle.textContent = authorName ? ('用户：' + authorName) : (title || ('ID ' + id));
+                        menu.appendChild(subtitle);
+
+                        var contentButton = document.createElement('button');
+                        contentButton.type = 'button';
+                        contentButton.className = 'yamibo-block-choice-button yamibo-block-choice-button-primary';
+                        contentButton.setAttribute('data-yamibo-block-choice', 'content');
+                        contentButton.textContent = type === 'thread' ? '屏蔽主题' : '屏蔽楼层';
+                        menu.appendChild(contentButton);
+
+                        if (authorUid && authorName && !isOwnUid(authorUid)) {
+                            var userButton = document.createElement('button');
+                            userButton.type = 'button';
+                            userButton.className = 'yamibo-block-choice-button';
+                            userButton.setAttribute('data-yamibo-block-choice', 'user');
+                            userButton.textContent = '屏蔽用户';
+                            menu.appendChild(userButton);
                         }
+
+                        var cancelButton = document.createElement('button');
+                        cancelButton.type = 'button';
+                        cancelButton.className = 'yamibo-block-choice-button yamibo-block-choice-button-cancel';
+                        cancelButton.setAttribute('data-yamibo-block-choice', 'cancel');
+                        cancelButton.textContent = '取消';
+                        menu.appendChild(cancelButton);
+
+                        backdrop.appendChild(menu);
+                        document.body.appendChild(backdrop);
+                    }
+
+                    function commitBlock(type, id, title, authorUid, authorName) {
+                        updateLocal(type, id, title, true, authorUid, authorName);
+                        if (window.AndroidForumBlocklist && window.AndroidForumBlocklist.block) {
+                            window.AndroidForumBlocklist.block(
+                                type,
+                                id,
+                                title,
+                                authorUid || '',
+                                authorName || ''
+                            );
+                        }
+                    }
+
+                    document.addEventListener('click', function(event) {
+                        var unblock = event.target.closest ? event.target.closest('.yamibo-unblock-action') : null;
+                        if (unblock) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            var unblockType = unblock.getAttribute('data-type');
+                            var unblockId = unblock.getAttribute('data-id');
+                            updateLocal(unblockType, unblockId, '', false, '', '');
+                            if (window.AndroidForumBlocklist && window.AndroidForumBlocklist.unblock) {
+                                window.AndroidForumBlocklist.unblock(unblockType, unblockId);
+                            }
+                            return;
+                        }
+
+                        var choice = event.target.closest ? event.target.closest('[data-yamibo-block-choice]') : null;
+                        if (choice) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            var menu = choice.closest('.yamibo-block-choice-menu');
+                            var selectedChoice = choice.getAttribute('data-yamibo-block-choice');
+                            if (!menu || selectedChoice === 'cancel') {
+                                closeBlockChoiceMenu();
+                                return;
+                            }
+                            var contentType = menu.getAttribute('data-content-type') || '';
+                            var contentId = menu.getAttribute('data-content-id') || '';
+                            var contentTitle = menu.getAttribute('data-content-title') || '';
+                            var authorUid = menu.getAttribute('data-author-uid') || '';
+                            var authorName = menu.getAttribute('data-author-name') || '';
+                            closeBlockChoiceMenu();
+                            if (selectedChoice === 'user') {
+                                commitBlock('user', authorUid, authorName, authorUid, authorName);
+                            } else {
+                                commitBlock(
+                                    contentType,
+                                    contentId,
+                                    contentTitle,
+                                    authorUid,
+                                    authorName
+                                );
+                            }
+                            return;
+                        }
+
+                        var backdrop = event.target.closest ? event.target.closest('.yamibo-block-choice-backdrop') : null;
+                        if (backdrop && event.target === backdrop) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            closeBlockChoiceMenu();
+                            return;
+                        }
+
+                        var action = event.target.closest ? event.target.closest('.yamibo-block-action[data-type][data-id]') : null;
+                        if (!action) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        showBlockChoiceMenu(action);
                     }, true);
 
                     var observer = new MutationObserver(scheduleSync);
