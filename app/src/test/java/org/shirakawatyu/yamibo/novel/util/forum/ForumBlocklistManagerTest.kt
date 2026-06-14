@@ -36,7 +36,14 @@ class ForumBlocklistManagerTest {
     fun blockedItemsRoundTripThroughStoredJson() {
         val expected = listOf(
             ForumBlockedItem(ForumBlockedItem.TYPE_THREAD, "546273", "测试主题"),
-            ForumBlockedItem(ForumBlockedItem.TYPE_POST, "40983574", "测试楼层")
+            ForumBlockedItem(ForumBlockedItem.TYPE_POST, "40983574", "测试楼层"),
+            ForumBlockedItem(
+                type = ForumBlockedItem.TYPE_USER,
+                id = "489445",
+                title = "425",
+                authorUid = "489445",
+                authorName = "425"
+            )
         )
         val actual = JSON.parseArray(
             JSON.toJSONString(expected),
