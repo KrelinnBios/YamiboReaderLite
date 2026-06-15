@@ -117,11 +117,10 @@ object BBSPageState {
         showLoadError = true
     }
 
-    // 短后台：尝试恢复/刷新；长后台：直接重建 WebView，避免复用半死不活的 renderer/surface。
-    // 重建阈值原为 15 分钟，但低内存机型在后台几分钟内就可能回收 WebView 的 renderer/surface，
-    // 此时仅 onResume + reload 旧实例会得到一片空白。降到 5 分钟，让"放一会儿再切回"直接重建。
-    private const val BACKGROUND_RECOVERY_THRESHOLD_MS = 30_000L
-    private const val FORCE_RECREATE_AFTER_LONG_BACKGROUND_MS = 5 * 60 * 1000L
+    // 后台 10 分钟以内切回：直接 onResume 续用现有页面，不刷新、不重建，保持原样与滚动位置。
+    // 超过 10 分钟：renderer/surface 多半已被系统回收，复用会白屏，此时才重建并重新加载。
+    private const val BACKGROUND_RECOVERY_THRESHOLD_MS = 10 * 60 * 1000L
+    private const val FORCE_RECREATE_AFTER_LONG_BACKGROUND_MS = 10 * 60 * 1000L
     private const val RESUME_RECOVERY_THROTTLE_MS = 5_000L
 
     var lastStoppedElapsedRealtime: Long = 0L
