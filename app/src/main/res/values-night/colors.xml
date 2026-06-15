@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- 开屏背景（含系统 SplashScreen 的 logo 背景）在夜间模式下用经典蓝黑。
-         由 UiModeManager.setApplicationNightMode 按 App 暗黑开关驱动夜间模式，
-         系统在下次冷启动即用这份 -night 资源绘制开屏。 -->
-    <color name="splash_background">#0D141D</color>
-</resources>

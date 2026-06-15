@@ -3,9 +3,7 @@ package org.shirakawatyu.yamibo.novel
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.app.UiModeManager
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import androidx.compose.ui.graphics.Color as ComposeColor
 import android.net.Uri
 import android.os.Build
@@ -213,10 +211,7 @@ class MainActivity : ComponentActivity() {
         GlobalData.dataStore = applicationContext.dataStore
         GlobalData.displayMetrics = resources.displayMetrics
         GlobalData.homePageRoute.value = "MangaHomePage"
-        // 冷启动同步读取暗黑引导缓存，让开屏（窗口背景 + 系统栏 + 骨架屏）首帧就跟随暗黑，
-        // 不必等 DataStore 异步加载后才变深色。
-        val launchDark = SettingsUtil.readDarkModeBootstrap()
-        GlobalData.isDarkMode.value = launchDark
+        GlobalData.isDarkMode.value = false
         GlobalData.darkModeTheme.value = 0
         GlobalData.lightModeTheme.value = 0
         super.onCreate(savedInstanceState)
@@ -233,18 +228,11 @@ class MainActivity : ComponentActivity() {
         WindowInsetsControllerCompat(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        if (launchDark) {
-            // 深色开屏：窗口背景换成经典蓝黑，盖掉米色 windowBackground 透出的浅色闪屏。
-            window.setBackgroundDrawable(ColorDrawable("#0D141D".toColorInt()))
-            window.statusBarColor = "#121B27".toColorInt()
-            window.navigationBarColor = "#121B27".toColorInt()
-        } else {
-            window.statusBarColor = "#551200".toColorInt()
-            window.navigationBarColor = "#EEE1BE".toColorInt()
-        }
+        window.statusBarColor = "#551200".toColorInt()
+        window.navigationBarColor = "#EEE1BE".toColorInt()
         WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = !launchDark
-            isAppearanceLightNavigationBars = !launchDark
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
         }
 
         if (bbsWebViewState == null) {
@@ -544,24 +532,7 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 }
                 SettingsUtil.getDnsOptimizationMode { GlobalData.dnsOptimizationMode.value = it }
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
-                SettingsUtil.getDarkMode {
-                    GlobalData.isDarkMode.value = it
-                    // 回写开屏引导缓存，让下次冷启动的窗口背景跟随当前暗黑状态。
-                    SettingsUtil.saveDarkModeBootstrap(it)
-                    // 用 DataStore 真值（而非可能过时的引导缓存）驱动 App 夜间模式，
-                    // 系统下次冷启动据此用 -night 资源画系统 SplashScreen（含 logo 背景）。
-                    // 暗 → MODE_NIGHT_YES、亮 → MODE_NIGHT_NO，使开屏始终与 App 暗黑开关一致。
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        runCatching {
-                            YamiboApplication.application
-                                .getSystemService(UiModeManager::class.java)
-                                ?.setApplicationNightMode(
-                                    if (it) UiModeManager.MODE_NIGHT_YES
-                                    else UiModeManager.MODE_NIGHT_NO
-                                )
-                        }
-                    }
-                }
+                SettingsUtil.getDarkMode { GlobalData.isDarkMode.value = it }
                 CurrentUserUtil.load()
                 GlobalData.darkModeTheme.value = 0
                 GlobalData.lightModeTheme.value = 0

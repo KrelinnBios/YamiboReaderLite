@@ -1,6 +1,5 @@
 package org.shirakawatyu.yamibo.novel.util
 
-import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -8,7 +7,6 @@ import com.alibaba.fastjson2.JSON
 import com.alibaba.fastjson2.JSONException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
-import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.bean.ReaderSettings
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 
@@ -160,35 +158,8 @@ class SettingsUtil {
                 callback("")
             })
         }
-        // 冷启动开屏引导缓存：DataStore 只能异步读，进程启动那一刻拿不到暗黑开关的值，
-        // 导致开屏永远按浅色画。这里把暗黑标记同步镜像到 SharedPreferences，供 onCreate
-        // 同步读取并立即套用深色开屏。真值仍以 DataStore 为准，这份仅作启动引导缓存。
-        private const val bootstrapPrefs = "launch_bootstrap"
-        private const val bootstrapDarkKey = "dark_mode"
-
         fun saveDarkMode(enabled: Boolean) {
             DataStoreUtil.addData(enabled.toString(), darkModeKey)
-            saveDarkModeBootstrap(enabled)
-        }
-
-        // 仅写引导缓存（不动 DataStore）。启动时读到 DataStore 真值后回写一份，
-        // 使早于此功能就开了暗黑的老用户也能在下次启动让开屏跟随暗黑（首次启动仍会按旧值）。
-        fun saveDarkModeBootstrap(enabled: Boolean) {
-            runCatching {
-                YamiboApplication.application
-                    .getSharedPreferences(bootstrapPrefs, Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean(bootstrapDarkKey, enabled)
-                    .apply()
-            }
-        }
-
-        fun readDarkModeBootstrap(): Boolean {
-            return runCatching {
-                YamiboApplication.application
-                    .getSharedPreferences(bootstrapPrefs, Context.MODE_PRIVATE)
-                    .getBoolean(bootstrapDarkKey, false)
-            }.getOrDefault(false)
         }
         fun getDarkMode(callback: (Boolean) -> Unit) {
             DataStoreUtil.getData(darkModeKey, callback = {
