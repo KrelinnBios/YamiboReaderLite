@@ -408,7 +408,7 @@ private fun ClipboardLinkHint(
     currentRoute: String?,
     onDismiss: () -> Unit
 ) {
-    AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visible = true,
         enter = fadeIn(tween(180)),
         exit = fadeOut(tween(120)),
