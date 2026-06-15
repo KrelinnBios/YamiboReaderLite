@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import androidx.compose.ui.graphics.Color as ComposeColor
 import android.net.Uri
 import android.os.Build
@@ -211,7 +212,10 @@ class MainActivity : ComponentActivity() {
         GlobalData.dataStore = applicationContext.dataStore
         GlobalData.displayMetrics = resources.displayMetrics
         GlobalData.homePageRoute.value = "MangaHomePage"
-        GlobalData.isDarkMode.value = false
+        // 冷启动同步读取暗黑引导缓存，让开屏（窗口背景 + 系统栏 + 骨架屏）首帧就跟随暗黑，
+        // 不必等 DataStore 异步加载后才变深色。
+        val launchDark = SettingsUtil.readDarkModeBootstrap()
+        GlobalData.isDarkMode.value = launchDark
         GlobalData.darkModeTheme.value = 0
         GlobalData.lightModeTheme.value = 0
         super.onCreate(savedInstanceState)
@@ -228,11 +232,18 @@ class MainActivity : ComponentActivity() {
         WindowInsetsControllerCompat(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        window.statusBarColor = "#551200".toColorInt()
-        window.navigationBarColor = "#EEE1BE".toColorInt()
+        if (launchDark) {
+            // 深色开屏：窗口背景换成经典蓝黑，盖掉米色 windowBackground 透出的浅色闪屏。
+            window.setBackgroundDrawable(ColorDrawable("#0D141D".toColorInt()))
+            window.statusBarColor = "#121B27".toColorInt()
+            window.navigationBarColor = "#121B27".toColorInt()
+        } else {
+            window.statusBarColor = "#551200".toColorInt()
+            window.navigationBarColor = "#EEE1BE".toColorInt()
+        }
         WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = !launchDark
+            isAppearanceLightNavigationBars = !launchDark
         }
 
         if (bbsWebViewState == null) {
