@@ -131,7 +131,7 @@ fun BottomNavBar(
             }
         }
 
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = webProgress in 1..99 &&
                     (baseRoute == "BBSPage" || baseRoute == "MinePage"),
             enter = fadeIn(tween(150)),
