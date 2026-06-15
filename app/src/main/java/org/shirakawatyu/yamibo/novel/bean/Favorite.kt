@@ -11,6 +11,7 @@ package org.shirakawatyu.yamibo.novel.bean
  * @param authorId 帖子作者ID，可为空，默认为null
  * @param lastMangaUrl 漫画书签URL
  * @param mangaCacheUrls 当前收藏已记录的漫画图片缓存键
+ * @param pinAnchorUrl 置顶前的前驱条目 URL（""=原本就是第一个，null=未置顶）；供“取消置顶”回到原位
  */
 data class Favorite(
     var title: String,
@@ -26,4 +27,5 @@ data class Favorite(
     var sourceFid: String? = null,
     var mangaCachedPages: Int = 0,
     var mangaCacheUrls: List<String> = emptyList(),
+    var pinAnchorUrl: String? = null,
 )

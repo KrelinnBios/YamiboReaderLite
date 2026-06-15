@@ -996,25 +996,27 @@ fun FavoritePage(
                                 Text("置顶")
                             }
                         }
-                        TextButton(
-                            onClick = {
-                                favoriteVM.moveToBottom(target.url)
-                                itemActionTarget = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Row(
+                        if (target.pinAnchorUrl != null) {
+                            TextButton(
+                                onClick = {
+                                    favoriteVM.unpinToOriginal(target.url)
+                                    itemActionTarget = null
+                                },
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(21.dp)
-                                )
-                                Spacer(Modifier.width(12.dp))
-                                Text("取消置顶")
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(21.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("取消置顶")
+                                }
                             }
                         }
                         TextButton(

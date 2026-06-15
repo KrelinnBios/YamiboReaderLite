@@ -271,7 +271,13 @@ class FavoriteUtil {
             writeMutex.withLock {
                 val map = getFavoriteMapSuspend()
                 if (map.containsKey(url)) {
-                    val fav = map.remove(url)!!
+                    // 记录置顶前的前驱条目 URL，供“取消置顶”回到原位；原本就是第一个则记空串。
+                    // 已置顶过的保留首次记录的原位，避免重复置顶把原位覆盖掉。
+                    val keys = map.keys.toList()
+                    val idx = keys.indexOf(url)
+                    val existingAnchor = map[url]?.pinAnchorUrl
+                    val anchor = existingAnchor ?: if (idx > 0) keys[idx - 1] else ""
+                    val fav = map.remove(url)!!.copy(pinAnchorUrl = anchor)
                     val newMap = LinkedHashMap<String, Favorite>()
                     newMap[url] = fav
                     newMap.putAll(map)
@@ -286,22 +292,38 @@ class FavoriteUtil {
             }
         }
 
-        // 取消置顶：把该条移到列表末尾（手动顺序模型下没有“原位置”，移到底部是置顶的自然反向操作）。
-        suspend fun moveUrlToBottomSuspend(url: String) {
+        // 取消置顶：把该条放回置顶前的原位（紧跟在记录的前驱之后；前驱为空则回到最前，
+        // 前驱已被删除则退回末尾兜底），并清除置顶标记。
+        suspend fun restoreUrlToOriginalSuspend(url: String) {
             writeMutex.withLock {
                 val map = getFavoriteMapSuspend()
-                if (map.containsKey(url)) {
-                    val fav = map.remove(url)!!
-                    val newMap = LinkedHashMap<String, Favorite>()
-                    newMap.putAll(map)
-                    newMap[url] = fav
-                    pendingFavMap = null
-                    suspendCancellableCoroutine { cont ->
-                        DataStoreUtil.Companion.addData(
-                            JSON.toJSONString(newMap),
-                            key
-                        ) { cont.resume(Unit) }
+                val fav = map[url] ?: return
+                val anchor = fav.pinAnchorUrl ?: return
+                map.remove(url)
+                val restored = fav.copy(pinAnchorUrl = null)
+                val newMap = LinkedHashMap<String, Favorite>()
+                when {
+                    anchor.isEmpty() -> {
+                        newMap[url] = restored
+                        newMap.putAll(map)
                     }
+                    map.containsKey(anchor) -> {
+                        for ((k, v) in map) {
+                            newMap[k] = v
+                            if (k == anchor) newMap[url] = restored
+                        }
+                    }
+                    else -> {
+                        newMap.putAll(map)
+                        newMap[url] = restored
+                    }
+                }
+                pendingFavMap = null
+                suspendCancellableCoroutine { cont ->
+                    DataStoreUtil.Companion.addData(
+                        JSON.toJSONString(newMap),
+                        key
+                    ) { cont.resume(Unit) }
                 }
             }
         }

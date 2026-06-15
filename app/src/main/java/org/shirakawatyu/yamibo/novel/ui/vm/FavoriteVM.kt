@@ -1033,9 +1033,9 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
-    fun moveToBottom(url: String) {
+    fun unpinToOriginal(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            FavoriteUtil.moveUrlToBottomSuspend(url)
+            FavoriteUtil.restoreUrlToOriginalSuspend(url)
         }
     }
 
