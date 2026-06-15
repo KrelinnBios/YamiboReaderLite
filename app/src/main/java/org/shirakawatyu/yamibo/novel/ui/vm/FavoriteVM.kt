@@ -1033,6 +1033,12 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
+    fun moveToBottom(url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            FavoriteUtil.moveUrlToBottomSuspend(url)
+        }
+    }
+
     fun clearFavoriteCache(favorite: Favorite, onToast: (String) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {

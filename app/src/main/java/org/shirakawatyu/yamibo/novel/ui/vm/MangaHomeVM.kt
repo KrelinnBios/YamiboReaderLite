@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alibaba.fastjson2.JSON
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,7 +35,9 @@ class MangaHomeVM : ViewModel() {
     private val api = YamiboRetrofit.getInstance().create(MangaApi::class.java)
     private val _uiState = MutableStateFlow(MangaHomeState())
     val uiState = _uiState.asStateFlow()
-    private val coverSemaphore = Semaphore(3)
+    private val coverSemaphore = Semaphore(6)
+    // tid -> 封面 URL 的内存缓存：切换分区、翻页、返回首页时复用，避免重复请求帖子详情接口。
+    private val coverCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var refreshVersion = 0L
     private var searchFormHash: String? = null
     private var lastSearchAt = 0L
@@ -89,22 +89,17 @@ class MangaHomeVM : ViewModel() {
             }
                 .onSuccess { loaded ->
                     if (version != refreshVersion) return@onSuccess
+                    // 已缓存的封面直接套上，立即显示；其余逐张异步补。
+                    val deduped = loaded.distinctBy(MangaHomeItem::tid)
+                        .map { it.copy(coverUrl = coverCache[it.tid]) }
                     _uiState.update {
                         it.copy(
-                            items = loaded.distinctBy(MangaHomeItem::tid),
+                            items = deduped,
                             isLoading = false,
                             hasMore = loaded.isNotEmpty()
                         )
                     }
-                    val withCovers = loadCovers(loaded.take(16))
-                    if (version == refreshVersion && withCovers.isNotEmpty()) {
-                        val coverMap = withCovers.associateBy(MangaHomeItem::tid)
-                        _uiState.update { current ->
-                            current.copy(
-                                items = current.items.map { coverMap[it.tid] ?: it }
-                            )
-                        }
-                    }
+                    loadCoversProgressive(deduped.take(16).filter { it.coverUrl == null }, version)
                 }
                 .onFailure { error ->
                     if (version != refreshVersion) return@onFailure
@@ -132,15 +127,16 @@ class MangaHomeVM : ViewModel() {
                     if (requestVersion != refreshVersion ||
                         _uiState.value.selectedFid != requestFid
                     ) return@onSuccess
-                    val withCovers = loadCovers(loaded.take(10)) + loaded.drop(10)
+                    val appended = loaded.map { it.copy(coverUrl = coverCache[it.tid]) }
                     _uiState.update {
                         it.copy(
-                            items = (it.items + withCovers).distinctBy(MangaHomeItem::tid),
+                            items = (it.items + appended).distinctBy(MangaHomeItem::tid),
                             page = nextPage,
                             isLoadingMore = false,
                             hasMore = loaded.isNotEmpty()
                         )
                     }
+                    loadCoversProgressive(appended.take(10).filter { it.coverUrl == null }, requestVersion)
                 }
                 .onFailure { error ->
                     if (requestVersion != refreshVersion ||
@@ -276,14 +272,32 @@ class MangaHomeVM : ViewModel() {
             .toList()
     }
 
-    private suspend fun loadCovers(items: List<MangaHomeItem>): List<MangaHomeItem> =
-        items.map { item ->
-            viewModelScope.async(Dispatchers.IO) {
+    // 封面逐张异步加载：每拿到一张就单独刷新对应条目，不再等整批拿齐，首页明显更快出图。
+    private fun loadCoversProgressive(items: List<MangaHomeItem>, version: Long) {
+        items.forEach { item ->
+            viewModelScope.launch(Dispatchers.IO) {
                 coverSemaphore.withPermit {
-                    item.copy(coverUrl = runCatching { findFirstImage(item.tid) }.getOrNull())
+                    if (version != refreshVersion) return@withPermit
+                    val cover = coverCache[item.tid]
+                        ?: runCatching { findFirstImage(item.tid) }.getOrNull()
+                        ?: return@withPermit
+                    coverCache[item.tid] = cover
+                    if (version != refreshVersion) return@withPermit
+                    _uiState.update { state ->
+                        state.copy(
+                            items = state.items.map {
+                                if (it.tid == item.tid && it.coverUrl == null) {
+                                    it.copy(coverUrl = cover)
+                                } else {
+                                    it
+                                }
+                            }
+                        )
+                    }
                 }
             }
-        }.awaitAll()
+        }
+    }
 
     private suspend fun findFirstImage(tid: String): String? {
         val json = JSON.parseObject(api.getThreadDetailApi(tid).string())

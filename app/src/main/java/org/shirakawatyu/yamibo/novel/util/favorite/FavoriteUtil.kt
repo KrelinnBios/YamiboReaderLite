@@ -286,6 +286,26 @@ class FavoriteUtil {
             }
         }
 
+        // 取消置顶：把该条移到列表末尾（手动顺序模型下没有“原位置”，移到底部是置顶的自然反向操作）。
+        suspend fun moveUrlToBottomSuspend(url: String) {
+            writeMutex.withLock {
+                val map = getFavoriteMapSuspend()
+                if (map.containsKey(url)) {
+                    val fav = map.remove(url)!!
+                    val newMap = LinkedHashMap<String, Favorite>()
+                    newMap.putAll(map)
+                    newMap[url] = fav
+                    pendingFavMap = null
+                    suspendCancellableCoroutine { cont ->
+                        DataStoreUtil.Companion.addData(
+                            JSON.toJSONString(newMap),
+                            key
+                        ) { cont.resume(Unit) }
+                    }
+                }
+            }
+        }
+
         suspend fun resetMangaCacheCountsSuspend() {
             writeMutex.withLock {
                 val map = getFavoriteMapSuspend()

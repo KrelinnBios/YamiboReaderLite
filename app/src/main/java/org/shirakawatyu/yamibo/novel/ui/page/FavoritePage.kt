@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
@@ -993,6 +994,27 @@ fun FavoritePage(
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Text("置顶")
+                            }
+                        }
+                        TextButton(
+                            onClick = {
+                                favoriteVM.moveToBottom(target.url)
+                                itemActionTarget = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(21.dp)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text("取消置顶")
                             }
                         }
                         TextButton(
