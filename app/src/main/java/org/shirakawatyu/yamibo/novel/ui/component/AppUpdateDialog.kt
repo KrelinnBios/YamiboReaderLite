@@ -82,7 +82,11 @@ fun AppUpdateDialog(
 
                     UpdateDownloadState.READY -> {
                         Text(
-                            text = info.releaseNotes.ifBlank { "新版本已经发布。" },
+                            text = buildString {
+                                appendLine("目标版本：v${info.versionName}")
+                                appendLine()
+                                append(info.releaseNotes.ifBlank { "新版本已经发布。" })
+                            },
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
