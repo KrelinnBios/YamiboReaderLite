@@ -1519,7 +1519,7 @@ fun MinePage(
             // 只要当前 WebView 还不是本次目标页面，就用不透明遮罩挡住旧 DOM。
             // 这样从历史帖子返回 MinePage 时，不会在个人主页提交前露出刚才的帖子。
             // 只有 fromHistory 时需要主动吞掉触摸事件，防止用户点到旧 DOM 的残留交互。
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = shouldBlockOldWebContent,
                 enter = EnterTransition.None,
                 exit = fadeOut()
