@@ -112,7 +112,7 @@ class MangaHomeVM : ViewModel() {
                         it.copy(
                             items = emptyList(),
                             isLoading = false,
-                            error = error.message ?: "漫画列表加载失败"
+                            error = friendlyError(error, "漫画列表加载失败")
                         )
                     }
                 }
@@ -149,11 +149,27 @@ class MangaHomeVM : ViewModel() {
                     _uiState.update {
                         it.copy(
                             isLoadingMore = false,
-                            error = error.message ?: "加载更多失败"
+                            error = friendlyError(error, "加载更多失败")
                         )
                     }
                 }
         }
+    }
+
+    // 网络类异常（stream was reset / 超时 / DNS / 连接失败等）原始信息对用户没意义，
+    // 还会把"stream was reset: PROTOCOL_ERROR"这种吓人的英文直接抛到漫画首页。
+    // 统一换成可操作的中文提示；IllegalStateException 携带的是给用户看的中文提示（如"请先登录"），原样保留。
+    private fun friendlyError(e: Throwable, fallback: String): String {
+        if (e is IllegalStateException) return e.message?.takeIf(String::isNotBlank) ?: fallback
+        val msg = e.message.orEmpty()
+        val isNetwork = e is java.io.IOException ||
+                msg.contains("stream was reset", ignoreCase = true) ||
+                msg.contains("PROTOCOL_ERROR", ignoreCase = true) ||
+                msg.contains("timeout", ignoreCase = true) ||
+                msg.contains("Unable to resolve host", ignoreCase = true) ||
+                msg.contains("Failed to connect", ignoreCase = true) ||
+                msg.contains("connection", ignoreCase = true)
+        return if (isNetwork) "网络不太稳定，下拉重试一下" else fallback
     }
 
     private suspend fun loadForumPage(fid: String, page: Int): List<MangaHomeItem> {

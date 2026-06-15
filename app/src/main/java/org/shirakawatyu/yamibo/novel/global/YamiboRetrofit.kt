@@ -327,10 +327,10 @@ class YamiboRetrofit {
             request: Request
         ): okhttp3.Response {
             var lastError: IOException? = null
-            // GET 请求遇到瞬时流重置 / 444 限流最多重试 2 次；
-            // 重试前清空空闲连接，确保换一条新连接，避免再次复用已被服务器掐掉的坏连接；
-            // 并做递增退避，给 WAF 限流窗口一点喘息时间。
-            repeat(3) { attempt ->
+            // GET 请求遇到瞬时流重置最多重试 3 次（稍弱网络下 stream was reset 偶发更频繁，
+            // 多给一次重试明显提升头像/表情/封面这类小图的成活率）；444 WAF 限流仍只重试 2 次，
+            // 避免反复打它加剧限流。每次重试前清空空闲连接换新连接，并做递增退避。
+            repeat(4) { attempt ->
                 try {
                     val response = chain.proceed(request)
                     val canRetryResponse = attempt < 2 &&
@@ -343,7 +343,7 @@ class YamiboRetrofit {
                     backoff(attempt)
                 } catch (e: IOException) {
                     lastError = e
-                    val canRetry = attempt < 2 &&
+                    val canRetry = attempt < 3 &&
                             request.method == "GET" &&
                             isTransientStreamReset(e)
                     if (!canRetry) {

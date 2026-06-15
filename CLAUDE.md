@@ -86,7 +86,7 @@
 ### 网络
 
 - **禁止强制 HTTP/1.1**（`protocols(HTTP_1_1)`）。这曾导致整个 App 无法连接论坛，并与共享连接池中的 h2 连接冲突。
-- 服务器偶发 `stream was reset: PROTOCOL_ERROR` 已在应用级拦截器 `proceedWithDnsRecovery` 处理：GET 最多重试 2 次，重试前执行 `connectionPool.evictAll()` 清理坏连接。不要再改协议协商层。
+- 服务器偶发 `stream was reset: PROTOCOL_ERROR` 已在应用级拦截器 `proceedWithDnsRecovery` 处理：GET 遇瞬时流重置最多重试 3 次、444 WAF 限流最多重试 2 次（限流多打反而加剧，故更保守），每次重试前执行 `connectionPool.evictAll()` 清理坏连接并递增退避。不要再改协议协商层。
 - 连接池 keepalive 固定为 **50 秒**，必须短于论坛服务器约 60～75 秒的空闲超时。不要改回分钟级，否则切回 App 时可能复用半死连接。
 
 ### 暗黑模式
