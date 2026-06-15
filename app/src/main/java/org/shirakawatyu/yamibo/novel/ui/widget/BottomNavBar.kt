@@ -6,8 +6,9 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -35,6 +36,7 @@ import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BottomNavBar(
     navController: NavController,
@@ -93,11 +95,20 @@ fun BottomNavBar(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable(
+                        .combinedClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
+                            // 单击：仅切换板块；已在本板块内时不做任何事，避免误触重载。
                             onClick = {
-                                navBarVM.returnToHome(index, currentRoute, navController)
+                                navBarVM.returnToHome(
+                                    index, currentRoute, navController, notifyHome = false
+                                )
+                            },
+                            // 长按：回到该板块主页（论坛首页 / 个人资料 / 漫画首页 / 收藏首页）。
+                            onLongClick = {
+                                navBarVM.returnToHome(
+                                    index, currentRoute, navController, notifyHome = true
+                                )
                             }
                         ),
                     contentAlignment = Alignment.Center

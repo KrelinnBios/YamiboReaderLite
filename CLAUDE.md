@@ -106,9 +106,10 @@
 
 ### 交互
 
-- 底栏单击表示“回该板块主页”；刷新统一使用下拉手势，原生页用 `PullToRefreshBox`，WebView 页用 `SwipeRefreshLayout`。长按刷新已删除，不要恢复。
+- 底栏**单击表示“切换板块”**：跳到对应板块；已在本板块内时不做任何事，避免误触重载。**长按表示“回该板块主页”**（论坛首页 / 个人资料 / 漫画首页 / 收藏首页），即 `returnToHome(notifyHome = true)` 发出的 `goHomeEvent`；单击走 `notifyHome = false`。不要把回主页改回单击。
+- 刷新统一使用下拉手势，原生页用 `PullToRefreshBox`，WebView 页用 `SwipeRefreshLayout`。长按刷新已删除，不要恢复（长按现用于回主页，不是刷新）。
 - 下拉刷新指示器必须跟随暗黑模式配色：深色背景 `#223247`、箭头 `#4EA1FF`。
-- 切回 `MangaHomePage` 不触发网络刷新，只清空搜索词并回到顶部，避免网络波动破坏现有列表。
+- 切回 `MangaHomePage`（长按底栏漫画键）不触发网络刷新，只清空搜索词并回到顶部，避免网络波动破坏现有列表。
 - 小说阅读器进度只显示页数 `当前/总数`，不显示百分比。
 - 小说阅读器标题不常驻顶部，放在点击正文后弹出的菜单中间，与漫画阅读器保持一致。
 - 从阅读器返回“原帖”的 URL 必须经过 `ReaderReturnBridge.forceMobileTemplate` 并带 `mobile=2`，否则论坛会渲染电脑版。
