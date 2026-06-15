@@ -1159,7 +1159,7 @@ fun NativeMangaPage(
 
                 val showPullUi by remember { derivedStateOf { pullOverscrollAmount > showUiDistancePx } }
 
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = showPullUi,
                     enter = fadeIn(), exit = fadeOut(),
                     modifier = Modifier
@@ -1189,7 +1189,7 @@ fun NativeMangaPage(
                     }
                 }
 
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = readerManager.isLoadingPrev && !readerManager.isManualJumping,
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300)),
@@ -1212,7 +1212,7 @@ fun NativeMangaPage(
                     }
                 }
 
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = probingUrl != null || readerManager.isManualJumping,
                     enter = fadeIn(tween(150)),
                     exit = fadeOut(tween(150)),
@@ -1230,7 +1230,7 @@ fun NativeMangaPage(
                     }
                 }
 
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = showChapterToast,
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300)),
@@ -1263,7 +1263,7 @@ fun NativeMangaPage(
                 )
             }
 
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = showUi && !showChapterList && !showSettingsPanel,
                 enter = fadeIn() + slideInVertically { -it },
                 exit = fadeOut() + slideOutVertically { -it },
@@ -1320,7 +1320,7 @@ fun NativeMangaPage(
                 }
             }
 
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = showUi && !showChapterList && !showSettingsPanel,
                 enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 },
                 exit = fadeOut(tween(300)) + slideOutVertically(tween(300)) { it / 2 },
