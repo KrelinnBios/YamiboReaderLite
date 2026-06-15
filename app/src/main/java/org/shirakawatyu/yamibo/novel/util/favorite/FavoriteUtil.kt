@@ -208,7 +208,7 @@ class FavoriteUtil {
             }
         }
 
-        private fun jsonToHashMap(text: String): LinkedHashMap<String, Favorite> {
+        internal fun jsonToHashMap(text: String): LinkedHashMap<String, Favorite> {
             val map = LinkedHashMap<String, Favorite>()
             try {
                 val jsonObject: JSONObject = JSON.parseObject(text)
@@ -231,7 +231,8 @@ class FavoriteUtil {
                         mangaCachedPages = obj.getIntValue("mangaCachedPages"),
                         mangaCacheUrls = obj.getJSONArray("mangaCacheUrls")
                             ?.mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
-                            .orEmpty()
+                            .orEmpty(),
+                        pinAnchorUrl = obj.getString("pinAnchorUrl")
                     )
                     map[fav.url] = fav
                 }
