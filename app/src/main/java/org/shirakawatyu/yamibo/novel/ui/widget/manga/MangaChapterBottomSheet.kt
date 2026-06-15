@@ -216,7 +216,7 @@ fun MangaChapterPanel(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = visible,
             enter = fadeIn(tween(180)),
             exit = fadeOut(tween(180))
@@ -229,7 +229,7 @@ fun MangaChapterPanel(
             )
         }
 
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = visible,
             enter = slideInHorizontally(tween(260)) { -it },
             exit = slideOutHorizontally(tween(220)) { -it },
