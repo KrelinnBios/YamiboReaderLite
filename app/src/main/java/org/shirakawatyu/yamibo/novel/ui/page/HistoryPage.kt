@@ -638,7 +638,7 @@ fun HistoryPage(navController: NavController) {
             )
 
             // 日期过滤标签
-            AnimatedVisibility(visible = selectedStartDateMillis != null) {
+            androidx.compose.animation.AnimatedVisibility(visible = selectedStartDateMillis != null) {
                 selectedStartDateMillis?.let { startMillis ->
                     val endMillis = selectedEndDateMillis ?: startMillis
                     val dateStr = if (startMillis == endMillis) {
