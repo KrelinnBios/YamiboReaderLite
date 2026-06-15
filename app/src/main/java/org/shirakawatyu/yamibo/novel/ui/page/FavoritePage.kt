@@ -413,9 +413,13 @@ fun FavoritePage(
     )
 
     // 分类数据
+    val novelCategoryColor = darkModeColor(
+        light = YamiboColors.secondary,
+        dark = Color(0xFF3FC1B0)
+    )
     val categoryOptions = listOf(
         Triple(-1, "全部", Color.Transparent),
-        Triple(1, "小说", MaterialTheme.colorScheme.secondary),
+        Triple(1, "小说", novelCategoryColor),
         Triple(2, "漫画", MaterialTheme.colorScheme.primary)
     )
 
