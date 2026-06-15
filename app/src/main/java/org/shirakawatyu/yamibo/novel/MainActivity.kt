@@ -247,24 +247,6 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = !launchDark
         }
 
-        // 让系统按 App 暗黑开关进入夜间模式，下次冷启动时用 values-night 的 splash_background
-        // 绘制系统 SplashScreen（含 logo 背景）。仅在与当前不一致时设置，避免重复触发配置变化；
-        // 配置变化由 manifest 的 configChanges=uiMode 接住，不重建 Activity。本次启动的开屏已由系统
-        // 用旧值画完，故改动在下次冷启动生效。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            runCatching {
-                val uiModeManager = getSystemService(UiModeManager::class.java)
-                val desired = if (launchDark) {
-                    UiModeManager.MODE_NIGHT_YES
-                } else {
-                    UiModeManager.MODE_NIGHT_NO
-                }
-                if (uiModeManager != null && uiModeManager.nightMode != desired) {
-                    uiModeManager.setApplicationNightMode(desired)
-                }
-            }
-        }
-
         if (bbsWebViewState == null) {
             bbsWebViewState = createBbsWebView(this, customWebChromeClient)
         }
@@ -564,8 +546,21 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
                 SettingsUtil.getDarkMode {
                     GlobalData.isDarkMode.value = it
-                    // 回写开屏引导缓存，让下次冷启动的开屏背景跟随当前暗黑状态。
+                    // 回写开屏引导缓存，让下次冷启动的窗口背景跟随当前暗黑状态。
                     SettingsUtil.saveDarkModeBootstrap(it)
+                    // 用 DataStore 真值（而非可能过时的引导缓存）驱动 App 夜间模式，
+                    // 系统下次冷启动据此用 -night 资源画系统 SplashScreen（含 logo 背景）。
+                    // 暗 → MODE_NIGHT_YES、亮 → MODE_NIGHT_NO，使开屏始终与 App 暗黑开关一致。
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        runCatching {
+                            YamiboApplication.application
+                                .getSystemService(UiModeManager::class.java)
+                                ?.setApplicationNightMode(
+                                    if (it) UiModeManager.MODE_NIGHT_YES
+                                    else UiModeManager.MODE_NIGHT_NO
+                                )
+                        }
+                    }
                 }
                 CurrentUserUtil.load()
                 GlobalData.darkModeTheme.value = 0

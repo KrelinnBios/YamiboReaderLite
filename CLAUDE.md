@@ -103,7 +103,7 @@
 - 深色链接统一使用浅蓝 `#7dbdf2`，不允许改成棕色；浅色（原色）模式下正文链接统一为站点默认链接色 `#6E2B19`。
 - 链接颜色统一要覆盖到链接内部的 `font[color]` / 内联 `color` 子元素（楼主常把链接套多种颜色），但只改文字色、绝不动 `background-image`。
 - 新页面未适配时，先让用户提供真实 HTML 片段，再按选择器精准补规则；不要凭空猜测或添加大范围通配。
-- 开屏跟随暗黑分两层：①窗口背景/系统栏由 `MainActivity.onCreate` 同步读取 `SettingsUtil.readDarkModeBootstrap()`（SharedPreferences 引导缓存，DataStore 异步读不到）后立即套深色；引导缓存在切换开关时写、启动读到 DataStore 真值后回写以自愈。②系统 SplashScreen 的 logo 背景是进程启动前由主题静态绘制，运行时改不了，靠 `res/values-night/colors.xml` 的 `splash_background` + `UiModeManager.setApplicationNightMode`（API 31+，按暗黑开关驱动 App 夜间模式）让系统下次冷启动用 `-night` 资源绘制。两者都在**下次冷启动**才生效（本次开屏系统已用旧值画完）。`MainActivity` 声明 `configChanges="uiMode"` 接住夜间模式切换、不重建。
+- 开屏跟随暗黑分两层：①窗口背景/系统栏由 `MainActivity.onCreate` 同步读取 `SettingsUtil.readDarkModeBootstrap()`（SharedPreferences 引导缓存，DataStore 异步读不到）后立即套深色；引导缓存在切换开关时写、启动读到 DataStore 真值后回写以自愈。②系统 SplashScreen 的 logo 背景是进程启动前由主题静态绘制，运行时改不了，靠 `res/values-night/colors.xml` 的 `splash_background` + `UiModeManager.setApplicationNightMode`（API 31+）让系统下次冷启动用 `-night` 资源绘制。夜间模式**必须用 DataStore 真值驱动**（在 `getDarkMode` 回调里 `暗→MODE_NIGHT_YES / 亮→MODE_NIGHT_NO`），不要用引导缓存或 `getNightMode()`（返回的是系统全局值、非 App 作用域）做判断——早期版本在 `onCreate` 用引导缓存 + `getNightMode()` 守卫，导致缓存过期时误设 `MODE_NIGHT_NO`、开屏首启变暗随后恒为浅色。两者都在**下次冷启动**才生效（本次开屏系统已用旧值画完）。`MainActivity` 声明 `configChanges="uiMode"` 接住夜间模式切换、不重建。
 
 ### 交互
 
