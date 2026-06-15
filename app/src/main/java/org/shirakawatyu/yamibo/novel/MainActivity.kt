@@ -3,6 +3,7 @@ package org.shirakawatyu.yamibo.novel
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.app.UiModeManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import androidx.compose.ui.graphics.Color as ComposeColor
@@ -244,6 +245,24 @@ class MainActivity : ComponentActivity() {
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = !launchDark
             isAppearanceLightNavigationBars = !launchDark
+        }
+
+        // 让系统按 App 暗黑开关进入夜间模式，下次冷启动时用 values-night 的 splash_background
+        // 绘制系统 SplashScreen（含 logo 背景）。仅在与当前不一致时设置，避免重复触发配置变化；
+        // 配置变化由 manifest 的 configChanges=uiMode 接住，不重建 Activity。本次启动的开屏已由系统
+        // 用旧值画完，故改动在下次冷启动生效。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            runCatching {
+                val uiModeManager = getSystemService(UiModeManager::class.java)
+                val desired = if (launchDark) {
+                    UiModeManager.MODE_NIGHT_YES
+                } else {
+                    UiModeManager.MODE_NIGHT_NO
+                }
+                if (uiModeManager != null && uiModeManager.nightMode != desired) {
+                    uiModeManager.setApplicationNightMode(desired)
+                }
+            }
         }
 
         if (bbsWebViewState == null) {
