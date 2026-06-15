@@ -168,6 +168,12 @@ class SettingsUtil {
 
         fun saveDarkMode(enabled: Boolean) {
             DataStoreUtil.addData(enabled.toString(), darkModeKey)
+            saveDarkModeBootstrap(enabled)
+        }
+
+        // 仅写引导缓存（不动 DataStore）。启动时读到 DataStore 真值后回写一份，
+        // 使早于此功能就开了暗黑的老用户也能在下次启动让开屏跟随暗黑（首次启动仍会按旧值）。
+        fun saveDarkModeBootstrap(enabled: Boolean) {
             runCatching {
                 YamiboApplication.application
                     .getSharedPreferences(bootstrapPrefs, Context.MODE_PRIVATE)

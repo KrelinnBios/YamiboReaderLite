@@ -543,7 +543,11 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 }
                 SettingsUtil.getDnsOptimizationMode { GlobalData.dnsOptimizationMode.value = it }
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
-                SettingsUtil.getDarkMode { GlobalData.isDarkMode.value = it }
+                SettingsUtil.getDarkMode {
+                    GlobalData.isDarkMode.value = it
+                    // 回写开屏引导缓存，让下次冷启动的开屏背景跟随当前暗黑状态。
+                    SettingsUtil.saveDarkModeBootstrap(it)
+                }
                 CurrentUserUtil.load()
                 GlobalData.darkModeTheme.value = 0
                 GlobalData.lightModeTheme.value = 0
