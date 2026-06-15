@@ -30,7 +30,7 @@ fun ReaderModeFAB(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    AnimatedVisibility(
+    androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + scaleIn(),
         exit = fadeOut() + scaleOut(),
