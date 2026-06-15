@@ -113,7 +113,7 @@ fun YamiboToastHost(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.BottomCenter
     ) {
         val event = displayedEvent
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = visible && event != null,
             enter = fadeIn(animationSpec = tween(200)) +
                     slideInVertically(initialOffsetY = { 30 }),
