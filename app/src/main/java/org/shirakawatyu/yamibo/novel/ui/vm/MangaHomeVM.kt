@@ -6,6 +6,7 @@ import com.alibaba.fastjson2.JSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -27,6 +28,10 @@ class MangaHomeVM : ViewModel() {
             "37" to "漫画图源"
         )
         private val allowedFids = sections.map { it.first }
+
+        // 搜索翻页上限与翻页间隔：限制总请求数并错峰，避免触发论坛搜索限流。
+        private const val MAX_SEARCH_PAGES = 20
+        private const val SEARCH_PAGE_INTERVAL_MS = 500L
     }
 
     private val api = YamiboRetrofit.getInstance().create(MangaApi::class.java)
@@ -216,11 +221,20 @@ class MangaHomeVM : ViewModel() {
 
         val allItems = MangaHtmlParser.parseListHtml(html).toMutableList()
         val searchId = MangaHtmlParser.extractSearchId(html)
-        val totalPages = MangaHtmlParser.extractTotalPages(html)
-        if (searchId != null && totalPages > 1) {
+        val totalPages = MangaHtmlParser.extractTotalPages(html).coerceAtMost(MAX_SEARCH_PAGES)
+        if (searchId != null && totalPages > 1 && allItems.isNotEmpty()) {
             for (page in 2..totalPages) {
-                val pageHtml = api.searchForumPage(searchid = searchId, page = page).string()
-                allItems += MangaHtmlParser.parseListHtml(pageHtml)
+                // 翻页之间留出间隔，避免连续快速请求触发论坛限流（444 / 防灌水）。
+                delay(SEARCH_PAGE_INTERVAL_MS)
+                // 单页失败（网络/444/防灌水）只截断后续翻页，保留已拿到的结果，
+                // 绝不让一页出错把整次搜索清空（表现为“搜不出来”或“只有一部分”）。
+                val pageHtml = runCatching {
+                    api.searchForumPage(searchid = searchId, page = page).string()
+                }.getOrNull() ?: break
+                if (MangaHtmlParser.isFloodControlOrError(pageHtml)) break
+                val pageItems = MangaHtmlParser.parseListHtml(pageHtml)
+                if (pageItems.isEmpty()) break
+                allItems += pageItems
             }
         }
 
