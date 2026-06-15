@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import org.shirakawatyu.yamibo.novel.R
 import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
+import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 
 private val PREFIX_REGEX = Regex("^(?:[【\\[].*?[】\\]]|[\\s\\u00A0\\u3000])+")
@@ -159,10 +160,12 @@ fun FavoriteItem(
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.outline
     }
 
-    // 小说（type 1）原用 secondary 系，深色下与卡片背景几乎同色、看不清；
-    // 换成青绿冷色，贴合蓝黑暗黑模式，又与漫画（type 2）的主题蓝清楚区分。
+    // 小说标记浅色保持原本棕红，暗黑模式改为青色，和顶部分类菜单样例保持一致。
     val middleColor = if (type == 1) {
-        Color(0xFF3FC1B0)
+        darkModeColor(
+            light = YamiboColors.secondary,
+            dark = Color(0xFF3FC1B0)
+        )
     } else {
         lerp(typeColor.first, typeColor.second, 0.75f)
     }
