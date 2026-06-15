@@ -366,7 +366,7 @@ private fun UpdateStatusHandle(
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { content() }
 
         // 检查更新：卡片右侧上下居中的主题色普通刷新转圈（替代原来顶部的「查」胶囊）。
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = isCheckingUpdate,
             enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(120))
@@ -379,7 +379,7 @@ private fun UpdateStatusHandle(
         }
 
         // 有更新 胶囊（顶部）
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = hasUpdate && !isCheckingUpdate,
             enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(120)),
@@ -394,7 +394,7 @@ private fun UpdateStatusHandle(
         }
 
         // 自动检查已开启 胶囊（仅在无查/新时展示）
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = autoCheckEnabled && !isCheckingUpdate && !hasUpdate,
             enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(120)),
