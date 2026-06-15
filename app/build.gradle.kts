@@ -14,7 +14,7 @@ fun buildValue(name: String, defaultValue: String? = null): String? {
 
 val appUpdateUrl = buildValue(
     "APP_UPDATE_URL",
-    "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases/latest"
+    "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases?per_page=20"
 )!!
 val appVersionName = buildValue("APP_VERSION_NAME", "1.0.0")!!
 val appVersionCode = buildValue("APP_VERSION_CODE", "3")!!.toInt()

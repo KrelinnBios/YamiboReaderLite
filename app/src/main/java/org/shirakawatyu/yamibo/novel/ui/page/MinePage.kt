@@ -1793,7 +1793,7 @@ fun MinePage(
                                                 when (val result = AppUpdateManager.checkForUpdate()) {
                                                     AppUpdateCheckResult.NoUpdate ->
                                                         YamiboToast.show(
-                                                            message = "已是最新版本（v${BuildConfig.VERSION_NAME}）"
+                                                            message = "未发现新版本，当前安装版本：v${BuildConfig.VERSION_NAME}"
                                                         )
 
                                                     is AppUpdateCheckResult.UpdateAvailable ->

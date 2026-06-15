@@ -9,6 +9,8 @@ import androidx.core.content.FileProvider
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import com.alibaba.fastjson2.JSON
+import com.alibaba.fastjson2.JSONArray
+import com.alibaba.fastjson2.JSONObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -40,8 +42,8 @@ sealed interface AppUpdateCheckResult {
 object AppUpdateManager {
     const val RELEASES_PAGE_URL =
         "https://github.com/KrelinnBios/YamiboReaderLite/releases"
-    const val LATEST_RELEASE_API_URL =
-        "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases/latest"
+    const val RELEASES_API_URL =
+        "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases?per_page=20"
 
     private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     private const val MAX_APK_SIZE_BYTES = 512L * 1024L * 1024L
@@ -81,13 +83,20 @@ object AppUpdateManager {
     }
 
     suspend fun checkForUpdate(): AppUpdateCheckResult = withContext(Dispatchers.IO) {
-        val endpoint = BuildConfig.APP_UPDATE_URL.trim().ifBlank { LATEST_RELEASE_API_URL }
+        val endpoint = BuildConfig.APP_UPDATE_URL.trim().ifBlank { RELEASES_API_URL }
+        val requestUrl = if ('?' in endpoint) {
+            "$endpoint&_=${System.currentTimeMillis()}"
+        } else {
+            "$endpoint?_=${System.currentTimeMillis()}"
+        }
+
         val request = Request.Builder()
-            .url(endpoint)
+            .url(requestUrl)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "YamiboReaderLite/${BuildConfig.VERSION_NAME}")
-            .header("Cache-Control", "no-cache")
+            .header("Cache-Control", "no-cache, no-store")
+            .header("Pragma", "no-cache")
             .build()
 
         try {
@@ -148,7 +157,29 @@ object AppUpdateManager {
     }
 
     internal fun parseReleaseJson(json: String): AppUpdateInfo? {
-        val root = runCatching { JSON.parseObject(json) }.getOrNull() ?: return null
+        val parsed = runCatching { JSON.parse(json) }.getOrNull() ?: return null
+
+        return when (parsed) {
+            is JSONArray -> {
+                val releases = buildList {
+                    for (index in 0 until parsed.size) {
+                        val release = parsed.getJSONObject(index) ?: continue
+                        parseReleaseObject(release)?.let(::add)
+                    }
+                }
+
+                releases.maxWithOrNull { left, right ->
+                    compareVersions(left.versionName, right.versionName)
+                }
+            }
+
+            is JSONObject -> parseReleaseObject(parsed)
+
+            else -> null
+        }
+    }
+
+    private fun parseReleaseObject(root: JSONObject): AppUpdateInfo? {
         if (root.getBooleanValue("draft") || root.getBooleanValue("prerelease")) return null
 
         val latestVersion = (
@@ -164,11 +195,13 @@ object AppUpdateManager {
         val assets = root.getJSONArray("assets")
         var apkUrl: String? = null
         var versionCode: Long? = null
+
         if (assets != null) {
             for (index in 0 until assets.size) {
                 val asset = assets.getJSONObject(index) ?: continue
                 val assetName = asset.getString("name").orEmpty()
                 val contentType = asset.getString("content_type").orEmpty()
+
                 if (assetName.endsWith(".apk", ignoreCase = true) ||
                     contentType.equals(APK_MIME_TYPE, ignoreCase = true)
                 ) {
