@@ -971,13 +971,20 @@ fun FavoritePage(
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
+                        // 同一个按钮根据是否已置顶切换：未置顶=上箭头「置顶」，已置顶=下箭头「取消置顶」回到原位。
+                        val isPinned = target.pinAnchorUrl != null
                         TextButton(
                             onClick = {
-                                favoriteVM.moveToTop(target.url)
-                                itemActionTarget = null
-                                coroutineScope.launch {
-                                    delay(120)
-                                    lazyListState.animateScrollToItem(0)
+                                if (isPinned) {
+                                    favoriteVM.unpinToOriginal(target.url)
+                                    itemActionTarget = null
+                                } else {
+                                    favoriteVM.moveToTop(target.url)
+                                    itemActionTarget = null
+                                    coroutineScope.launch {
+                                        delay(120)
+                                        lazyListState.animateScrollToItem(0)
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -988,35 +995,13 @@ fun FavoritePage(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.KeyboardArrowUp,
+                                    if (isPinned) Icons.Default.KeyboardArrowDown
+                                    else Icons.Default.KeyboardArrowUp,
                                     contentDescription = null,
                                     modifier = Modifier.size(21.dp)
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Text("置顶")
-                            }
-                        }
-                        if (target.pinAnchorUrl != null) {
-                            TextButton(
-                                onClick = {
-                                    favoriteVM.unpinToOriginal(target.url)
-                                    itemActionTarget = null
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.KeyboardArrowDown,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(21.dp)
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Text("取消置顶")
-                                }
+                                Text(if (isPinned) "取消置顶" else "置顶")
                             }
                         }
                         TextButton(

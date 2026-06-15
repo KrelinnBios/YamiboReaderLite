@@ -159,7 +159,13 @@ fun FavoriteItem(
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.outline
     }
 
-    val middleColor = lerp(typeColor.first, typeColor.second, 0.75f)
+    // 小说（type 1）原用 secondary 系，深色下与卡片背景几乎同色、看不清；
+    // 换成醒目的暖琥珀，并与漫画（type 2）的蓝清楚区分。
+    val middleColor = if (type == 1) {
+        Color(0xFFE0A33D)
+    } else {
+        lerp(typeColor.first, typeColor.second, 0.75f)
+    }
 
     Card(
         modifier = modifier
@@ -321,22 +327,6 @@ private fun UpdateStatusHandle(
     val primary = darkThemeColor(YamiboColors.primary) { primary }
     val updateAccent = MaterialTheme.colorScheme.primary
 
-    val currentStatus = when {
-        isCheckingUpdate -> HandleStatus.CHECKING
-        hasUpdate -> HandleStatus.UPDATED
-        else -> null
-    }
-
-    var lastVisibleStatus by remember { mutableStateOf<HandleStatus?>(currentStatus) }
-
-    LaunchedEffect(currentStatus) {
-        if (currentStatus != null) {
-            lastVisibleStatus = currentStatus
-        }
-    }
-
-    val capsuleStatus = currentStatus ?: lastVisibleStatus ?: HandleStatus.CHECKING
-
     Box(
         modifier = modifier
             .size(40.dp),
@@ -344,9 +334,22 @@ private fun UpdateStatusHandle(
     ) {
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { content() }
 
-        // 检查中 / 有更新 胶囊（高优先级）
+        // 检查更新：卡片右侧上下居中的主题色普通刷新转圈（替代原来顶部的「查」胶囊）。
         AnimatedVisibility(
-            visible = currentStatus != null,
+            visible = isCheckingUpdate,
+            enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
+            exit = fadeOut(animationSpec = tween(120))
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = primary
+            )
+        }
+
+        // 有更新 胶囊（顶部）
+        AnimatedVisibility(
+            visible = hasUpdate && !isCheckingUpdate,
             enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(120)),
             modifier = Modifier
@@ -354,17 +357,14 @@ private fun UpdateStatusHandle(
                 .offset(y = (-12).dp)
         ) {
             HandleStatusCapsule(
-                status = capsuleStatus,
-                accent = when (capsuleStatus) {
-                    HandleStatus.CHECKING -> primary
-                    HandleStatus.UPDATED -> updateAccent
-                }
+                status = HandleStatus.UPDATED,
+                accent = updateAccent
             )
         }
 
-        // 自动检查已开启 胶囊（低优先级，仅在无查/新时展示）
+        // 自动检查已开启 胶囊（仅在无查/新时展示）
         AnimatedVisibility(
-            visible = autoCheckEnabled && currentStatus == null,
+            visible = autoCheckEnabled && !isCheckingUpdate && !hasUpdate,
             enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(120)),
             modifier = Modifier
