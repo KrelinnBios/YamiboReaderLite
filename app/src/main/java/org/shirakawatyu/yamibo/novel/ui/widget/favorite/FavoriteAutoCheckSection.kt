@@ -107,7 +107,7 @@ internal fun AutoCheckSection(
         }
 
         val sizeSpec = tween<IntSize>(durationMillis = 300, easing = FastOutSlowInEasing)
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = enabled,
             enter = fadeIn(tween(300, easing = FastOutSlowInEasing)) +
                     expandVertically(animationSpec = sizeSpec, expandFrom = Alignment.Top),
