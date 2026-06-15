@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -110,7 +112,8 @@ fun FavoriteItem(
     mangaCachedPages: Int = 0,
     hasUpdate: Boolean = false,
     isCheckingUpdate: Boolean = false,
-    autoCheckEnabled: Boolean = false
+    autoCheckEnabled: Boolean = false,
+    isPinned: Boolean = false
 ) {
     val tagColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
 
@@ -169,6 +172,10 @@ fun FavoriteItem(
     } else {
         lerp(typeColor.first, typeColor.second, 0.75f)
     }
+    val pinColor = darkModeColor(
+        light = YamiboColors.primary.copy(alpha = 0.8f),
+        dark = Color(0xFF8CCBFF)
+    )
 
     Card(
         modifier = modifier
@@ -197,18 +204,39 @@ fun FavoriteItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    modifier = Modifier.fillMaxWidth(),
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 4,
-                    overflow = TextOverflow.Clip,
-                    text = displayTitle,
-                    fontWeight = FontWeight.Medium,
-                    style = TextStyle(
-                        lineBreak = LineBreak.Simple
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = if (isPinned) 22.dp else 0.dp),
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 4,
+                        overflow = TextOverflow.Clip,
+                        text = displayTitle,
+                        fontWeight = FontWeight.Medium,
+                        style = TextStyle(
+                            lineBreak = LineBreak.Simple
+                        )
                     )
-                )
+                    AnimatedVisibility(
+                        visible = isPinned,
+                        modifier = Modifier.align(Alignment.TopEnd),
+                        enter = fadeIn(animationSpec = tween(160, easing = FastOutSlowInEasing)),
+                        exit = fadeOut(animationSpec = tween(120))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "已置顶",
+                            tint = pinColor,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .graphicsLayer {
+                                    rotationZ = 18f
+                                }
+                        )
+                    }
+                }
 
                 Column(
                     modifier = Modifier.padding(top = 6.dp)
