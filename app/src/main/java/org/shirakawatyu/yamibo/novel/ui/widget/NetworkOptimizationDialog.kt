@@ -168,7 +168,7 @@ fun NetworkOptimizationDialog(onDismiss: () -> Unit) {
                     }
                 }
 
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = tempEnabled,
                     enter = fadeIn(
                         animationSpec = tween(
@@ -498,7 +498,7 @@ private fun ManualDnsContent(
             )
         )
 
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = showUrlValidationError,
             enter = fadeIn(
                 animationSpec = tween(
