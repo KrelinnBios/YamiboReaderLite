@@ -219,7 +219,7 @@ fun FavoriteItem(
                             lineBreak = LineBreak.Simple
                         )
                     )
-                    AnimatedVisibility(
+                    androidx.compose.animation.AnimatedVisibility(
                         visible = isPinned,
                         modifier = Modifier.align(Alignment.TopEnd),
                         enter = fadeIn(animationSpec = tween(160, easing = FastOutSlowInEasing)),
