@@ -911,7 +911,7 @@ fun MangaWebPage(
                 )
             }
         }
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = showBlackScreen,
             enter = fadeIn(tween(0)),
             exit = fadeOut(tween(100)),
