@@ -235,14 +235,28 @@ object AppUpdateManager {
             throw IOException("无法创建更新缓存目录")
         }
 
-        val targetFile = File(updateDir, "300 Lite.apk")
+        updateDir.listFiles()
+            ?.filter { it.name.startsWith("300 Lite-") || it.name == "300 Lite.apk" }
+            ?.forEach { it.delete() }
+
+        val safeVersionName = info.versionName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val targetFile = File(updateDir, "300 Lite-$safeVersionName.apk")
         val tempFile = File(updateDir, "${targetFile.name}.download")
         tempFile.delete()
+        targetFile.delete()
+
+        val apkDownloadUrl = if ('?' in info.apkUrl) {
+            "${info.apkUrl}&_=${System.currentTimeMillis()}"
+        } else {
+            "${info.apkUrl}?_=${System.currentTimeMillis()}"
+        }
 
         val request = Request.Builder()
-            .url(info.apkUrl)
+            .url(apkDownloadUrl)
             .header("Accept", APK_MIME_TYPE)
             .header("User-Agent", "YamiboReaderLite/${BuildConfig.VERSION_NAME}")
+            .header("Cache-Control", "no-cache, no-store")
+            .header("Pragma", "no-cache")
             .build()
 
         try {
@@ -308,6 +322,13 @@ object AppUpdateManager {
 
         if (packageInfo.packageName != context.packageName) {
             throw IOException("APK 包名不匹配")
+        }
+
+        val downloadedVersionName = packageInfo.versionName.orEmpty()
+        if (compareVersions(downloadedVersionName, info.versionName) != 0) {
+            throw IOException(
+                "APK versionName 与发布信息不一致：下载到 v$downloadedVersionName，预期 v${info.versionName}"
+            )
         }
 
         val downloadedVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
