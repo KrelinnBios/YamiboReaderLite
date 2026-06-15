@@ -298,12 +298,28 @@ class YamiboRetrofit {
             return builder.build()
         }
 
-        /** HTTP/2 流被服务器重置（stream was reset: PROTOCOL_ERROR 等）属于瞬时故障，重试一次通常即可恢复。 */
+        /**
+         * 瞬时故障：HTTP/2 流被服务器重置（stream was reset: PROTOCOL_ERROR 等），
+         * 或连接被对端在收发途中掐断（unexpected end of stream / connection reset 等）。
+         * 这类错误重试一次通常即可恢复。
+         */
         private fun isTransientStreamReset(e: IOException): Boolean {
             val msg = e.message ?: return false
             return msg.contains("stream was reset", ignoreCase = true) ||
                     msg.contains("PROTOCOL_ERROR", ignoreCase = true) ||
-                    msg.contains("REFUSED_STREAM", ignoreCase = true)
+                    msg.contains("REFUSED_STREAM", ignoreCase = true) ||
+                    msg.contains("unexpected end of stream", ignoreCase = true) ||
+                    msg.contains("Connection reset", ignoreCase = true) ||
+                    msg.contains("connection abort", ignoreCase = true) ||
+                    msg.contains("connection closed", ignoreCase = true)
+        }
+
+        /**
+         * nginx/WAF 反爬限流时会直接回 444（关闭连接、无正常响应体）。
+         * 这是“请求被拒/限流”的临时信号，退避后换一条新连接重试通常即可放行。
+         */
+        private fun isRateLimitedResponse(response: okhttp3.Response): Boolean {
+            return response.code == 444
         }
 
         private fun proceedWithDnsRecovery(
@@ -311,11 +327,20 @@ class YamiboRetrofit {
             request: Request
         ): okhttp3.Response {
             var lastError: IOException? = null
-            // GET 请求遇到瞬时流重置最多重试 2 次；
-            // 重试前清空空闲连接，确保不会再次复用已被服务器掐掉的坏连接。
+            // GET 请求遇到瞬时流重置 / 444 限流最多重试 2 次；
+            // 重试前清空空闲连接，确保换一条新连接，避免再次复用已被服务器掐掉的坏连接；
+            // 并做递增退避，给 WAF 限流窗口一点喘息时间。
             repeat(3) { attempt ->
                 try {
-                    return chain.proceed(request)
+                    val response = chain.proceed(request)
+                    val canRetryResponse = attempt < 2 &&
+                            request.method == "GET" &&
+                            isRateLimitedResponse(response)
+                    if (!canRetryResponse) return response
+                    // 444 没有可用响应体，丢弃后退避换连接重试。
+                    response.close()
+                    sharedConnectionPool.evictAll()
+                    backoff(attempt)
                 } catch (e: IOException) {
                     lastError = e
                     val canRetry = attempt < 2 &&
@@ -327,9 +352,20 @@ class YamiboRetrofit {
                         throw e
                     }
                     sharedConnectionPool.evictAll()
+                    backoff(attempt)
                 }
             }
-            throw lastError ?: IOException("request failed")
+            throw lastError ?: IOException("request failed after retries")
+        }
+
+        /** 递增退避：第 1 次重试 ~300ms，第 2 次 ~600ms（带少量抖动，避免与并发请求同时重试）。 */
+        private fun backoff(attempt: Int) {
+            try {
+                val base = 300L * (attempt + 1)
+                Thread.sleep(base + kotlin.random.Random.nextLong(0, 150))
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
 
         fun proxyWebViewResource(request: android.webkit.WebResourceRequest): android.webkit.WebResourceResponse? {
