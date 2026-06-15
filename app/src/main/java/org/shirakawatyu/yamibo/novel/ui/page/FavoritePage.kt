@@ -224,6 +224,7 @@ fun FavoritePage(
     val lazyListState = rememberLazyListState()
     var previousListSize by remember { mutableIntStateOf(favoriteList.size) }
     var wasAtTop by remember { mutableStateOf(true) }
+    var keepTopAfterUnpin by remember { mutableStateOf(false) }
     var showTopToast by remember { mutableStateOf(false) }
     var newItemsCount by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
@@ -359,6 +360,11 @@ fun FavoritePage(
 
 
     LaunchedEffect(favoriteList, favoriteVM.currentCategory, uiState.isInManageMode) {
+        if (keepTopAfterUnpin) {
+            lazyListState.scrollToItem(0)
+            keepTopAfterUnpin = false
+        }
+
         val addedCount = favoriteList.size - previousListSize
 
         val isSameCategory = favoriteVM.currentCategory == previousCategory
@@ -796,6 +802,7 @@ fun FavoritePage(
                             hasUpdate = hasUpdate,
                             isCheckingUpdate = isCheckingUpdate,
                             autoCheckEnabled = autoCheckEnabled,
+                            isPinned = item.pinAnchorUrl != null,
                             dragHandle = {}
                         )
                     }
@@ -980,6 +987,7 @@ fun FavoritePage(
                         TextButton(
                             onClick = {
                                 if (isPinned) {
+                                    keepTopAfterUnpin = true
                                     favoriteVM.unpinToOriginal(target.url)
                                     itemActionTarget = null
                                 } else {
