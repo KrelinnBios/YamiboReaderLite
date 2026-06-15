@@ -412,7 +412,16 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* Floor jump button (.pi strong a) kept a light cream border (#FCF4CF). */",
     ".pg_viewthread .pi strong a { background-color: transparent !important; border-color: #3c5677 !important; color: #7dbdf2 !important; }",
     "/* === Forum-jump dropdown selected/hover highlight (light tan #EBD7A9 / #FFEEBB) === */",
-    "#fjump_menu li.a a, #fjump_menu li a:hover { background-color: #274766 !important; color: #ffffff !important; }"
+    "#fjump_menu li.a a, #fjump_menu li a:hover { background-color: #274766 !important; color: #ffffff !important; }",
+    "/* === 好友/列表里的小动作按钮 .mico（发消息/删除）原用橙色 var(--dz-BG-3)=#FF9900， */",
+    "/* 深色未覆盖该变量导致橙底近白字不协调，统一改成主题按钮蓝灰。=== */",
+    ".imglist li .mico, .imglist li a.mico { background-color: #274766 !important; color: #edf4fb !important; }",
+    "/* === 列表里的「已关闭」标记 .micon.lock 保持站点原样（红底白字），不做深色染色； */",
+    "/* 否则 .lock{color} 会把它染成灰字。--dz-BG-2=#FF5656 是站点原色。=== */",
+    ".micon.lock { background-color: #FF5656 !important; color: #fff !important; }",
+    "/* === 签到日历表头「上个月」是 <a class=z>，命中 .z{background} 多出一个色块； */",
+    "/* 「下个月」是 <a class=y> 无背景。这里去掉上个月背景并让两者颜色一致。=== */",
+    "#tablehead a.z, #tablehead a.y { background-color: transparent !important; color: #7dbdf2 !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
