@@ -160,9 +160,9 @@ fun FavoriteItem(
     }
 
     // 小说（type 1）原用 secondary 系，深色下与卡片背景几乎同色、看不清；
-    // 换成醒目的暖琥珀，并与漫画（type 2）的蓝清楚区分。
+    // 换成青绿冷色，贴合蓝黑暗黑模式，又与漫画（type 2）的主题蓝清楚区分。
     val middleColor = if (type == 1) {
-        Color(0xFFE0A33D)
+        Color(0xFF3FC1B0)
     } else {
         lerp(typeColor.first, typeColor.second, 0.75f)
     }
