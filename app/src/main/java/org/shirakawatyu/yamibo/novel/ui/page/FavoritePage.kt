@@ -118,8 +118,6 @@ import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.updateCheck.AutoUpdateCheckScheduler
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 
 
 // 非搜索场景下，确认"暂无收藏"前的等待时间。
@@ -408,15 +406,6 @@ fun FavoritePage(
         searchQuery = ""
         isSearchBarExpanded = false
     }
-
-    val reorderableState = rememberReorderableLazyListState(
-        lazyListState = lazyListState,
-        onMove = { from, to ->
-            // 搜索结果是当前列表的子集，过滤态下索引不再等同于 VM 中的收藏列表索引。
-            // 因此搜索中禁用拖拽，避免重排错位。
-            if (!isInManageMode && !isSearching) favoriteVM.moveFavorite(from.index, to.index)
-        }
-    )
 
     // 分类数据
     val novelCategoryColor = darkModeColor(
@@ -769,43 +758,36 @@ fun FavoritePage(
                             }
                         }
                     }
-                    ReorderableItem(
-                        state = reorderableState,
-                        key = item.url,
-                    ) { isDragging ->
-                        val isSelected = selectedItems.contains(item.url)
-                        val hasUpdate = novelCheckMap[item.url]?.hasUpdate == true ||
-                                mangaCheckMap[item.url]?.hasUpdate == true ||
-                                otherCheckMap[item.url]?.hasUpdate == true
-                        val isCheckingUpdate = uiState.checkingUpdateUrls.contains(item.url)
-                        val autoCheckEnabled = novelCheckMap[item.url]?.autoCheckEnabled == true ||
-                                mangaCheckMap[item.url]?.autoCheckEnabled == true ||
-                                otherCheckMap[item.url]?.autoCheckEnabled == true
-                        FavoriteItem(
-                            item.title,
-                            item.lastView,
-                            item.lastPage,
-                            item.lastChapter,
-                            onClick = currentOnClick,
-                            onLongClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                itemActionTarget = item
-                            },
-                            modifier = Modifier.animateItem(),
-                            isDragging = isDragging,
-                            isManageMode = isInManageMode,
-                            isSelected = isSelected,
-                            isHidden = item.isHidden,
-                            type = item.type,
-                            cacheInfo = cacheInfoMap[item.url],
-                            mangaCachedPages = item.mangaCachedPages,
-                            hasUpdate = hasUpdate,
-                            isCheckingUpdate = isCheckingUpdate,
-                            autoCheckEnabled = autoCheckEnabled,
-                            isPinned = item.pinAnchorUrl != null,
-                            dragHandle = {}
-                        )
-                    }
+                    val isSelected = selectedItems.contains(item.url)
+                    val hasUpdate = novelCheckMap[item.url]?.hasUpdate == true ||
+                            mangaCheckMap[item.url]?.hasUpdate == true ||
+                            otherCheckMap[item.url]?.hasUpdate == true
+                    val isCheckingUpdate = uiState.checkingUpdateUrls.contains(item.url)
+                    val autoCheckEnabled = novelCheckMap[item.url]?.autoCheckEnabled == true ||
+                            mangaCheckMap[item.url]?.autoCheckEnabled == true ||
+                            otherCheckMap[item.url]?.autoCheckEnabled == true
+                    FavoriteItem(
+                        item.title,
+                        item.lastView,
+                        item.lastPage,
+                        item.lastChapter,
+                        onClick = currentOnClick,
+                        onLongClick = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            itemActionTarget = item
+                        },
+                        modifier = Modifier.animateItem(),
+                        isManageMode = isInManageMode,
+                        isSelected = isSelected,
+                        isHidden = item.isHidden,
+                        type = item.type,
+                        cacheInfo = cacheInfoMap[item.url],
+                        mangaCachedPages = item.mangaCachedPages,
+                        hasUpdate = hasUpdate,
+                        isCheckingUpdate = isCheckingUpdate,
+                        autoCheckEnabled = autoCheckEnabled,
+                        isPinned = item.pinAnchorUrl != null
+                    )
                 }
             }
 

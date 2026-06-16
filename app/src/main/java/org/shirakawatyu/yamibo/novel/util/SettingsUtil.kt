@@ -18,7 +18,6 @@ class SettingsUtil {
     companion object {
         private val key = stringPreferencesKey("settings")
         private val collapseModeKey = stringPreferencesKey("favorite_collapse_mode")
-        private val homePageKey = stringPreferencesKey("home_page")
         private val customDnsKey = stringPreferencesKey("custom_dns_mode")
         private val clickToTopKey = stringPreferencesKey("click_to_top_mode")
         private val autoSignInKey = stringPreferencesKey("auto_sign_in")
@@ -28,7 +27,6 @@ class SettingsUtil {
         private val dnsModeKey = stringPreferencesKey("dns_optimization_mode")
         private val darkModeKey = stringPreferencesKey("dark_mode")
         private val customDnsUrlKey = stringPreferencesKey("custom_dns_url")
-        private val skipVersionKey = stringPreferencesKey("skip_version")
         fun saveSettings(settings: ReaderSettings) {
             DataStoreUtil.addData(JSON.toJSONString(settings), key)
         }
@@ -45,10 +43,6 @@ class SettingsUtil {
         }
 
 
-        fun saveFavoriteCollapseMode(isCollapsed: Boolean) {
-            DataStoreUtil.addData(isCollapsed.toString(), collapseModeKey)
-        }
-
         fun getFavoriteCollapseMode(callback: (isCollapsed: Boolean) -> Unit) {
             DataStoreUtil.getData(collapseModeKey, callback = {
                 callback(it.toBooleanStrictOrNull() ?: false)
@@ -56,21 +50,6 @@ class SettingsUtil {
                 callback(false)
             })
         }
-        fun saveHomePage(route: String) {
-            DataStoreUtil.addData(route, homePageKey)
-        }
-
-        fun getHomePage(callback: (route: String) -> Unit) {
-            DataStoreUtil.getData(homePageKey, callback = {
-                callback(it.ifBlank { "BBSPage" })
-            }, onNull = {
-                callback("BBSPage")
-            })
-        }
-        fun saveCustomDnsMode(isEnabled: Boolean) {
-            DataStoreUtil.addData(isEnabled.toString(), customDnsKey)
-        }
-
         fun getCustomDnsMode(callback: (isEnabled: Boolean) -> Unit) {
             DataStoreUtil.getData(customDnsKey, callback = {
                 callback(it.toBooleanStrictOrNull() ?: false)
@@ -78,10 +57,6 @@ class SettingsUtil {
                 callback(false)
             })
         }
-        fun saveClickToTopMode(isEnabled: Boolean) {
-            DataStoreUtil.addData(isEnabled.toString(), clickToTopKey)
-        }
-
         fun getClickToTopMode(callback: (isEnabled: Boolean) -> Unit) {
             DataStoreUtil.getData(clickToTopKey, callback = {
                 callback(it.toBooleanStrictOrNull() ?: false)
@@ -166,27 +141,6 @@ class SettingsUtil {
                 callback(it.toBooleanStrictOrNull() ?: false)
             }, onNull = {
                 callback(false)
-            })
-        }
-        fun saveSkipVersion(version: String) {
-            DataStoreUtil.addData(version, skipVersionKey)
-        }
-        fun getSkipVersion(callback: (String) -> Unit) {
-            DataStoreUtil.getData(skipVersionKey, callback = {
-                callback(it)
-            }, onNull = {
-                callback("")
-            })
-        }
-
-        fun saveLastUpdateCheckTime(millis: Long) {
-            DataStoreUtil.addData(millis.toString(), stringPreferencesKey("last_update_check"))
-        }
-        fun getLastUpdateCheckTime(callback: (Long) -> Unit) {
-            DataStoreUtil.getData(stringPreferencesKey("last_update_check"), callback = {
-                callback(it.toLongOrNull() ?: 0L)
-            }, onNull = {
-                callback(0L)
             })
         }
     }

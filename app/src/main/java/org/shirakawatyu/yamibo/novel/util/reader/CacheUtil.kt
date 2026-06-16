@@ -89,15 +89,6 @@ class CacheUtil {
         }
 
         /**
-         * 获取指定小说和指定页码的缓存
-         */
-        fun getCache(novelUrl: String, pageNum: Int, callback: (data: CacheData?) -> Unit) {
-            val key = generateKey(novelUrl, pageNum)
-            val data = inMemoryCache[key]
-            callback(data)
-        }
-
-        /**
          * 保存缓存数据
          */
         fun saveCache(novelUrl: String, data: CacheData) {

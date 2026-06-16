@@ -521,8 +521,9 @@ fun MinePage(
                 javaScriptEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
-                setSupportZoom(false)
-                builtInZoomControls = false
+                // 与 BBS WebView 一致开启缩放：从「我的主题」进入帖子后切电脑版需要双指缩放
+                setSupportZoom(true)
+                builtInZoomControls = true
                 displayZoomControls = false
                 textZoom = 100
                 domStorageEnabled = true

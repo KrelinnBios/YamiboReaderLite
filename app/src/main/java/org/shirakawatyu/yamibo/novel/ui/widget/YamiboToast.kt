@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicLong
  */
 object YamiboToast {
     const val LENGTH_SHORT = 2_000L
-    const val LENGTH_LONG = 3_500L
 
     private val nextId = AtomicLong(0L)
 
@@ -75,10 +74,6 @@ object YamiboToast {
                 durationMillis = durationMillis.coerceAtLeast(800L)
             )
         )
-    }
-
-    fun showLong(context: Context? = null, message: String) {
-        show(context = context, message = message, durationMillis = LENGTH_LONG)
     }
 }
 

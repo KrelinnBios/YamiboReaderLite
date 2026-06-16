@@ -4,9 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -89,8 +87,6 @@ private fun formatFileSize(bytes: Long): String {
  * @param lastChapter 上次阅读的章节名称，可能为空
  * @param onClick 点击该项时触发的回调函数
  * @param modifier 组件修饰符，默认为Modifier
- * @param isDragging 是否正在拖拽状态，影响动画效果，默认为false
- * @param dragHandle 拖拽手柄的可组合项
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -102,8 +98,6 @@ fun FavoriteItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isDragging: Boolean = false,
-    dragHandle: @Composable (() -> Unit) = {},
     isManageMode: Boolean = false,
     isSelected: Boolean = false,
     isHidden: Boolean = false,
@@ -138,18 +132,9 @@ fun FavoriteItem(
         }
     }
 
-    // 拖拽动画：根据是否处于拖拽状态动态调整卡片的阴影、缩放和颜色
-    val elevation by animateDpAsState(
-        targetValue = if (isDragging) 12.dp else 1.dp,
-        label = "elevation_animation"
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.02f else 1.0f,
-        label = "scale_animation"
-    )
+    // 管理模式下随选中/隐藏状态平滑切换卡片底色。
     val color by animateColorAsState(
         targetValue = when {
-            isDragging -> MaterialTheme.colorScheme.surfaceVariant
             isManageMode && isSelected -> MaterialTheme.colorScheme.primaryContainer
             isManageMode && isHidden -> MaterialTheme.colorScheme.surfaceVariant
             else -> MaterialTheme.colorScheme.tertiary
@@ -181,34 +166,31 @@ fun FavoriteItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(5.dp)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
         colors = CardDefaults.cardColors(containerColor = color),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .drawBehind {
-                    drawRect(
-                        color = middleColor,
-                        topLeft = Offset(0f, 0f),
-                        size = Size(3.dp.toPx(), size.height)
-                    )
-                }
-                .padding(start = 15.dp, end = 15.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(Modifier.weight(1f)) {
-                Box(modifier = Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth()) {
+            // 文字层：左侧保留 3dp 主题色竖条；右侧给图钉/刷新留一个不大的固定余量。
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        drawRect(
+                            color = middleColor,
+                            topLeft = Offset(0f, 0f),
+                            size = Size(3.dp.toPx(), size.height)
+                        )
+                    }
+                    .padding(start = 15.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = if (isPinned) 22.dp else 0.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         fontSize = 16.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 4,
@@ -219,115 +201,109 @@ fun FavoriteItem(
                             lineBreak = LineBreak.Simple
                         )
                     )
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = isPinned,
-                        modifier = Modifier.align(Alignment.TopEnd),
-                        enter = fadeIn(animationSpec = tween(160, easing = FastOutSlowInEasing)),
-                        exit = fadeOut(animationSpec = tween(120))
+
+                    Column(
+                        modifier = Modifier.padding(top = 6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.PushPin,
-                            contentDescription = "已置顶",
-                            tint = pinColor,
-                            modifier = Modifier
-                                .size(14.dp)
-                                .graphicsLayer {
-                                    rotationZ = 18f
-                                }
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.padding(top = 6.dp)
-                ) {
-                    if (!lastChapter.isNullOrBlank()) {
-                        Text(
-                            modifier = Modifier.padding(0.dp, 2.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                            fontSize = 12.sp,
-                            text = lastChapter,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (type == 1) {
-                        Text(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            text = "上次读到第${lastPage + 1}页, 对应网页第${lastView}页"
-                        )
-                    }
-                    if (cacheInfo != null && cacheInfo.totalPages > 0) {
-                        Row(
-                            modifier = Modifier.padding(top = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_cache),
-                                contentDescription = "已缓存",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(4.dp))
+                        if (!lastChapter.isNullOrBlank()) {
                             Text(
-                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(0.dp, 2.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                 fontSize = 12.sp,
-                                text = "已缓存 ${cacheInfo.totalPages} 页 (${
-                                    formatFileSize(
-                                        cacheInfo.totalSize
-                                    )
-                                })"
+                                text = lastChapter,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
-                    if (type == 2 && mangaCachedPages > 0) {
-                        Row(
-                            modifier = Modifier.padding(top = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_cache),
-                                contentDescription = "已缓存",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(4.dp))
+                        if (type == 1) {
                             Text(
-                                color = MaterialTheme.colorScheme.primary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
-                                text = "已缓存 $mangaCachedPages 页"
+                                text = "上次读到第${lastPage + 1}页, 对应网页第${lastView}页"
                             )
                         }
+                        if (cacheInfo != null && cacheInfo.totalPages > 0) {
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_cache),
+                                    contentDescription = "已缓存",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    text = "已缓存 ${cacheInfo.totalPages} 页 (${
+                                        formatFileSize(
+                                            cacheInfo.totalSize
+                                        )
+                                    })"
+                                )
+                            }
+                        }
+                        if (type == 2 && mangaCachedPages > 0) {
+                            Row(
+                                modifier = Modifier.padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_cache),
+                                    contentDescription = "已缓存",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    text = "已缓存 $mangaCachedPages 页"
+                                )
+                            }
+                        }
+                    }
+
+                    if (isManageMode && isHidden) {
+                        Text(
+                            modifier = Modifier.padding(top = 2.dp),
+                            color = MaterialTheme.colorScheme.outline,
+                            fontSize = 12.sp,
+                            text = "[已隐藏]"
+                        )
                     }
                 }
 
-                if (isManageMode && isHidden) {
-                    Text(
-                        modifier = Modifier.padding(top = 2.dp),
-                        color = MaterialTheme.colorScheme.outline,
-                        fontSize = 12.sp,
-                        text = "[已隐藏]"
-                    )
-                }
+                // 右侧固定状态槽（余量不大）：刷新转圈 / 更新胶囊，垂直居中，不压文字。
+                UpdateStatusHandle(
+                    isCheckingUpdate = isCheckingUpdate,
+                    hasUpdate = hasUpdate,
+                    autoCheckEnabled = autoCheckEnabled
+                )
             }
 
-            // 更新状态直接坐在右侧 40dp 把手上，不挤占标题和正文。
-            val handle = @Composable {
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    dragHandle()
-                }
+            // 置顶图钉：固定在卡片右上角（位于状态槽上方，不压标题）。
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isPinned,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 6.dp, end = 8.dp),
+                enter = fadeIn(animationSpec = tween(160, easing = FastOutSlowInEasing)),
+                exit = fadeOut(animationSpec = tween(120))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PushPin,
+                    contentDescription = "已置顶",
+                    tint = pinColor,
+                    modifier = Modifier
+                        .size(14.dp)
+                        .graphicsLayer {
+                            rotationZ = 18f
+                        }
+                )
             }
-
-            UpdateStatusHandle(
-                isCheckingUpdate = isCheckingUpdate,
-                hasUpdate = hasUpdate,
-                autoCheckEnabled = autoCheckEnabled,
-                modifier = Modifier.padding(start = 8.dp)
-            ) { handle() }
         }
     }
 }
@@ -352,8 +328,7 @@ private fun UpdateStatusHandle(
     isCheckingUpdate: Boolean,
     hasUpdate: Boolean,
     autoCheckEnabled: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    modifier: Modifier = Modifier
 ) {
     val primary = darkThemeColor(YamiboColors.primary) { primary }
     val updateAccent = MaterialTheme.colorScheme.primary
@@ -363,8 +338,6 @@ private fun UpdateStatusHandle(
             .size(40.dp),
         contentAlignment = Alignment.Center
     ) {
-        Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { content() }
-
         // 检查更新：卡片右侧上下居中的主题色普通刷新转圈（替代原来顶部的「查」胶囊）。
         androidx.compose.animation.AnimatedVisibility(
             visible = isCheckingUpdate,

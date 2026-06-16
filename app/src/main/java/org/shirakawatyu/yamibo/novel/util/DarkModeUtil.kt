@@ -1,7 +1,6 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -92,25 +91,6 @@ data class LightThemeColors(
     override val tertiary: Color,
     override val onSecondary: Color,
 ) : ThemeColors {
-    fun toLightColorScheme() = lightColorScheme(
-        primary = primary,
-        primaryContainer = surfaceVariant,
-        secondary = surface,
-        secondaryContainer = surfaceVariant,
-        tertiary = tertiary,
-        background = background,
-        surface = surface,
-        onPrimary = onPrimary,
-        onPrimaryContainer = onSecondary,
-        onSecondary = onSecondary,
-        onSecondaryContainer = onSecondary,
-        onTertiary = onSecondary,
-        onBackground = onBackground,
-        onSurface = onSurface,
-        onSurfaceVariant = onSurfaceVariant,
-        outline = outline,
-    )
-
     companion object {
         val MODERN_WHITE = LightThemeColors(
             statusBar = Color(0xFF64748B),

@@ -144,10 +144,6 @@ object UpdateCheckEngine {
         scope.launch { performNovel(url, title, authorId, notify = false) }
     }
 
-    fun trackOtherSilently(url: String, title: String) {
-        scope.launch { performOther(url, title, notify = false) }
-    }
-
     /** 类型探测后静默建立"追踪更新"基线：不弹 Toast，不改变自动检查开关。 */
     fun trackMangaSilently(url: String, title: String) {
         scope.launch { performManga(url, title, null, null, null, notify = false) }

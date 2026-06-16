@@ -1,6 +1,5 @@
 package org.shirakawatyu.yamibo.novel.util.manga
 
-import android.graphics.BitmapFactory
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.asResponseBody
 import okio.Buffer
@@ -65,11 +64,5 @@ object ImageCheckerUtil {
 
     fun isGarbageByBounds(width: Int, height: Int): Boolean {
         return width > 0 && height > 0 && width < 150 && height < 150
-    }
-
-    fun checkImageBoundsValid(imageBytes: ByteArray): Boolean {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
-        return !isGarbageByBounds(options.outWidth, options.outHeight)
     }
 }

@@ -390,25 +390,6 @@ object MangaImagePipeline {
     }
 
     /**
-     * 生成 Native 可见图片请求。
-     */
-    fun buildImageRequest(
-        context: Context,
-        url: String,
-        cookie: String = "",
-        forceVersion: Int = 0,
-        memory: Boolean = true
-    ): ImageRequest {
-        return newImageRequestBuilder(
-            context = context,
-            url = url,
-            cookie = cookie,
-            forceVersion = forceVersion,
-            memory = memory
-        ).build()
-    }
-
-    /**
      * 给需要 listener 的 UI 使用：
      * MangaImagePipeline.newImageRequestBuilder(...).listener(...).build()
      */

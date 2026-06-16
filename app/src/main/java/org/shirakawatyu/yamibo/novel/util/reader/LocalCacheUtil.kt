@@ -404,26 +404,6 @@ class LocalCacheUtil(private val context: Context) {
         }
     }
 
-    // 批量更新缓存的标题（用于孤立缓存的别名显示）
-    fun updateCacheTitles(titlesMap: Map<String, String>) {
-        val currentIndex = _index.value
-        var changed = false
-        val newIndex = currentIndex.toMutableMap()
-
-        titlesMap.forEach { (url, title) ->
-            val cache = newIndex[url]
-            // 只有当缓存存在，且标题不一致时才更新
-            if (cache != null && cache.title != title) {
-                newIndex[url] = cache.copy(title = title)
-                changed = true
-            }
-        }
-
-        if (changed) {
-            writeIndex(newIndex)
-        }
-    }
-
     private fun buildCompatKeys(primaryUrl: String, aliasUrls: List<String>): List<String> {
         return buildList {
             add(primaryUrl)

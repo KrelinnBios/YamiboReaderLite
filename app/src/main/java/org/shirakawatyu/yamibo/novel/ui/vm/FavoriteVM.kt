@@ -712,31 +712,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
-    fun moveFavorite(from: Int, to: Int) {
-        if (_uiState.value.isInManageMode) return
-
-        val currentUiList = _uiState.value.favoriteList.toMutableList()
-        if (from < 0 || from >= currentUiList.size || to < 0 || to >= currentUiList.size || from == to) return
-
-        val item = currentUiList.removeAt(from)
-        currentUiList.add(to, item)
-
-        _uiState.update { it.copy(favoriteList = currentUiList.toList()) }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            stateMutex.withLock {
-                val categoryUrls = currentUiList.map { it.url }.toSet()
-                val newQueue = java.util.LinkedList(currentUiList)
-
-                val newListToSave = allFavorites.map { fav ->
-                    if (categoryUrls.contains(fav.url)) newQueue.poll() ?: fav else fav
-                }
-                allFavorites = newListToSave
-                FavoriteUtil.saveFavoriteOrder(newListToSave)
-            }
-        }
-    }
-
     fun toggleManageMode() {
         val realCookie =
             android.webkit.CookieManager.getInstance().getCookie("https://bbs.yamibo.com") ?: ""
@@ -924,23 +899,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         callback(_uiState.value.cacheInfoMap)
     }
 
-    fun deleteFavoriteCache(url: String) {
-        viewModelScope.launch {
-            try {
-                val normalizedUrl = FavoriteUtil.normalizeUrl(url)
-
-                localCache.deleteNovelCompat(
-                    primaryUrl = normalizedUrl,
-                    aliasUrls = cacheAliasesForNormalizedUrl(normalizedUrl, url)
-                )
-
-                refreshCacheInfo()
-            } catch (e: Exception) {
-                Log.e(logTag, "删除 $url 的缓存失败", e)
-            }
-        }
-    }
-
     private fun cacheAliasesForNormalizedUrl(normalizedUrl: String, originalUrl: String): List<String> {
         val absoluteUrl = org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
             .toAbsoluteBbsUrl(normalizedUrl)
@@ -966,37 +924,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             } catch (e: Exception) {
                 Log.e(logTag, "清除所有缓存失败", e)
             }
-        }
-    }
-
-    fun clearBookmark(url: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            stateMutex.withLock {
-                val updated = allFavorites.map { fav ->
-                    if (fav.url == url) fav.copy(
-                        lastPage = 0,
-                        lastView = 1,
-                        lastChapter = null,
-                        lastMangaUrl = null
-                    ) else fav
-                }
-                allFavorites = updated
-                FavoriteUtil.saveFavoriteOrder(updated)
-            }
-            withContext(Dispatchers.Main) { updateUiList() }
-        }
-    }
-
-    fun clearAllBookmarks() {
-        viewModelScope.launch(Dispatchers.IO) {
-            stateMutex.withLock {
-                val updated = allFavorites.map { fav ->
-                    fav.copy(lastPage = 0, lastView = 1, lastChapter = null, lastMangaUrl = null)
-                }
-                allFavorites = updated
-                FavoriteUtil.saveFavoriteOrder(updated)
-            }
-            withContext(Dispatchers.Main) { updateUiList() }
         }
     }
 
@@ -1089,12 +1016,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     onToast("缓存清理失败")
                 }
             }
-        }
-    }
-
-    fun setFavoriteHidden(url: String, hidden: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            FavoriteUtil.updateHiddenStatus(setOf(url), hidden)
         }
     }
 
@@ -1192,12 +1113,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         UpdateCheckEngine.checkOther(favorite)
     }
 
-    fun clearOtherUpdateCheckFlag(url: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            OtherUpdateCheckUtil.clearUpdateFlagSuspend(url)
-        }
-    }
-
     fun saveOtherAutoCheck(url: String, enabled: Boolean, intervalHours: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             if (enabled) {
@@ -1286,24 +1201,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 }
             }
             NovelUpdateCheckUtil.updateAutoCheckSuspend(
-                url,
-                enabled,
-                intervalHours
-            )
-            if (enabled) AutoUpdateCheckScheduler.triggerNow(applicationContext)
-        }
-    }
-
-    fun saveMangaAutoCheck(url: String, enabled: Boolean, intervalHours: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (enabled) {
-                val already = MangaUpdateCheckUtil.getMapSuspend()[url]?.autoCheckEnabled == true
-                if (!already && autoCheckEnabledCountSuspend() >= MAX_AUTO_CHECK) {
-                    showShortToast("自动检查已达上限")
-                    return@launch
-                }
-            }
-            MangaUpdateCheckUtil.updateAutoCheckSuspend(
                 url,
                 enabled,
                 intervalHours

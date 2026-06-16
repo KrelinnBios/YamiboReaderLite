@@ -422,7 +422,27 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".micon.lock { background-color: #FF5656 !important; color: #fff !important; }",
     "/* === 签到日历表头「上个月」是 <a class=z>，命中 .z{background} 多出一个色块； */",
     "/* 「下个月」是 <a class=y> 无背景。这里去掉上个月背景并让两者颜色一致。=== */",
-    "#tablehead a.z, #tablehead a.y { background-color: transparent !important; color: #7dbdf2 !important; }"
+    "#tablehead a.z, #tablehead a.y { background-color: transparent !important; color: #7dbdf2 !important; }",
+    "/* === 参与/回复主题（发帖/回复 高级编辑器，body.pg_post / .edt）=== */",
+    "/* 编辑器外框 .edt 及各类衬线（#999/#CCC/#DDD/#FEFEFE）在深色下是浅线 */",
+    ".edt { border-color: #274766 !important; }",
+    ".edt .btn, .edt .b1r, .edt .b2r { border-color: #274766 !important; }",
+    "/* 工具栏 .bar / #e_controls / #e_button / .cst 原是 #FFEEBB 亮黄 */",
+    ".edt .bar, #e_controls, #e_button, .edt .cst { background: #182332 !important; border-color: #274766 !important; }",
+    "/* 工具栏按钮 .bar a 用 sprite 图标背景，只改边框不动背景，hover 才给底色 */",
+    ".edt .bar a { border-color: #182332 !important; }",
+    ".edt .bar a:hover, .edt .bar a.hover { border-color: #4ea1ff !important; background-color: #223247 !important; }",
+    "/* 字体/大小下拉按钮 .b2r a.dp 原是白底，保留下拉箭头图标仅换底色与边框 */",
+    ".edt .b2r a.dp { background-color: #223247 !important; border-color: #3c5677 !important; color: #c7d8ea !important; }",
+    "/* 编辑区包裹 .area 原是 #FCF4CF 米色 */",
+    ".edt .area { background: #182332 !important; }",
+    "/* 编辑面 .pt（纯文本 textarea / 富文本 iframe）原是 #FCF4CF */",
+    ".edt .pt, #e_textarea, #e_iframe { background: #182332 !important; color: #c7d8ea !important; }",
+    "/* 底部信息栏 .bbar / #e_bbar（保存/字数等）原是 #FFEEBB + #999 灰字 */",
+    ".edt .bbar, #e_bbar { background: #182332 !important; border-color: #274766 !important; }",
+    ".edt .bbar, .edt .bbar a, #e_bbar a, #e_tip { color: #8099b2 !important; }",
+    "/* 主题栏「修改」链接与标题输入区文字 */",
+    ".pg_post .pbt, .pg_post #subjecthide { color: #c7d8ea !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
