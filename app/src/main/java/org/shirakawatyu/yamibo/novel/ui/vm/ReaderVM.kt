@@ -1227,6 +1227,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     private val chapterHeadingSelector =
         "h1, h2, h3, center, div[align=center], font[size=5], font[size=6], font[size=7]"
 
+    // 纯文本章节标题：楼层首行以「第N章/节/卷/篇/幕/话/回」或「序章/楔子/引子/尾声/后记/番外」开头。
+    // 用于《主仆百合》这类不用居中大字号、而是直接写「第一章 造化弄人」的小说。
+    private val chapterHeadingTextRegex = Regex(
+        """^(?:序章|楔子|引子|尾声|尾聲|后记|後記|番外|第[零〇一二三四五六七八九十百千万兩两\d]+(?:章|节|節|卷|篇|幕|话|話|回))"""
+    )
+
     /** 从单个楼层中提取「标题样式」文本（取不到或过长则返回 null）。 */
     private fun extractStructuralHeading(node: org.jsoup.nodes.Element): String? {
         return node.selectFirst(chapterHeadingSelector)?.text()
@@ -1274,26 +1280,41 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val convertedTexts = convertedCombinedText.split(delimiter)
         val replyRegex = Regex("发表于\\s*\\d{4}-\\d{1,2}-\\d{1,2}")
 
-        // 章节标题优先取作者排版的「标题样式」元素（居中/大字号/标题标签）——这才是真正的章节
-        // 小标题；没有这种排版的楼层视为上一章延续，不再制造垃圾目录项（促销/致谢/正文句等）。
-        // 整帖都没有这类标题时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
-        val structuralHeadings = messageNodes.map { node ->
-            extractStructuralHeading(node)?.let { convertChineseIfNeeded(it, translationMode) }
+        val firstLines = messageNodes.indices.map { i ->
+            (convertedTexts.getOrElse(i) { rawTexts[i] })
+                .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         }
-        val useStructuralHeadings = structuralHeadings.any { it != null }
+
+        // 章节标题用两种信号识别真正的章节小标题：
+        // 1) 首行匹配「第N章/序章/楔子…」等文本标题（如《主仆百合》直接写「第一章 造化弄人」）；
+        // 2) 楼层里有「标题样式」元素（居中/大字号/标题标签，如《愿在沉船中安眠》的时间小标题）。
+        // 命中的楼层才开启新章节，其余楼层视为上一章延续，不再把简介/闲聊/致谢/正文句当成章节。
+        // 整帖都识别不到时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
+        val detectedHeadings = messageNodes.indices.map { i ->
+            val firstLine = firstLines[i]
+            if (firstLine.contains(replyRegex)) return@map null
+            val normalizedFirst = firstLine.replace(Regex("\\s+"), " ").trim()
+            if (chapterHeadingTextRegex.containsMatchIn(normalizedFirst)) {
+                normalizedFirst.take(30)
+            } else {
+                extractStructuralHeading(messageNodes[i])
+                    ?.let { convertChineseIfNeeded(it, translationMode) }
+            }
+        }
+        val useDetectedHeadings = detectedHeadings.any { it != null }
 
         var currentValidTitle: String? = null
 
         for (i in messageNodes.indices) {
             val node = messageNodes[i]
             val rawText = convertedTexts.getOrElse(i) { rawTexts[i] }
-            val firstLine = rawText.lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
+            val firstLine = firstLines[i]
 
             if (firstLine.contains(replyRegex)) continue
 
-            if (useStructuralHeadings) {
-                // 有标题样式的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
-                structuralHeadings[i]?.let { currentValidTitle = it }
+            if (useDetectedHeadings) {
+                // 命中标题的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
+                detectedHeadings[i]?.let { currentValidTitle = it }
             } else {
                 currentValidTitle = firstLine.take(30)
             }
