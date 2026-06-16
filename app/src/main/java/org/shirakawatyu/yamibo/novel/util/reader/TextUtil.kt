@@ -307,6 +307,8 @@ class TextUtil {
                 if (content.type == ContentType.TEXT) {
                     val text = content.data
                     val chapterTitle = content.chapterTitle
+                    // 记录该楼层分页前的位置，处理完后把硬分章标记打到它产出的第一片上。
+                    val emitStartIndex = resultLines.size
 
                     text.lineSequence().forEach { rawLine ->
                         val line = rawLine.trimEnd(*TRIM_CHARS)
@@ -338,6 +340,10 @@ class TextUtil {
                                 output = resultLines
                             )
                         }
+                    }
+                    if (content.chapterStart && resultLines.size > emitStartIndex) {
+                        resultLines[emitStartIndex] =
+                            resultLines[emitStartIndex].copy(chapterStart = true)
                     }
                 }
             }

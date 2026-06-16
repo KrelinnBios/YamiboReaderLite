@@ -33,6 +33,15 @@ data class AppUpdateInfo(
     val releasePageUrl: String
 )
 
+/** APK 下载进度：当前来源、第几个源、已下载/总字节。totalBytes <= 0 表示未知。 */
+data class AppDownloadProgress(
+    val sourceLabel: String,
+    val sourceIndex: Int,
+    val sourceCount: Int,
+    val downloadedBytes: Long,
+    val totalBytes: Long
+)
+
 sealed interface AppUpdateCheckResult {
     data object NoUpdate : AppUpdateCheckResult
     data class UpdateAvailable(val info: AppUpdateInfo) : AppUpdateCheckResult
@@ -49,10 +58,9 @@ object AppUpdateManager {
     // GitHub 直链接在镜像域名后即可（如 https://gh.llkk.cc/https://github.com/.../300.Lite.apk）。
     // 某镜像失效时改这里即可，无需动下载逻辑。
     internal val DOWNLOAD_MIRROR_PREFIXES = listOf(
-        "https://gh.llkk.cc/",
-        "https://ghfast.top/",
         "https://ghproxy.net/",
-        "https://gh-proxy.com/"
+        "https://gh-proxy.com/",
+        "https://gh.llkk.cc/"
     )
 
     /** 构造下载候选链：GitHub 直链优先，其后是各镜像前缀拼接的同一直链。 */
@@ -164,12 +172,13 @@ object AppUpdateManager {
 
     suspend fun downloadAndOpenInstaller(
         context: Context,
-        info: AppUpdateInfo
+        info: AppUpdateInfo,
+        onProgress: (AppDownloadProgress) -> Unit = {}
     ): Result<Unit> {
         val appContext = context.applicationContext
         return try {
             val apkFile = withContext(Dispatchers.IO) {
-                downloadAndValidateApk(appContext, info)
+                downloadAndValidateApk(appContext, info, onProgress)
             }
             withContext(Dispatchers.Main) {
                 openInstaller(appContext, apkFile)
@@ -262,7 +271,11 @@ object AppUpdateManager {
         )
     }
 
-    private fun downloadAndValidateApk(context: Context, info: AppUpdateInfo): File {
+    private fun downloadAndValidateApk(
+        context: Context,
+        info: AppUpdateInfo,
+        onProgress: (AppDownloadProgress) -> Unit = {}
+    ): File {
         val updateDir = File(context.externalCacheDir ?: context.cacheDir, "update")
         if (!updateDir.exists() && !updateDir.mkdirs()) {
             throw IOException("无法创建更新缓存目录")
@@ -285,10 +298,21 @@ object AppUpdateManager {
         val candidates = buildDownloadCandidates(info.apkUrl)
         var lastError: Exception? = null
 
-        for (url in candidates) {
+        candidates.forEachIndexed { index, url ->
             tempFile.delete()
+            val label = downloadSourceLabel(url, info.apkUrl)
             try {
-                downloadApkTo(url, tempFile)
+                downloadApkTo(url, tempFile) { downloaded, total ->
+                    onProgress(
+                        AppDownloadProgress(
+                            sourceLabel = label,
+                            sourceIndex = index + 1,
+                            sourceCount = candidates.size,
+                            downloadedBytes = downloaded,
+                            totalBytes = total
+                        )
+                    )
+                }
                 validateApk(context, tempFile, info)
             } catch (error: CancellationException) {
                 tempFile.delete()
@@ -296,7 +320,7 @@ object AppUpdateManager {
             } catch (error: Exception) {
                 lastError = error
                 tempFile.delete()
-                continue
+                return@forEachIndexed
             }
 
             targetFile.delete()
@@ -310,8 +334,22 @@ object AppUpdateManager {
         throw lastError ?: IOException("所有下载源均不可用")
     }
 
+    /** 下载来源的可读名称：GitHub 直链或镜像域名。 */
+    private fun downloadSourceLabel(candidateUrl: String, apkUrl: String): String {
+        if (candidateUrl == apkUrl) return "GitHub 直链"
+        val host = candidateUrl.removeSuffix(apkUrl)
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .trimEnd('/')
+        return if (host.isBlank()) "镜像" else "镜像 $host"
+    }
+
     /** 将单个下载源的 APK 写入临时文件；失败抛异常，由调用方决定是否换源。 */
-    private fun downloadApkTo(apkUrl: String, tempFile: File) {
+    private fun downloadApkTo(
+        apkUrl: String,
+        tempFile: File,
+        onBytes: (downloaded: Long, total: Long) -> Unit = { _, _ -> }
+    ) {
         val apkDownloadUrl = if ('?' in apkUrl) {
             "$apkUrl&_=${System.currentTimeMillis()}"
         } else {
@@ -340,6 +378,8 @@ object AppUpdateManager {
                 tempFile.outputStream().buffered().use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     var totalBytes = 0L
+                    var lastReported = 0L
+                    onBytes(0L, contentLength)
                     while (true) {
                         val count = input.read(buffer)
                         if (count < 0) break
@@ -348,10 +388,16 @@ object AppUpdateManager {
                             throw IOException("APK 文件大小异常")
                         }
                         output.write(buffer, 0, count)
+                        // 每累计约 64KB 回报一次进度，避免过于频繁刷新 UI。
+                        if (totalBytes - lastReported >= 64 * 1024) {
+                            lastReported = totalBytes
+                            onBytes(totalBytes, contentLength)
+                        }
                     }
                     if (totalBytes <= 0L || contentLength > 0L && totalBytes != contentLength) {
                         throw IOException("APK 下载不完整")
                     }
+                    onBytes(totalBytes, contentLength)
                 }
             }
         }

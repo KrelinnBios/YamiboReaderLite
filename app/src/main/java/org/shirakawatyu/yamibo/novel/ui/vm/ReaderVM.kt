@@ -1258,7 +1258,9 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     ): List<Content> {
         val result = ArrayList<Content>()
         val doc = Jsoup.parse(html)
-        doc.getElementsByTag("i").forEach { it.remove() }
+        // 只删「本帖最后由…编辑」这类编辑提示（i.pstatus），不要删所有 <i>：
+        // 部分作者把章节标题写成斜体 <i>第二章…</i>，删光 <i> 会连标题一起丢，导致目录缺章。
+        doc.select("i.pstatus").forEach { it.remove() }
 
         val messageNodes = doc.getElementsByClass("message")
         if (messageNodes.isEmpty()) return result
@@ -1285,20 +1287,22 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         }
 
-        // 章节标题用两种信号识别真正的章节小标题：
-        // 1) 首行匹配「第N章/序章/楔子…」等文本标题（如《主仆百合》直接写「第一章 造化弄人」）；
-        // 2) 楼层里有「标题样式」元素（居中/大字号/标题标签，如《愿在沉船中安眠》的时间小标题）。
+        // 章节标题用两种信号识别真正的章节小标题（Pair 的第二个值表示是否「硬分章」）：
+        // 1) 首行匹配「第N章/序章/楔子…」等文本标题（如《主仆百合》直接写「第一章 造化弄人」）——
+        //    这类编号标题每次出现都是新章，标为硬分章，即便两章同名（如两个「第七章」）也不合并；
+        // 2) 楼层里有「标题样式」元素（居中/大字号/标题标签，如《愿在沉船中安眠》的时间小标题）——
+        //    这类重复属同章装饰，不硬分章，连续同名仍合并成一章。
         // 命中的楼层才开启新章节，其余楼层视为上一章延续，不再把简介/闲聊/致谢/正文句当成章节。
         // 整帖都识别不到时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
-        val detectedHeadings = messageNodes.indices.map { i ->
+        val detectedHeadings: List<Pair<String, Boolean>?> = messageNodes.indices.map { i ->
             val firstLine = firstLines[i]
             if (firstLine.contains(replyRegex)) return@map null
             val normalizedFirst = firstLine.replace(Regex("\\s+"), " ").trim()
             if (chapterHeadingTextRegex.containsMatchIn(normalizedFirst)) {
-                normalizedFirst.take(30)
+                normalizedFirst.take(30) to true
             } else {
                 extractStructuralHeading(messageNodes[i])
-                    ?.let { convertChineseIfNeeded(it, translationMode) }
+                    ?.let { convertChineseIfNeeded(it, translationMode) to false }
             }
         }
         val useDetectedHeadings = detectedHeadings.any { it != null }
@@ -1312,15 +1316,21 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
             if (firstLine.contains(replyRegex)) continue
 
+            var isHardStart = false
             if (useDetectedHeadings) {
                 // 命中标题的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
-                detectedHeadings[i]?.let { currentValidTitle = it }
+                detectedHeadings[i]?.let { (title, isHard) ->
+                    currentValidTitle = title
+                    isHardStart = isHard
+                }
             } else {
                 currentValidTitle = firstLine.take(30)
             }
 
             if (rawText.isNotBlank()) {
-                result.add(Content(rawText, ContentType.TEXT, currentValidTitle))
+                result.add(
+                    Content(rawText, ContentType.TEXT, currentValidTitle, chapterStart = isHardStart)
+                )
             }
 
             if (loadImages) {
@@ -1431,8 +1441,16 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                             currentAsciiRatios,
                             typefaceFromMode(state.fontFamily)
                         )
-                        for (t in pagedText) {
-                            passagesList.add(Content(t, ContentType.TEXT, content.chapterTitle))
+                        // 硬分章标记只放在该楼层分页后的第一片上，后续分页片不再算新章起点。
+                        for ((pieceIndex, t) in pagedText.withIndex()) {
+                            passagesList.add(
+                                Content(
+                                    t,
+                                    ContentType.TEXT,
+                                    content.chapterTitle,
+                                    chapterStart = content.chapterStart && pieceIndex == 0
+                                )
+                            )
                         }
                     }
                     ContentType.IMG -> passagesList.add(content)
@@ -1456,9 +1474,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val chapterList = mutableListOf<ChapterInfo>()
         var lastTitle: String? = null
         passages.forEachIndexed { index, content ->
-            if (content.chapterTitle != null && content.chapterTitle != lastTitle && content.chapterTitle != "footer") {
-                chapterList.add(ChapterInfo(title = content.chapterTitle, startIndex = index))
-                lastTitle = content.chapterTitle
+            val title = content.chapterTitle
+            if (title != null && title != "footer" && (content.chapterStart || title != lastTitle)) {
+                // 硬分章（chapterStart）即便与上一章同名也新建目录项，
+                // 以支持作者把两个同名「第N章」分楼层发布的情况。
+                chapterList.add(ChapterInfo(title = title, startIndex = index))
+                lastTitle = title
             }
         }
         return chapterList

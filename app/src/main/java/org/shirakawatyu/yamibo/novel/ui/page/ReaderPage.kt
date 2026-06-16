@@ -538,7 +538,7 @@ fun ReaderPage(
                 ChapterDrawerContent(
                     drawerState = drawerState,
                     chapterList = uiState.chapterList,
-                    currentChapterTitle = currentChapterTitle,
+                    currentPageIndex = currentPageIndex,
                     pageCount = uiState.htmlList.size,
                     isVerticalMode = uiState.isVerticalMode,
                     onChapterClick = { index ->
@@ -1030,15 +1030,17 @@ fun ReaderSettingsBar(
 fun ChapterDrawerContent(
     drawerState: DrawerState,
     chapterList: List<ChapterInfo>,
-    currentChapterTitle: String?,
+    currentPageIndex: Int,
     pageCount: Int,
     isVerticalMode: Boolean,
     onChapterClick: (index: Int) -> Unit
 ) {
     val lazyListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val currentChapterIndex = remember(currentChapterTitle, chapterList) {
-        chapterList.indexOfFirst { it.title == currentChapterTitle }.coerceAtLeast(0)
+    // 按当前页码定位所在章节，而不是按标题——否则重名章节（如多个「现在 – 2044年」）
+    // 总会高亮到第一个同名章节。
+    val currentChapterIndex = remember(currentPageIndex, chapterList) {
+        chapterList.indexOfLast { it.startIndex <= currentPageIndex }.coerceAtLeast(0)
     }
     LaunchedEffect(drawerState.targetValue) {
         if (drawerState.targetValue == DrawerValue.Open) {

@@ -2,7 +2,9 @@ package org.shirakawatyu.yamibo.novel.ui.component
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.shirakawatyu.yamibo.novel.util.AppDownloadProgress
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 
@@ -43,6 +47,7 @@ fun AppUpdateDialog(
     val scope = rememberCoroutineScope()
     var state by remember(info.versionName) { mutableStateOf(UpdateDownloadState.READY) }
     var failureMessage by remember(info.versionName) { mutableStateOf("") }
+    var downloadProgress by remember(info.versionName) { mutableStateOf<AppDownloadProgress?>(null) }
 
     AlertDialog(
         onDismissRequest = {
@@ -61,11 +66,41 @@ fun AppUpdateDialog(
             ) {
                 when (state) {
                     UpdateDownloadState.DOWNLOADING -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.padding(end = 12.dp)
+                        val p = downloadProgress
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                if (p == null) {
+                                    "正在准备下载…"
+                                } else {
+                                    val src = if (p.sourceCount > 1) {
+                                        "${p.sourceLabel}（第 ${p.sourceIndex}/${p.sourceCount} 个源）"
+                                    } else {
+                                        p.sourceLabel
+                                    }
+                                    "正在下载并校验 APK\n来源：$src"
+                                }
                             )
-                            Text("正在下载并校验 APK…（GitHub 优先，必要时自动切换镜像）")
+                            Spacer(Modifier.height(12.dp))
+                            if (p != null && p.totalBytes > 0L) {
+                                val frac = (p.downloadedBytes.toFloat() / p.totalBytes)
+                                    .coerceIn(0f, 1f)
+                                LinearProgressIndicator(
+                                    progress = { frac },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = String.format(
+                                        "%.1f / %.1f MB（%d%%）",
+                                        p.downloadedBytes / 1048576.0,
+                                        p.totalBytes / 1048576.0,
+                                        (frac * 100).toInt()
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else {
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
                         }
                     }
 
@@ -100,7 +135,12 @@ fun AppUpdateDialog(
                     scope.launch {
                         state = UpdateDownloadState.DOWNLOADING
                         failureMessage = ""
-                        AppUpdateManager.downloadAndOpenInstaller(context, info)
+                        downloadProgress = null
+                        AppUpdateManager.downloadAndOpenInstaller(
+                            context,
+                            info,
+                            onProgress = { downloadProgress = it }
+                        )
                             .onSuccess {
                                 state = UpdateDownloadState.INSTALLER_OPENED
                             }
