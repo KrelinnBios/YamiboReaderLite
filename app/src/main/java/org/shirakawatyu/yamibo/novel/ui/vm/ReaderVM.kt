@@ -1222,6 +1222,29 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         )
     }
 
+    // 作者排版章节小标题的特征：居中、大字号（size>=5）或标题标签。这些才是真正的章节标题，
+    // 而促销链接、致谢、正文叙述句等不会用这种排版。
+    private val chapterHeadingSelector =
+        "h1, h2, h3, center, div[align=center], font[size=5], font[size=6], font[size=7]"
+
+    /** 从单个楼层中提取「标题样式」文本（取不到或过长则返回 null）。 */
+    private fun extractStructuralHeading(node: org.jsoup.nodes.Element): String? {
+        return node.selectFirst(chapterHeadingSelector)?.text()
+            ?.replace(' ', ' ')
+            ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && it.length <= 24 }
+    }
+
+    private fun convertChineseIfNeeded(text: String, translationMode: Int): String {
+        if (text.isBlank()) return text
+        return when (translationMode) {
+            1 -> ChineseConvertUtil.toSimplified(text, applicationContext)
+            2 -> ChineseConvertUtil.toTraditional(text, applicationContext)
+            else -> text
+        }
+    }
+
     private fun parseHtmlToContentList(
         html: String,
         translationMode: Int,
@@ -1250,6 +1273,15 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
         val convertedTexts = convertedCombinedText.split(delimiter)
         val replyRegex = Regex("发表于\\s*\\d{4}-\\d{1,2}-\\d{1,2}")
+
+        // 章节标题优先取作者排版的「标题样式」元素（居中/大字号/标题标签）——这才是真正的章节
+        // 小标题；没有这种排版的楼层视为上一章延续，不再制造垃圾目录项（促销/致谢/正文句等）。
+        // 整帖都没有这类标题时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
+        val structuralHeadings = messageNodes.map { node ->
+            extractStructuralHeading(node)?.let { convertChineseIfNeeded(it, translationMode) }
+        }
+        val useStructuralHeadings = structuralHeadings.any { it != null }
+
         var currentValidTitle: String? = null
 
         for (i in messageNodes.indices) {
@@ -1258,7 +1290,13 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             val firstLine = rawText.lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
 
             if (firstLine.contains(replyRegex)) continue
-            currentValidTitle = firstLine.take(30)
+
+            if (useStructuralHeadings) {
+                // 有标题样式的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
+                structuralHeadings[i]?.let { currentValidTitle = it }
+            } else {
+                currentValidTitle = firstLine.take(30)
+            }
 
             if (rawText.isNotBlank()) {
                 result.add(Content(rawText, ContentType.TEXT, currentValidTitle))
