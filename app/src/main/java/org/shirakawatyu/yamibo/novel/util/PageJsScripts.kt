@@ -1048,8 +1048,45 @@ object PageJsScripts {
                 var isMemberSpace = (document.body && document.body.id === 'space') ||
                     ($memberSpaceUrlExpression);
                 var enable = $enable && !isMemberSpace;
+
+                // 富文本编辑器（参与/回复主题）正文是独立的同源 iframe 文档，
+                // 主文档注入的 CSS 够不到它，需要单独往其 contentDocument 注入深色样式。
+                // 只在发帖/回复页（mod=post）处理，避免在其它页面空转。
+                function yamiboStyleEditorFrames(applyDark) {
+                    if (location.href.indexOf('mod=post') < 0) return;
+                    var frames = document.querySelectorAll('iframe');
+                    for (var i = 0; i < frames.length; i++) {
+                        try {
+                            var doc = frames[i].contentDocument;
+                            if (!doc || !doc.body) continue;
+                            var editable = doc.body.isContentEditable ||
+                                doc.body.getAttribute('contenteditable') === 'true';
+                            if (!editable) continue;
+                            var sid = 'yamibo-dark-editor';
+                            var ex = doc.getElementById(sid);
+                            if (ex) ex.remove();
+                            if (!applyDark) continue;
+                            var st = doc.createElement('style');
+                            st.id = sid;
+                            st.innerHTML = 'html,body{background:#182332 !important;color:#c7d8ea !important;}a{color:#7dbdf2 !important;}';
+                            (doc.head || doc.body || doc.documentElement).appendChild(st);
+                        } catch (e) {}
+                    }
+                }
+                // 编辑器在页面就绪后才初始化 iframe，做几次延迟重试以捕捉到它。
+                if (location.href.indexOf('mod=post') >= 0 && !window.__yamiboEditorThemeHooked) {
+                    window.__yamiboEditorThemeHooked = true;
+                    var yamiboEditorTries = 0;
+                    var yamiboEditorTimer = setInterval(function() {
+                        yamiboStyleEditorFrames(window.__yamiboEditorDark === true);
+                        if (++yamiboEditorTries > 20) clearInterval(yamiboEditorTimer);
+                    }, 300);
+                }
+
                 if (!enable) {
                     if (existing) existing.remove();
+                    window.__yamiboEditorDark = false;
+                    yamiboStyleEditorFrames(false);
                     return;
                 }
                 if (existing) existing.remove();
@@ -1059,6 +1096,8 @@ object PageJsScripts {
 $styleString
                 ].join('\n');
                 (document.body || document.documentElement).appendChild(style);
+                window.__yamiboEditorDark = true;
+                yamiboStyleEditorFrames(true);
             })();
         """.trimIndent()
     }

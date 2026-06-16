@@ -68,6 +68,30 @@ class AppUpdateManagerTest {
     }
 
     @Test
+    fun buildsGithubFirstThenMirrorCandidates() {
+        val apkUrl =
+            "https://github.com/KrelinnBios/YamiboReaderLite/releases/download/v1.1.8/300.Lite.apk"
+        val candidates = AppUpdateManager.buildDownloadCandidates(apkUrl)
+
+        // GitHub 直链必须排第一
+        assertEquals(apkUrl, candidates.first())
+        // 其后是各镜像前缀拼接同一直链
+        assertEquals(
+            AppUpdateManager.DOWNLOAD_MIRROR_PREFIXES.size + 1,
+            candidates.size
+        )
+        AppUpdateManager.DOWNLOAD_MIRROR_PREFIXES.forEach { prefix ->
+            assertTrue(candidates.contains(prefix + apkUrl))
+        }
+    }
+
+    @Test
+    fun nonGithubUrlHasNoMirrorFallback() {
+        val apkUrl = "https://example.com/app.apk"
+        assertEquals(listOf(apkUrl), AppUpdateManager.buildDownloadCandidates(apkUrl))
+    }
+
+    @Test
     fun comparesSemanticVersions() {
         assertTrue(AppUpdateManager.compareVersions("1.0.1", "1.0.0") > 0)
         assertTrue(AppUpdateManager.compareVersions("2.0.0", "1.99.99") > 0)

@@ -18,6 +18,11 @@ object StaticAssetProxy {
         "js", "css", "woff", "woff2", "ttf", "eot", "svg", "ico"
     )
 
+    // 头像是公开静态图片（/uc_server/data/avatar/.../xx_avatar_*.jpg|svg），无鉴权。
+    private val SAFE_AVATAR_EXTENSIONS = setOf(
+        "jpg", "jpeg", "png", "gif", "svg", "webp"
+    )
+
     private val SAFE_STATIC_HOSTS = setOf(
         "bbs.yamibo.com",
         "m.yamibo.com",
@@ -51,6 +56,18 @@ object StaticAssetProxy {
         val path = uri.path.orEmpty().lowercase()
         if (path.isBlank()) return false
 
+        val query = uri.encodedQuery.orEmpty()
+        val queryLower = query.lowercase()
+
+        // 头像：公开静态图片，原本被各 WebView 页排除而走 WebView 原生网络（无 DNS 优化/
+        // 连接池），加载慢或加载不出。这里放行，改走优化过的 okHttpClient。
+        if (path.startsWith("/uc_server/data/avatar/")) {
+            val avatarExt = path.substringAfterLast('.', missingDelimiterValue = "")
+            if (avatarExt !in SAFE_AVATAR_EXTENSIONS) return false
+            if (DANGEROUS_STATIC_QUERY_KEYS.any { queryLower.contains(it) }) return false
+            return true
+        }
+
         val ext = path.substringAfterLast('.', missingDelimiterValue = "")
         if (ext !in SAFE_STATIC_EXTENSIONS) return false
 
@@ -60,9 +77,6 @@ object StaticAssetProxy {
                     path.startsWith("/data/cache/") ||
                     path.startsWith("/source/plugin/")
         if (!isSafeStaticPath) return false
-
-        val query = uri.encodedQuery.orEmpty()
-        val queryLower = query.lowercase()
 
         if (DANGEROUS_STATIC_QUERY_KEYS.any { queryLower.contains(it) }) {
             return false
@@ -126,6 +140,18 @@ object StaticAssetProxy {
                         mime == "image/vnd.microsoft.icon" ||
                         mime == "image/png" ||
                         mime == "application/octet-stream"
+
+            path.endsWith(".jpg") || path.endsWith(".jpeg") ->
+                mime == "image/jpeg" || mime == "application/octet-stream"
+
+            path.endsWith(".png") ->
+                mime == "image/png" || mime == "application/octet-stream"
+
+            path.endsWith(".gif") ->
+                mime == "image/gif" || mime == "application/octet-stream"
+
+            path.endsWith(".webp") ->
+                mime == "image/webp" || mime == "application/octet-stream"
 
             else -> false
         }

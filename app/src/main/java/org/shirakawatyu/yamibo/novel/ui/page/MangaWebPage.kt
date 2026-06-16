@@ -82,6 +82,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
+import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient
@@ -160,7 +161,10 @@ fun MangaWebPage(
 ) {
 
     val finalUrl = remember(url) {
-        if (url.startsWith("http")) url else "${RequestConfig.BASE_URL}/$url"
+        val absolute = if (url.startsWith("http")) url else "${RequestConfig.BASE_URL}/$url"
+        // 帖子/章节页统一走手机版模板：无论从漫画发现页进入，还是从原生阅读器点「原帖」
+        // 返回，都渲染手机版而非电脑版。
+        ReaderReturnBridge.forceMobileTemplate(absolute)
     }
     var canGoBack by remember { mutableStateOf(false) }
     var baseIndex by remember { mutableIntStateOf(-1) }
@@ -660,9 +664,10 @@ fun MangaWebPage(
                 } ?: false
 
                 if (mangaWebView.url == null) {
-                    val finalUrl =
+                    val reloadUrl = ReaderReturnBridge.forceMobileTemplate(
                         if (url.startsWith("http")) url else "${RequestConfig.BASE_URL}/$url"
-                    mangaWebView.loadUrl(finalUrl)
+                    )
+                    mangaWebView.loadUrl(reloadUrl)
                 }
 
             }

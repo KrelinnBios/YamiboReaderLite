@@ -45,6 +45,25 @@ object AppUpdateManager {
     const val RELEASES_API_URL =
         "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases?per_page=20"
 
+    // 下载源回退顺序：先 GitHub 直链，连不上再依次试镜像。镜像是「前缀代理」——把完整
+    // GitHub 直链接在镜像域名后即可（如 https://gh.llkk.cc/https://github.com/.../300.Lite.apk）。
+    // 某镜像失效时改这里即可，无需动下载逻辑。
+    internal val DOWNLOAD_MIRROR_PREFIXES = listOf(
+        "https://gh.llkk.cc/",
+        "https://ghfast.top/",
+        "https://ghproxy.net/",
+        "https://gh-proxy.com/"
+    )
+
+    /** 构造下载候选链：GitHub 直链优先，其后是各镜像前缀拼接的同一直链。 */
+    internal fun buildDownloadCandidates(apkUrl: String): List<String> {
+        val candidates = mutableListOf(apkUrl)
+        if (apkUrl.startsWith("https://github.com/", ignoreCase = true)) {
+            DOWNLOAD_MIRROR_PREFIXES.forEach { prefix -> candidates.add(prefix + apkUrl) }
+        }
+        return candidates.distinct()
+    }
+
     private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     private const val MAX_APK_SIZE_BYTES = 512L * 1024L * 1024L
 
@@ -240,15 +259,49 @@ object AppUpdateManager {
             ?.forEach { it.delete() }
 
         val safeVersionName = info.versionName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        // 缓存文件名内嵌版本号，便于排查“缓存里到底是哪一版”。GitHub 发布资产仍叫 300 Lite.apk。
         val targetFile = File(updateDir, "300 Lite-$safeVersionName.apk")
         val tempFile = File(updateDir, "${targetFile.name}.download")
         tempFile.delete()
         targetFile.delete()
 
-        val apkDownloadUrl = if ('?' in info.apkUrl) {
-            "${info.apkUrl}&_=${System.currentTimeMillis()}"
+        // 多源下载：GitHub 直链优先，失败按序回退镜像。每个源下载后都严格校验
+        // （版本号必须正好等于弹窗展示版本、且高于当前版本、签名一致），任何一个源给到
+        // 旧包/错包都会被拒绝并自动换下一个源，从根本上杜绝“显示新版却装到旧版”。
+        val candidates = buildDownloadCandidates(info.apkUrl)
+        var lastError: Exception? = null
+
+        for (url in candidates) {
+            tempFile.delete()
+            try {
+                downloadApkTo(url, tempFile)
+                validateApk(context, tempFile, info)
+            } catch (error: CancellationException) {
+                tempFile.delete()
+                throw error
+            } catch (error: Exception) {
+                lastError = error
+                tempFile.delete()
+                continue
+            }
+
+            targetFile.delete()
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+            return targetFile
+        }
+
+        throw lastError ?: IOException("所有下载源均不可用")
+    }
+
+    /** 将单个下载源的 APK 写入临时文件；失败抛异常，由调用方决定是否换源。 */
+    private fun downloadApkTo(apkUrl: String, tempFile: File) {
+        val apkDownloadUrl = if ('?' in apkUrl) {
+            "$apkUrl&_=${System.currentTimeMillis()}"
         } else {
-            "${info.apkUrl}?_=${System.currentTimeMillis()}"
+            "$apkUrl?_=${System.currentTimeMillis()}"
         }
 
         val request = Request.Builder()
@@ -259,47 +312,34 @@ object AppUpdateManager {
             .header("Pragma", "no-cache")
             .build()
 
-        try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw IOException("APK 下载失败：HTTP ${response.code}")
-                }
-                val body = response.body ?: throw IOException("APK 下载内容为空")
-                val contentLength = body.contentLength()
-                if (contentLength > MAX_APK_SIZE_BYTES) {
-                    throw IOException("APK 文件大小异常")
-                }
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IOException("APK 下载失败：HTTP ${response.code}")
+            }
+            val body = response.body ?: throw IOException("APK 下载内容为空")
+            val contentLength = body.contentLength()
+            if (contentLength > MAX_APK_SIZE_BYTES) {
+                throw IOException("APK 文件大小异常")
+            }
 
-                body.byteStream().use { input ->
-                    tempFile.outputStream().buffered().use { output ->
-                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                        var totalBytes = 0L
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            totalBytes += count
-                            if (totalBytes > MAX_APK_SIZE_BYTES) {
-                                throw IOException("APK 文件大小异常")
-                            }
-                            output.write(buffer, 0, count)
+            body.byteStream().use { input ->
+                tempFile.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var totalBytes = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        totalBytes += count
+                        if (totalBytes > MAX_APK_SIZE_BYTES) {
+                            throw IOException("APK 文件大小异常")
                         }
-                        if (totalBytes <= 0L || contentLength > 0L && totalBytes != contentLength) {
-                            throw IOException("APK 下载不完整")
-                        }
+                        output.write(buffer, 0, count)
+                    }
+                    if (totalBytes <= 0L || contentLength > 0L && totalBytes != contentLength) {
+                        throw IOException("APK 下载不完整")
                     }
                 }
             }
-
-            validateApk(context, tempFile, info)
-            targetFile.delete()
-            if (!tempFile.renameTo(targetFile)) {
-                tempFile.copyTo(targetFile, overwrite = true)
-                tempFile.delete()
-            }
-            return targetFile
-        } catch (error: Exception) {
-            tempFile.delete()
-            throw error
         }
     }
 

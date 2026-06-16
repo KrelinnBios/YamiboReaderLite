@@ -65,7 +65,7 @@ fun AppUpdateDialog(
                             CircularProgressIndicator(
                                 modifier = Modifier.padding(end = 12.dp)
                             )
-                            Text("正在从 GitHub 下载并校验 APK…")
+                            Text("正在下载并校验 APK…（GitHub 优先，必要时自动切换镜像）")
                         }
                     }
 

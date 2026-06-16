@@ -460,6 +460,11 @@ class YamiboRetrofit {
                 if (reqBuilder.build().header("Referer").isNullOrBlank()) {
                     reqBuilder.header("Referer", "https://bbs.yamibo.com/")
                 }
+                // 签到页是动态状态页：强制向服务器重新校验，避免 OkHttp 磁盘缓存命中旧响应，
+                // 导致显示的签到状态与后台自动签到后的真实状态不一致。
+                if (urlStr.contains("zqlj_sign", ignoreCase = true)) {
+                    reqBuilder.header("Cache-Control", "no-cache")
+                }
                 val response = okHttpClient.newCall(reqBuilder.build()).execute()
                 if (response.isSuccessful) {
                     syncSetCookieToWebView(response)
