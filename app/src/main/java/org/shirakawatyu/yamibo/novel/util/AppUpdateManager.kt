@@ -82,6 +82,20 @@ object AppUpdateManager {
             .build()
     }
 
+    // 多源下载专用客户端：让失效/卡死的镜像快速失败，避免逐个长时间等待。
+    // 连接 8s（连不上的镜像很快放弃）、读取间隔 30s（连上却不吐数据的卡死也快放弃）、
+    // 单次整体上限 4min（足够在慢网下载完整 APK）。真正可用的源不受影响。
+    private val downloadClient by lazy {
+        OkHttpClient.Builder()
+            .dns(YamiboRetrofit.okHttpClient.dns)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(4, TimeUnit.MINUTES)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    }
+
     /**
      * 启动时的自动检查：带节流。距上次自动检查不足 [AUTO_CHECK_MIN_INTERVAL_MS] 时返回 null（跳过），
      * 避免频繁启动把 GitHub 未认证接口的限流额度用尽（403）。无论成功失败都记录检查时间。
@@ -312,7 +326,7 @@ object AppUpdateManager {
             .header("Pragma", "no-cache")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        downloadClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("APK 下载失败：HTTP ${response.code}")
             }
