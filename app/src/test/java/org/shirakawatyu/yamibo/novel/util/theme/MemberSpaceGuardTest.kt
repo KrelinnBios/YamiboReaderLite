@@ -7,35 +7,39 @@ import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 
 class MemberSpaceGuardTest {
     @Test
-    fun memberSpaceUrlsAreExcludedFromThemeInjection() {
-        assertTrue(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/space-uid-615797.html"))
-        assertTrue(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/blog-615797-117517.html"))
-        assertTrue(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=blog&id=117517"))
-        assertTrue(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=space&uid=615797&do=blog&id=117517"))
-        assertTrue(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=space&username=test"))
-    }
-
-    @Test
-    fun functionalAndMobileCenterPagesStillReceiveTheme() {
-        assertFalse(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php"))
-        assertFalse(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=space&do=notice"))
-        assertFalse(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=spacecp&ac=profile"))
-        assertFalse(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=blog&mobile=2"))
-        assertFalse(MemberSpaceGuard.isMemberSpaceUrl("https://bbs.yamibo.com/home.php?mod=space&uid=615797&mycenter=1"))
-    }
-
-    @Test
-    fun runtimeJsUsesTheSharedUrlRuleSource() {
+    fun customDiySpacesAreExcludedFromThemeInjection() {
+        // body#space 且用了 data/attachment 自定义背景图 → 自定义 DIY 空间，排除暗黑
         assertTrue(
-            PageJsScripts.getDarkModeSetJs(enable = true)
-                .contains(MemberSpaceGuard.jsExpression())
+            MemberSpaceGuard.isMemberSpaceHtml(
+                "<body id=\"space\"><style>.a{background-image:url('https://bbs.yamibo.com/data/attachment/album/x.jpg')}</style></body>"
+            )
+        )
+        assertTrue(
+            MemberSpaceGuard.isMemberSpaceHtml(
+                "<body id='space'><div style=\"background:url(https://bbs.yamibo.com/data/attachment/album/y.png)\"></div></body>"
+            )
         )
     }
 
     @Test
-    fun htmlFallbackRecognizesBodySpaceRegardlessOfAttributeOrderOrQuotes() {
-        assertTrue(MemberSpaceGuard.isMemberSpaceHtml("<body id=\"space\">"))
-        assertTrue(MemberSpaceGuard.isMemberSpaceHtml("<body class='custom' id='space' data-x='1'>"))
+    fun plainSpacesAndOtherPagesReceiveTheme() {
+        // body#space 但只有 static 默认背景（无自定义）→ 照常暗黑
+        assertFalse(
+            MemberSpaceGuard.isMemberSpaceHtml(
+                "<body id=\"space\"><style>.a{background-image:url(https://bbs.yamibo.com/static/image/feed/blog_b.png)}</style></body>"
+            )
+        )
+        // body#space 但完全没有背景图 → 照常暗黑
+        assertFalse(MemberSpaceGuard.isMemberSpaceHtml("<body id=\"space\"></body>"))
+        // 非空间页 → 照常暗黑
         assertFalse(MemberSpaceGuard.isMemberSpaceHtml("<body id=\"nv_home\" class=\"pg_space\">"))
+    }
+
+    @Test
+    fun runtimeJsUsesTheSharedRuleSource() {
+        assertTrue(
+            PageJsScripts.getDarkModeSetJs(enable = true)
+                .contains(MemberSpaceGuard.jsExpression())
+        )
     }
 }

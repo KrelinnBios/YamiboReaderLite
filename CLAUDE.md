@@ -96,9 +96,10 @@
 - 原色（浅色）模式**不再是零注入**：会注入一份**极小**的覆盖（`util/theme/LightClassic.kt` 的 `LIGHT_MODE_CSS_RULES_CLASSIC`），目前**仅**统一正文链接颜色。同样走 `injectThemeCssIntoHtml` / `getThemeSetJs` 两条路径，不要往里塞与"链接统一"无关的规则，浅色模式整体应保持论坛原样。
 - CSS 规则字符串末尾会统一执行 `background:` → `background-color:` 重写。规则中可以写 `background:`，但**绝不能覆盖站点的 `background-image`**，轮播图、头像和会员自定义背景依赖它。
 - CSS 规则字符串中**不能出现单引号**，否则会破坏 JS 注入字符串拼接。
-- 会员 DIY 空间页完全不启用暗黑模式：看别人的个人主页、日志或相册时，URL 命中 `space-uid-N`、`blog-N`，或 `mod=space` / `mod=blog` 且带 `uid=` / `username=` 参数，或页面为 `body#space` 模板时保持原样。
-- 底栏“我的”加载的是手机版个人中心（`mobile=2` / `mobile=yes` / `mycenter=1`），自己的家园功能页（如 `do=notice`、`do=thread`、`mod=spacecp`、BLOG 列表）也没有会员 DIY，必须正常启用暗黑模式；不要退化为简单匹配 `home.php?mod=space`，否则会误伤这些功能页。
-- 会员空间守卫统一由 `util/theme/MemberSpaceGuard` 提供（`jsExpression()` 给 JS 注入、`isMemberSpaceHtml()` 给 HTML 代理兜底）；深色与浅色注入（`getDarkModeSetJs` / `getLightModeSetJs` / `injectDarkModeCssIntoHtml` / `injectLightModeCssIntoHtml`）以及 `YamiboRetrofit` 的 HTML 代理 URL 判断都必须共用它，改判断逻辑要一处改、各处一致。
+- 只有**自定义 DIY 会员空间**才不启用暗黑模式（保留作者亲手设计的版面）；判定改为**按页面内容**：页面是 `body#space` 且使用了 `data/attachment` 的自定义背景图。普通空间（如「xxx的空间」，只有 `static/image` 默认图、无自定义背景）以及帖子、版块、手机版个人中心等所有其它页面都照常启用暗黑。不要再用 URL（`space-uid-N`/`mod=space&uid=` 等）来排除——那会误伤无自定义的普通空间，让它们也变不了深色。
+- 底栏“我的”是手机版个人中心（`mobile=2` / `mobile=yes` / `mycenter=1`），非 `body#space`，照常暗黑。
+- 会员空间守卫统一由 `util/theme/MemberSpaceGuard` 提供：`isMemberSpaceHtml()` 给 HTML 代理判断、`jsExpression()` 给运行时 JS 判断，两者共用「`body#space` + `data/attachment` 背景」这同一组内容规则。`YamiboRetrofit.proxyHtmlForDarkMode` 不再按 URL 跳过空间页（所有 bbs 主框架页都进代理），由 `injectDarkModeCssIntoHtml` / `injectLightModeCssIntoHtml` 调 `isMemberSpaceHtml()` 决定注不注入；深色/浅色 JS 注入（`getDarkModeSetJs` / `getLightModeSetJs`）调 `jsExpression()`。改判断逻辑要一处改、各处一致。
+- 当前 DIY 检测认 `data/attachment` 自定义背景图。若遇到只用纯外链图（无 `data/attachment`）做 DIY 的空间会漏判，按真实样本再扩展规则，不要凭空猜。
 - 投票区 `#poll` 的彩条以及用户侧栏的经验/积分彩条依赖内联颜色，必须保留原色；不要用大范围 `.plc div` / `.pls div` 规则覆盖 `.pbr`、`.pbg`、`.pbr2`、`.pbg2`。
 - 深色链接统一使用浅蓝 `#7dbdf2`，不允许改成棕色；浅色（原色）模式下正文链接统一为站点默认链接色 `#6E2B19`。
 - 链接颜色统一要覆盖到链接内部的 `font[color]` / 内联 `color` 子元素（楼主常把链接套多种颜色），但只改文字色、绝不动 `background-image`。

@@ -1040,13 +1040,10 @@ object PageJsScripts {
             (function() {
                 var styleId = 'yamibo-dark-mode';
                 var existing = document.getElementById(styleId);
-                // 会员 DIY 空间页（看别人的个人主页/日志/相册，body#space 模板或带具体 uid 的
-                // 空间 URL）不启用暗黑模式；自己的家园功能页（do=notice 提醒 / do=thread 我的
-                // 帖子 / mod=spacecp 个人资料 / home.php BLOG 列表）照常变深色；
-                // home.php?mod=blog 是日志空间路径，必须保持会员自定义样式。
-                // 底栏「我的」是手机版个人中心（mobile=2 / mycenter=1），必须照常变深色。
-                var isMemberSpace = (document.body && document.body.id === 'space') ||
-                    ($memberSpaceUrlExpression);
+                // 只有「自定义 DIY 会员空间」（body#space 且用了 data/attachment 自定义背景图）
+                // 才不启用暗黑，以保留作者亲自设计的版面；普通空间（无自定义背景）以及其它所有
+                // 页面都照常变深色。
+                var isMemberSpace = ($memberSpaceUrlExpression);
                 var enable = $enable && !isMemberSpace;
 
                 // 富文本编辑器（参与/回复主题）正文是独立的同源 iframe 文档，
@@ -1111,9 +1108,8 @@ $styleString
             (function() {
                 var styleId = 'yamibo-light-mode';
                 var existing = document.getElementById(styleId);
-                // 会员 DIY 空间（个人主页/日志/相册）保持原样，不做链接统一。
-                var isMemberSpace = (document.body && document.body.id === 'space') ||
-                    ($memberSpaceUrlExpression);
+                // 只有自定义 DIY 会员空间保持原样，不做链接统一；普通空间照常处理。
+                var isMemberSpace = ($memberSpaceUrlExpression);
                 var enable = $enable && !isMemberSpace;
                 if (!enable) {
                     if (existing) existing.remove();
