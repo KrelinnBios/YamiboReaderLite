@@ -7,6 +7,10 @@ buildscript {
                 "org.bouncycastle:bcpkix-jdk18on",
                 "org.bouncycastle:bcutil-jdk18on" -> useVersion("1.84")
                 "org.bitbucket.b_c:jose4j" -> useVersion("0.9.6")
+                "org.jdom:jdom2" -> useVersion("2.0.6.1")
+                "com.google.protobuf:protobuf-java",
+                "com.google.protobuf:protobuf-kotlin",
+                "com.google.protobuf:protobuf-java-util" -> useVersion("3.25.5")
                 "io.netty:netty-buffer",
                 "io.netty:netty-codec",
                 "io.netty:netty-codec-http",
