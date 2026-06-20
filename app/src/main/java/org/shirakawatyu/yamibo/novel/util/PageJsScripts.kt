@@ -1409,6 +1409,15 @@ $styleString
                         return action;
                     }
 
+                    // 列表页（大区帖子列表）的屏蔽按钮加上图标，与旁边的浏览数(dm-eye-fill)、
+                    // 评论数(dm-chat-s-fill)按钮保持一致；颜色由站点 .threadlist_foot i/a 规则统一。
+                    // 帖子页内的屏蔽按钮不走这里，保持纯文字。
+                    function setListActionLabel(action, blocked) {
+                        var icon = blocked ? 'dm-plus-c' : 'dm-minus-c';
+                        var text = blocked ? '取消屏蔽' : '屏蔽';
+                        action.innerHTML = '<i class="' + icon + '"></i>' + text;
+                    }
+
                     // 从行/楼层里尽量取作者用户名（带文字的「空间链接」）。
                     function getAuthorName(scope) {
                         if (!scope) return '';
@@ -1456,11 +1465,12 @@ $styleString
                                     var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
                                     var title = titleLink ? String(titleLink.textContent || '').trim() : '';
                                     action = makeAction('thread', tid, title, isBlocked, authorUid, authorName);
+                                    setListActionLabel(action, isBlocked);
                                     holder.appendChild(action);
                                     foot.appendChild(holder);
                                 }
                             } else {
-                                action.textContent = isBlocked ? '取消屏蔽' : '屏蔽';
+                                setListActionLabel(action, isBlocked);
                             }
 
                             if (isBlocked) {
