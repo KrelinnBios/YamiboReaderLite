@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
@@ -491,18 +492,20 @@ fun HistoryPage(navController: NavController) {
                         }
                     } else {
                         if (historyList.isNotEmpty()) {
-                            TextButton(onClick = { isManageMode = true }) {
-                                Text(
-                                    "管理",
-                                    color = topBarContentColor,
-                                    fontSize = 15.sp
+                            IconButton(onClick = { isManageMode = true }) {
+                                Icon(
+                                    Icons.Default.Checklist,
+                                    contentDescription = "管理",
+                                    tint = topBarContentColor,
+                                    modifier = Modifier.size(23.dp)
                                 )
                             }
-                            TextButton(onClick = { showClearDialog = true }) {
-                                Text(
-                                    "清空",
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 15.sp
+                            IconButton(onClick = { showClearDialog = true }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "清空",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(23.dp)
                                 )
                             }
                         }

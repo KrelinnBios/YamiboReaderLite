@@ -33,9 +33,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
@@ -110,7 +112,6 @@ import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.AutoCheckSection
-import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteManageDoneButton
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
@@ -508,6 +509,51 @@ fun FavoritePage(
         }
     }
 
+    // 管理模式「完成」用 ✔ 图标，与旁边的放大镜图标风格统一。
+    @Composable
+    fun ManageDoneButton() {
+        IconButton(
+            onClick = { favoriteVM.toggleManageMode() },
+            modifier = Modifier
+                .size(44.dp)
+                .padding(end = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "完成",
+                modifier = Modifier.size(24.dp),
+                tint = topBarContentColor
+            )
+        }
+    }
+
+    // 底部悬浮管理栏里的单个操作：图标在上、文字在下，四个按钮等宽，文字不换行。
+    @Composable
+    fun ManageActionButton(
+        label: String,
+        tint: Color,
+        onClick: () -> Unit,
+        icon: @Composable () -> Unit
+    ) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            icon()
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = label,
+                color = tint,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+
     Column(
         modifier = Modifier
             .padding(bottom = lockedNavHeight + 50.dp)
@@ -537,9 +583,7 @@ fun FavoritePage(
                             .padding(start = 6.dp, end = if (isInManageMode) 6.dp else 2.dp)
                     )
                     if (isInManageMode) {
-                        FavoriteManageDoneButton(
-                            onClick = { favoriteVM.toggleManageMode() }
-                        )
+                        ManageDoneButton()
                     } else {
                         MoreOptionsButton()
                     }
@@ -673,9 +717,7 @@ fun FavoritePage(
                                 tint = if (isSearching) MaterialTheme.colorScheme.primary else topBarContentColor
                             )
                         }
-                        FavoriteManageDoneButton(
-                            onClick = { favoriteVM.toggleManageMode() }
-                        )
+                        ManageDoneButton()
                     } else {
                         IconButton(
                             onClick = { isSearchBarExpanded = true },
@@ -859,71 +901,69 @@ fun FavoritePage(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+                        val danger = MaterialTheme.colorScheme.error
                         val allSelected = searchedFavoriteList.isNotEmpty() &&
                                 selectedItems.size >= searchedFavoriteList.size &&
                                 searchedFavoriteList.all { selectedItems.contains(it.url) }
-                        TextButton(
+                        ManageActionButton(
+                            label = if (allSelected) "取消" else "全选",
+                            tint = neutral,
                             onClick = {
                                 favoriteVM.setSelectedItems(
                                     if (allSelected) emptySet()
                                     else searchedFavoriteList.map { it.url }.toSet()
                                 )
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            }
                         ) {
-                            Text(if (allSelected) "取消" else "全选")
-                        }
-
-                        TextButton(
-                            onClick = { favoriteVM.hideSelectedItems() },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            Icon(
+                                Icons.Default.SelectAll,
+                                "全选",
+                                modifier = Modifier.size(20.dp),
+                                tint = neutral
                             )
+                        }
+                        ManageActionButton(
+                            label = "隐藏",
+                            tint = neutral,
+                            onClick = { favoriteVM.hideSelectedItems() }
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_visibility_off),
                                 "隐藏",
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
+                                tint = neutral
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("隐藏")
                         }
-
-                        TextButton(
-                            onClick = { favoriteVM.unhideSelectedItems() },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        ManageActionButton(
+                            label = "显示",
+                            tint = neutral,
+                            onClick = { favoriteVM.unhideSelectedItems() }
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_visibility),
                                 "显示",
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
+                                tint = neutral
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("显示")
                         }
-
-                        Spacer(Modifier.width(4.dp))
-
-                        TextButton(
+                        ManageActionButton(
+                            label = "删除",
+                            tint = danger,
                             onClick = {
                                 if (selectedItems.isNotEmpty()) showDeleteConfirmDialog = true
-                            },
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
+                            }
                         ) {
-                            Icon(Icons.Default.Delete, "删除", modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("删除")
+                            Icon(
+                                Icons.Default.Delete,
+                                "删除",
+                                modifier = Modifier.size(20.dp),
+                                tint = danger
+                            )
                         }
                     }
                 }

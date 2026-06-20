@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -189,6 +190,15 @@ fun FavoriteItem(
                     .padding(start = 15.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 管理模式下在卡片左侧展示选框（与浏览历史一致）；点击整张卡片切换选中，
+                // 选框本身只做状态展示，由父级 onClick 负责切换。
+                if (isManageMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = null,
+                        modifier = Modifier.padding(end = 10.dp)
+                    )
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
                         modifier = Modifier.fillMaxWidth(),
