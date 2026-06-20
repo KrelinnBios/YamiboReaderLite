@@ -1781,12 +1781,88 @@ $styleString
         })();
     """.trimIndent()
 
+    val PRESERVE_DESKTOP_SPACE_LINKS_JS = """
+        (function() {
+            function isDesktopSpacePage() {
+                var href = location.href || '';
+                if (/[?&]mobile=no(?:&|${'$'})/i.test(href)) return true;
+                if (/[?&]mobile=(?:2|yes)(?:&|${'$'})/i.test(href)) return false;
+                var body = document.body;
+                if (!body) return false;
+                if (body.id === 'space') return true;
+                var bodyClass = ' ' + (body.className || '') + ' ';
+                return /\spg_space(?:cp)?\s/.test(bodyClass);
+            }
+
+            function shouldRewrite(url) {
+                var host = (url.hostname || '').toLowerCase();
+                if (host !== 'bbs.yamibo.com' && host !== 'm.yamibo.com') return false;
+                if (!/\/home\.php$/i.test(url.pathname)) return false;
+                return (url.searchParams.get('mod') || '').toLowerCase() === 'space';
+            }
+
+            function rewriteLink(link) {
+                var raw = link.getAttribute('href') || '';
+                if (!raw || raw.charAt(0) === '#' || /^javascript:/i.test(raw) || /^mailto:/i.test(raw)) return;
+                var url;
+                try {
+                    url = new URL(raw, document.baseURI || location.href);
+                } catch (e) {
+                    return;
+                }
+                if (!shouldRewrite(url)) return;
+                if ((url.hostname || '').toLowerCase() === 'm.yamibo.com') {
+                    url.hostname = 'bbs.yamibo.com';
+                }
+                var mobile = (url.searchParams.get('mobile') || '').toLowerCase();
+                if (mobile !== 'no') {
+                    url.searchParams.set('mobile', 'no');
+                    link.href = url.href;
+                }
+            }
+
+            function rewriteAllSpaceLinks() {
+                if (!isDesktopSpacePage()) return;
+                var links = document.querySelectorAll('a[href*="home.php"][href*="mod=space"],a[href*="home.php"][href*="mod%3Dspace"]');
+                for (var i = 0; i < links.length; i++) {
+                    rewriteLink(links[i]);
+                }
+            }
+
+            function boot() {
+                if (!isDesktopSpacePage()) return;
+                rewriteAllSpaceLinks();
+                if (window.__yamiboDesktopSpaceLinksObserver) return;
+                var pending = false;
+                window.__yamiboDesktopSpaceLinksObserver = new MutationObserver(function() {
+                    if (pending) return;
+                    pending = true;
+                    setTimeout(function() {
+                        pending = false;
+                        rewriteAllSpaceLinks();
+                    }, 80);
+                });
+                window.__yamiboDesktopSpaceLinksObserver.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['href']
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', boot, { once: true });
+            }
+            boot();
+        })();
+    """.trimIndent()
     val BBS_COMMIT_BOOTSTRAP_JS by lazy {
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
+            "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -1796,6 +1872,7 @@ $styleString
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }

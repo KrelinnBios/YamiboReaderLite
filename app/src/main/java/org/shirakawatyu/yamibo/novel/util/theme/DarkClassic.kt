@@ -349,6 +349,11 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".p_pop.blk, .bui, .p_pop.blk.bui { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
     "/* === 弹窗对话框（fwin）=== */",
     ".fwin, .fwinmask .flb { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "form[fwin], .fwin form, .fwin .c, .fwin .o, .fwin .pns, .fwinmask form[fwin] { background: #182332 !important; color: #c7d8ea !important; border-color: #274766 !important; }",
+    "form[fwin] .c, form[fwin] .o, form[fwin] .pns, .fwin .c, .fwin .o, .fwin .pns { color: #c7d8ea !important; border-color: #274766 !important; }",
+    "form[fwin] .pn, .fwin .pn { background: #274766 !important; background-image: none !important; color: #c7d8ea !important; border-color: #4b6a8f !important; text-shadow: none !important; box-shadow: none !important; }",
+    "form[fwin] .pnc, form[fwin] .pn.pnc, .fwin .pnc { background: #31577a !important; background-image: none !important; color: #ffffff !important; border-color: #4ea1ff !important; }",
+    "form[fwin] .pn strong, .fwin .pn strong { color: inherit !important; }",
     "/* === 快速回复区 === */",
     ".fastre, #fastpost, .pgs.cl.mtm { background: #182332 !important; border-color: #274766 !important; }",
     "/* === 通用衬线工具类（bbda/btda/bbs 虚线/实线分隔，帖子页/板块页/家园页都在用）=== */",
@@ -430,6 +435,12 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "/* 列表分隔线（原 #DBC38C 虚线 / #CDCDCD / #CCC）改深蓝灰 */",
     "#space .el li, #space .el .i, #space .xld dt, #space .xld dd, #space .bbda, #space #ct, #space hr.da, #space .mbm.pbm.bbda { border-color: #274766 !important; }",
     "#space .el .i, #space .blockcode { background: #1f2c3d !important; color: #c7d8ea !important; }",
+    "/* Desktop member-space blog/log content: authors may set black inline text. */",
+    "#space .bm, #space .bm_c, #space .bm_h, #space .ct2, #space .ct2_a, #space .mn, #space .sd { background: #182332 !important; color: #c7d8ea !important; border-color: #274766 !important; }",
+    "#space .blog, #space .blogbody, #space .blogcontent, #space .article, #space .d, #space .message, #space .content { color: #c7d8ea !important; }",
+    "#space .blog p, #space .blog div, #space .blog span, #space .blog font, #space .blogbody p, #space .blogbody div, #space .blogbody span, #space .blogbody font, #space .blogcontent p, #space .blogcontent div, #space .blogcontent span, #space .blogcontent font, #space .article p, #space .article div, #space .article span, #space .article font, #space .d p, #space .d div, #space .d span, #space .d font { color: #c7d8ea !important; }",
+    "#space [style*=\"color:#000\"], #space [style*=\"color: #000\"], #space [style*=\"color:black\"], #space [style*=\"color: black\"], #space font[color=\"#000000\"], #space font[color=\"#000\"], #space font[color=\"black\"] { color: #c7d8ea !important; }",
+    "#space .d a, #space .blog a, #space .blogbody a, #space .blogcontent a, #space .article a, #space .message a, #space .content a { color: #7dbdf2 !important; }",
     "/* 头像与日志缩略图边框（原 #FCF4CF 米色底） */",
     "#space .user_avatar, #space .xld .atc img, #space .summaryimg { border-color: #274766 !important; background: #1f2c3d !important; }",
     "/* 留言板输入框 */",
@@ -482,7 +493,14 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".edt .bbar, #e_bbar { background: #182332 !important; border-color: #274766 !important; }",
     ".edt .bbar, .edt .bbar a, #e_bbar a, #e_tip { color: #8099b2 !important; }",
     "/* 主题栏「修改」链接与标题输入区文字 */",
-    ".pg_post .pbt, .pg_post #subjecthide { color: #c7d8ea !important; }"
+    ".pg_post .pbt, .pg_post #subjecthide { color: #c7d8ea !important; }",
+    "/* Private-message reply form uses the compact .tedt editor outside thread pages. */",
+    "#pmform, #pmform .tedt, #pmform .tedt .bar, #pmform .tedt .area, #pmform .mtn { background: #182332 !important; color: #c7d8ea !important; border-color: #274766 !important; }",
+    "#pmform .tedt .pt, #pmform textarea, #pmform input[type=\"text\"] { background-color: #223247 !important; background-image: none !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "#pmform .tedt .bar a { background-color: transparent !important; border-color: transparent !important; color: #c7d8ea !important; filter: invert(1) brightness(1.15) !important; }",
+    "#pmform .pn { background: #274766 !important; background-image: none !important; color: #c7d8ea !important; border-color: #4b6a8f !important; text-shadow: none !important; box-shadow: none !important; }",
+    "#pmform .pnc, #pmform .pn.pnc { background: #31577a !important; background-image: none !important; color: #ffffff !important; border-color: #4ea1ff !important; }",
+    "#pmform .pn strong, #pmform #pmforum_return { color: inherit !important; }"
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
