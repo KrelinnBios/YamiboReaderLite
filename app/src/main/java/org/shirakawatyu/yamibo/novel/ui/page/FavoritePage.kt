@@ -527,7 +527,7 @@ fun FavoritePage(
         }
     }
 
-    // 底部悬浮管理栏里的单个操作：图标在上、文字在下，四个按钮等宽，文字不换行。
+    // 底部悬浮管理栏里的单个操作：图标在左、文字在右，紧凑排布，文字不换行。
     @Composable
     fun ManageActionButton(
         label: String,
@@ -535,19 +535,19 @@ fun FavoritePage(
         onClick: () -> Unit,
         icon: @Composable () -> Unit
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             icon()
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.width(4.dp))
             Text(
                 text = label,
                 color = tint,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 maxLines = 1,
                 softWrap = false
             )
@@ -901,8 +901,8 @@ fun FavoritePage(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val neutral = MaterialTheme.colorScheme.onSurfaceVariant
