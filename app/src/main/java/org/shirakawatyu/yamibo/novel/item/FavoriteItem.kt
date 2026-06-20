@@ -104,6 +104,7 @@ fun FavoriteItem(
     type: Int = 0,
     cacheInfo: FavoriteVM.CacheInfo? = null,
     mangaCachedPages: Int = 0,
+    mangaCacheBytes: Long = 0,
     hasUpdate: Boolean = false,
     isCheckingUpdate: Boolean = false,
     autoCheckEnabled: Boolean = false,
@@ -260,7 +261,11 @@ fun FavoriteItem(
                                 Text(
                                     color = MaterialTheme.colorScheme.primary,
                                     fontSize = 12.sp,
-                                    text = "已缓存 $mangaCachedPages 页"
+                                    text = if (mangaCacheBytes > 0) {
+                                        "已缓存 $mangaCachedPages 页 (${formatFileSize(mangaCacheBytes)})"
+                                    } else {
+                                        "已缓存 $mangaCachedPages 页"
+                                    }
                                 )
                             }
                         }

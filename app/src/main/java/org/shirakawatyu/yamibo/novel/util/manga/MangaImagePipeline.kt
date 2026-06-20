@@ -777,6 +777,18 @@ object MangaImagePipeline {
             }
     }
 
+    /** 统计给定图片 URL 在磁盘缓存中的实际字节大小（仅计已命中的快照）。 */
+    fun sumDiskCachedBytes(context: Context, urls: List<String>): Long {
+        val diskCache = context.applicationContext.imageLoader.diskCache ?: return 0L
+        return urls
+            .distinctBy(::cacheKey)
+            .sumOf { url ->
+                openSnapshot(diskCache, cacheKey(url))?.use { snapshot ->
+                    runCatching { snapshot.data.toFile().length() }.getOrDefault(0L)
+                } ?: 0L
+            }
+    }
+
     private fun cacheBustingUrl(url: String, forceVersion: Int): String {
         if (forceVersion <= 0) return url
         return if (url.contains("?")) "$url&_t=$forceVersion" else "$url?_t=$forceVersion"

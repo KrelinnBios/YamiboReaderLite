@@ -30,6 +30,8 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "#nv, #nv ul, #nv li, #nv li a { background: #121b27 !important; border-color: #274766 !important; }",
     "#nv li.a, #nv li.a a, #nv li a:hover { background: #274766 !important; color: #ffffff !important; }",
     "#qmenu, #qmenu_menu, #visitedforums_menu, #fjump_menu { background: #182332 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
+    "/* 家园/空间页（pg_space/pg_spacecp）顶部自定义导航条容器：站点原为米色，单独补深色（背景重写为 background-color，保留可能的背景图）。内部 .nvv/.z 主导航与 .header-tool 用户工具的文字/链接已由 .z/.y/.pg_space a 等规则覆盖。 */",
+    ".oyheader, .header-stackup { background: #0d141d !important; border-color: #274766 !important; }",
     "/* 论坛首页/页头的百合会 logo（#boardlogo）是棕红色图，深色页头上几乎贴底看不见， */",
     "/* 用暗黑图片惯用滤镜反相点亮、保留暖色调，让它变成清晰可见的浅色 logo。 */",
     "#boardlogo, .boardlogo { filter: invert(1) hue-rotate(180deg) !important; }",

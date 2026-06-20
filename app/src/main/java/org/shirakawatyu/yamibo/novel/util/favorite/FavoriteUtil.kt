@@ -229,6 +229,7 @@ class FavoriteUtil {
                         favId = obj.getString("favId"),
                         sourceFid = obj.getString("sourceFid"),
                         mangaCachedPages = obj.getIntValue("mangaCachedPages"),
+                        mangaCacheBytes = obj.getLongValue("mangaCacheBytes"),
                         mangaCacheUrls = obj.getJSONArray("mangaCacheUrls")
                             ?.mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
                             .orEmpty(),
@@ -338,6 +339,7 @@ class FavoriteUtil {
                         changed = true
                         favorite.copy(
                             mangaCachedPages = 0,
+                            mangaCacheBytes = 0,
                             mangaCacheUrls = emptyList()
                         )
                     } else {

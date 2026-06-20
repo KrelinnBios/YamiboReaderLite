@@ -26,6 +26,7 @@ data class Favorite(
     var favId: String? = null,
     var sourceFid: String? = null,
     var mangaCachedPages: Int = 0,
+    var mangaCacheBytes: Long = 0,
     var mangaCacheUrls: List<String> = emptyList(),
     var pinAnchorUrl: String? = null,
 )

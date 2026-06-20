@@ -674,6 +674,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     fun updateMangaCachedPages(
         favoriteUrl: String,
         cachedPages: Int,
+        cachedBytes: Long = 0,
         cachedUrls: List<String> = emptyList()
     ) {
         if (cachedPages < 0) return
@@ -690,12 +691,14 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                             .toList()
                             .takeLast(MANGA_CACHE_URL_LIMIT)
                         if (favorite.mangaCachedPages == cachedPages &&
+                            favorite.mangaCacheBytes == cachedBytes &&
                             favorite.mangaCacheUrls == mergedUrls
                         ) {
                             return@map favorite
                         }
                         favorite.copy(
                             mangaCachedPages = cachedPages,
+                            mangaCacheBytes = cachedBytes,
                             mangaCacheUrls = mergedUrls
                         ).also {
                             updatedFavorite = it
@@ -734,6 +737,12 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         else newSelections.add(url)
 
         _uiState.update { it.copy(selectedItems = newSelections) }
+    }
+
+    /** 设置当前选中集合（用于「全选/取消全选」）。 */
+    fun setSelectedItems(urls: Set<String>) {
+        if (!_uiState.value.isInManageMode) return
+        _uiState.update { it.copy(selectedItems = urls) }
     }
 
     fun hideSelectedItems() {
@@ -832,21 +841,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 }
             }
         }
-    }
-
-    fun deleteAllFavorites(onToast: (String) -> Unit) {
-        val favoritesToDelete = allFavorites
-        if (favoritesToDelete.isEmpty()) {
-            onToast("暂无收藏")
-            return
-        }
-        if (favoritesToDelete.any { it.favId.isNullOrBlank() }) {
-            onToast("收藏数据不完整，请刷新后重试")
-            return
-        }
-        val allUrls = favoritesToDelete.map { it.url }.toSet()
-        _uiState.update { it.copy(selectedItems = allUrls) }
-        deleteSelectedFavorites(onToast)
     }
 
     private fun refreshCacheInfo(index: Map<String, LocalCacheUtil.CacheIndex>) {
@@ -992,6 +986,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                             if (usedLegacyFallback || item.url == normalizedUrl) {
                                 item.copy(
                                     mangaCachedPages = 0,
+                                    mangaCacheBytes = 0,
                                     mangaCacheUrls = emptyList()
                                 )
                             } else {

@@ -793,12 +793,14 @@ fun NativeMangaPage(
             }
             LaunchedEffect(pageUrls, currentIndex) {
                 delay(1200)
-                val cachedPages = withContext(Dispatchers.IO) {
-                    MangaImagePipeline.countDiskCachedPages(context, pageUrls)
+                val (cachedPages, cachedBytes) = withContext(Dispatchers.IO) {
+                    MangaImagePipeline.countDiskCachedPages(context, pageUrls) to
+                            MangaImagePipeline.sumDiskCachedBytes(context, pageUrls)
                 }
                 favoriteVM.updateMangaCachedPages(
                     favoriteUrl = originalUrl,
                     cachedPages = cachedPages,
+                    cachedBytes = cachedBytes,
                     cachedUrls = pageUrls
                 )
             }

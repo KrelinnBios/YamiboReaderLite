@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -109,7 +110,6 @@ import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.AutoCheckSection
-import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteDeleteAllButton
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteManageDoneButton
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
@@ -160,7 +160,6 @@ fun FavoritePage(
             favoriteVM.isFavoritePageVisible = false
         }
     }
-    var showDeleteAllFavoritesDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var itemActionTarget by remember { mutableStateOf<Favorite?>(null) }
     var singleDeleteTarget by remember { mutableStateOf<Favorite?>(null) }
@@ -491,10 +490,22 @@ fun FavoritePage(
 
     @Composable
     fun MoreOptionsButton() {
-        FavoriteDeleteAllButton(
-            enabled = favoriteList.isNotEmpty(),
-            onDeleteAll = { showDeleteAllFavoritesDialog = true }
-        )
+        val enabled = favoriteList.isNotEmpty()
+        IconButton(
+            onClick = { if (enabled) favoriteVM.toggleManageMode() },
+            enabled = enabled,
+            modifier = Modifier
+                .size(44.dp)
+                .padding(end = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Checklist,
+                contentDescription = "管理收藏",
+                modifier = Modifier.size(23.dp),
+                tint = if (enabled) topBarContentColor
+                else topBarContentColor.copy(alpha = 0.38f)
+            )
+        }
     }
 
     Column(
@@ -783,6 +794,7 @@ fun FavoritePage(
                         type = item.type,
                         cacheInfo = cacheInfoMap[item.url],
                         mangaCachedPages = item.mangaCachedPages,
+                        mangaCacheBytes = item.mangaCacheBytes,
                         hasUpdate = hasUpdate,
                         isCheckingUpdate = isCheckingUpdate,
                         autoCheckEnabled = autoCheckEnabled,
@@ -851,6 +863,24 @@ fun FavoritePage(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val allSelected = searchedFavoriteList.isNotEmpty() &&
+                                selectedItems.size >= searchedFavoriteList.size &&
+                                searchedFavoriteList.all { selectedItems.contains(it.url) }
+                        TextButton(
+                            onClick = {
+                                favoriteVM.setSelectedItems(
+                                    if (allSelected) emptySet()
+                                    else searchedFavoriteList.map { it.url }.toSet()
+                                )
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Text(if (allSelected) "取消" else "全选")
+                        }
+
                         TextButton(
                             onClick = { favoriteVM.hideSelectedItems() },
                             colors = ButtonDefaults.textButtonColors(
@@ -1120,48 +1150,7 @@ fun FavoritePage(
                 }
             )
         }
-        if (showDeleteAllFavoritesDialog) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAllFavoritesDialog = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.error,
-                textContentColor = MaterialTheme.colorScheme.onSurface,
-                title = {
-                    Text(
-                        "删除所有收藏",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 18.sp
-                    )
-                },
-                text = {
-                    Text(
-                        "确定要删除所有收藏吗？此操作不可撤销。",
-                        fontSize = 15.sp
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAllFavoritesDialog = false
-                            favoriteVM.deleteAllFavorites { message ->
-                                YamiboToast.show(context = context, message = message)
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("确定", fontSize = 15.sp)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAllFavoritesDialog = false }) {
-                        Text("取消", fontSize = 15.sp)
-                    }
-                }
-            )
-        }
-        // DNS确认对话框
+        // 多选删除确认对话框
         if (showDeleteConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteConfirmDialog = false },
