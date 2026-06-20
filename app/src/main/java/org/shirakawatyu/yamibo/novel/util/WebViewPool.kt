@@ -261,6 +261,10 @@ object WebViewPool {
             settings.apply {
                 javaScriptEnabled = true
                 useWideViewPort = true
+                // 电脑版页面（约 980px 宽版布局）需要 overview 模式缩放到屏宽，
+                // 否则页面超出屏幕、右侧浮动的提交按钮等被挤出可视区（浏览器默认就是 fit-to-width）。
+                // 手机版页面 viewport 已是 device-width，开启后不受影响。与其余 WebView 设置保持一致。
+                loadWithOverviewMode = true
                 domStorageEnabled = true
                 loadsImagesAutomatically = false
                 blockNetworkImage = true
