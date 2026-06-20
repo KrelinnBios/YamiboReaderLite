@@ -340,6 +340,8 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     "#poll table, #poll tbody, #poll tr, #poll td, #poll th, #poll .pcht { background: transparent !important; }",
     "/* 彩条轨道给一个微弱底色，深色背景下能看出每条的长度比例 */",
     "#poll .pbg { background: rgba(255,255,255,0.10) !important; }",
+    "/* 家园侧栏「资料完成度」进度条：站点轨道是浅灰(#eee + #ccc 边框)，深色下是一截亮条；轨道压暗、边框转深，进度块 .pbr 的颜色保留不动 */",
+    ".pbg { background: rgba(255,255,255,0.08) !important; border-color: #3c5677 !important; }",
     "/* === 电脑版帖子页：楼层分隔线 / 各类衬线统一深蓝 === */",
     ".pg_viewthread #ct, .pg_viewthread #postlist, .pg_viewthread .pl, .pg_viewthread .pi, .pg_viewthread .pil, .pg_viewthread .pti, .pg_viewthread .po, .pg_viewthread .pob, .pg_viewthread .pdbt, .pg_viewthread .psth, .pg_viewthread .sign, .pg_viewthread .plc, .pg_viewthread .pls, .pg_viewthread .pct, .pg_viewthread .pcb, .pg_viewthread .plhin, .pg_viewthread .pm2, .pg_viewthread .tns, .pg_viewthread .tns th, .pg_viewthread .tns td, .pg_viewthread .t_fsz, .pg_viewthread .ad, .pg_viewthread .t_table, .pg_viewthread .t_table td, .pg_viewthread .p_tbl td, .pg_viewthread .cgtl td, .pg_viewthread .cgtl th, .pg_viewthread .cgtl caption { border-color: #274766 !important; }",
     "/* === 评分区（rate）=== */",
