@@ -1162,10 +1162,31 @@ $styleString
     }
 
     fun injectThemeCssIntoHtml(html: String, isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
+        val fixed = fixDesktopViewport(html)
         return when {
-            isDark -> injectDarkModeCssIntoHtml(html, darkThemeId)
-            else -> injectLightModeCssIntoHtml(html, lightThemeId)
+            isDark -> injectDarkModeCssIntoHtml(fixed, darkThemeId)
+            else -> injectLightModeCssIntoHtml(fixed, lightThemeId)
         }
+    }
+
+    private val VIEWPORT_META_REGEX =
+        Regex("<meta[^>]*name=[\"']viewport[\"'][^>]*>", RegexOption.IGNORE_CASE)
+
+    /**
+     * 电脑版页面（Discuz 桌面模板，含 id="toptb"）的 body 是 min-width:1200px、.wp 固定 1200px 的宽版布局，
+     * 但服务器仍下发 width=device-width 的 viewport meta。该 meta 会让 WebView 以 1.0 缩放在窄屏渲染 1200px 布局，
+     * 导致右侧（含浮动的提交按钮等）被挤出屏幕看不到——而浏览器窗口够宽所以正常。
+     * 这里把它改成 width=1200，配合 useWideViewPort + loadWithOverviewMode 把整页缩放到屏宽，和浏览器表现一致。
+     * 手机版页面没有 id="toptb"，保持原 width=device-width 不动。会员 DIY 空间也是桌面布局，同样需要修正，
+     * 因此在 CSS 注入（含 DIY 早返回）之前先处理。
+     */
+    private fun fixDesktopViewport(html: String): String {
+        if (!html.contains("id=\"toptb\"")) return html
+        if (!VIEWPORT_META_REGEX.containsMatchIn(html)) return html
+        return VIEWPORT_META_REGEX.replace(
+            html,
+            "<meta name=\"viewport\" content=\"width=1200, user-scalable=yes\">"
+        )
     }
 
     fun getForumBlockerJs(enabled: Boolean, itemsJson: String, isDark: Boolean, selfUid: String = ""): String {
