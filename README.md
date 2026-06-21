@@ -1,7 +1,7 @@
 # YamiboReaderLite
 
 <p align="center">
-  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="96" alt="300 Lite">
+  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="120" alt="300 Lite">
 </p>
 
 <p align="center">
