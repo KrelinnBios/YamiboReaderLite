@@ -1083,11 +1083,15 @@ fun MinePage(
                 ) {
                     val html = YamiboRetrofit.proxyHtmlForDarkMode(request)
                     if (html != null) {
+                        val dm = context.resources.displayMetrics
+                        val widthPx = (view?.width ?: 0).takeIf { it > 0 } ?: dm.widthPixels
+                        val desktopFitScale = PageJsScripts.calculateDesktopFitScale(widthPx, dm.density)
                         val modified = PageJsScripts.injectThemeCssIntoHtml(
                             html,
                             GlobalData.isDarkMode.value,
                             GlobalData.darkModeTheme.value,
-                            GlobalData.lightModeTheme.value
+                            GlobalData.lightModeTheme.value,
+                            desktopFitScale
                         )
                         return WebResourceResponse(
                             "text/html",

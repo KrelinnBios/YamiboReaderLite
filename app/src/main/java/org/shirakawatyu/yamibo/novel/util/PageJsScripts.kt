@@ -1161,6 +1161,12 @@ $styleString
         return "$darkJs\n$lightJs"
     }
 
+    fun calculateDesktopFitScale(widthPx: Int, density: Float): Double {
+        if (widthPx <= 0 || density <= 0f) return 0.0
+        val widthDp = widthPx / density
+        return if (widthDp > 0f) (widthDp / DESKTOP_LAYOUT_WIDTH_DP).toDouble() else 0.0
+    }
+
     /**
      * @param desktopFitScale 电脑版页面要写入 viewport 的 initial-scale（把 1200px 布局缩放到屏宽）。
      *   传 0 表示不写显式缩放、退回 loadWithOverviewMode 自动缩放。由调用方按实际屏宽算出（屏宽dp / 1200）。
@@ -1172,15 +1178,20 @@ $styleString
         lightThemeId: Int,
         desktopFitScale: Double = 0.0
     ): String {
-        val fixed = fixDesktopViewport(html, desktopFitScale)
+        val fixed = applyDesktopViewportForWebView(html, desktopFitScale)
         return when {
             isDark -> injectDarkModeCssIntoHtml(fixed, darkThemeId)
             else -> injectLightModeCssIntoHtml(fixed, lightThemeId)
         }
     }
 
+    private const val DESKTOP_LAYOUT_WIDTH_DP = 1200f
+
     private val VIEWPORT_META_REGEX =
         Regex("<meta[^>]*name=[\"']viewport[\"'][^>]*>", RegexOption.IGNORE_CASE)
+    private val HEAD_OPEN_REGEX = Regex("<head\\b[^>]*>", RegexOption.IGNORE_CASE)
+    private val TOPTB_ID_REGEX =
+        Regex("""\bid\s*=\s*(?:"toptb"|'toptb'|toptb)(?=[\s>])""", RegexOption.IGNORE_CASE)
 
     /**
      * 电脑版页面（Discuz 桌面模板，含 id="toptb"）的 body 是 min-width:1200px、.wp 固定 1200px 的宽版布局，
@@ -1190,19 +1201,23 @@ $styleString
      * loadWithOverviewMode 在部分机型/页面上不会真正缩放）。手机版页面没有 id="toptb"，保持原
      * width=device-width 不动。会员 DIY 空间也是桌面布局，同样需要修正，因此在 CSS 注入（含 DIY 早返回）之前先处理。
      */
-    private fun fixDesktopViewport(html: String, desktopFitScale: Double): String {
-        if (!html.contains("id=\"toptb\"")) return html
-        if (!VIEWPORT_META_REGEX.containsMatchIn(html)) return html
+    fun applyDesktopViewportForWebView(html: String, desktopFitScale: Double = 0.0): String {
+        if (!TOPTB_ID_REGEX.containsMatchIn(html)) return html
         val content = if (desktopFitScale > 0.0) {
             val scale = String.format(java.util.Locale.US, "%.3f", desktopFitScale)
             "width=1200, initial-scale=$scale, user-scalable=yes"
         } else {
             "width=1200, user-scalable=yes"
         }
-        return VIEWPORT_META_REGEX.replace(
-            html,
-            "<meta name=\"viewport\" content=\"$content\">"
-        )
+        val viewportTag = "<meta name=\"viewport\" content=\"$content\">"
+        if (VIEWPORT_META_REGEX.containsMatchIn(html)) {
+            return VIEWPORT_META_REGEX.replace(html, viewportTag)
+        }
+        val headMatch = HEAD_OPEN_REGEX.find(html)
+        if (headMatch != null) {
+            return html.replaceRange(headMatch.range.last + 1, headMatch.range.last + 1, viewportTag)
+        }
+        return viewportTag + html
     }
 
     fun getForumBlockerJs(enabled: Boolean, itemsJson: String, isDark: Boolean, selfUid: String = ""): String {

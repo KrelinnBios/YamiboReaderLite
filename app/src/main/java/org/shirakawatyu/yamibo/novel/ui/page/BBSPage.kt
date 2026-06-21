@@ -340,8 +340,7 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
                 // 电脑版页面整页缩放到屏宽所需的 initial-scale = 屏宽dp / 1200。
                 val dm = context.resources.displayMetrics
                 val widthPx = (view?.width ?: 0).takeIf { it > 0 } ?: dm.widthPixels
-                val widthDp = widthPx / dm.density
-                val desktopFitScale = if (widthDp > 0f) (widthDp / 1200f).toDouble() else 0.0
+                val desktopFitScale = PageJsScripts.calculateDesktopFitScale(widthPx, dm.density)
                 val modified = PageJsScripts.injectThemeCssIntoHtml(
                     html,
                     GlobalData.isDarkMode.value,

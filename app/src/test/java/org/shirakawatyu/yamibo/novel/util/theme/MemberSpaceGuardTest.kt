@@ -1,5 +1,6 @@
 package org.shirakawatyu.yamibo.novel.util.theme
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,5 +42,42 @@ class MemberSpaceGuardTest {
             PageJsScripts.getDarkModeSetJs(enable = true)
                 .contains(MemberSpaceGuard.jsExpression())
         )
+    }
+
+    @Test
+    fun desktopViewportIsReplacedOrInsertedForDesktopPages() {
+        val withViewport = """
+            <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body><div id="toptb"></div></body></html>
+        """.trimIndent()
+
+        val replaced = PageJsScripts.applyDesktopViewportForWebView(withViewport, 0.375)
+        assertTrue(
+            replaced.contains(
+                "<meta name=\"viewport\" content=\"width=1200, initial-scale=0.375, user-scalable=yes\">"
+            )
+        )
+        assertFalse(replaced.contains("width=device-width"))
+
+        val missingViewport = "<html><head><title>x</title></head><body><div id='toptb'></div></body></html>"
+        val inserted = PageJsScripts.applyDesktopViewportForWebView(missingViewport, 0.3)
+        assertTrue(
+            inserted.contains(
+                "<head><meta name=\"viewport\" content=\"width=1200, initial-scale=0.300, user-scalable=yes\"><title>x</title>"
+            )
+        )
+    }
+
+    @Test
+    fun nonDesktopPagesKeepTheirViewport() {
+        val mobile = "<html><head><meta name=\"viewport\" content=\"width=device-width\"></head><body id=\"nv_forum\"></body></html>"
+        assertEquals(mobile, PageJsScripts.applyDesktopViewportForWebView(mobile, 0.3))
+    }
+
+    @Test
+    fun desktopFitScaleUsesDensityIndependentWidth() {
+        assertEquals(0.3, PageJsScripts.calculateDesktopFitScale(widthPx = 1080, density = 3f), 0.0001)
+        assertEquals(0.0, PageJsScripts.calculateDesktopFitScale(widthPx = 0, density = 3f), 0.0001)
+        assertEquals(0.0, PageJsScripts.calculateDesktopFitScale(widthPx = 1080, density = 0f), 0.0001)
     }
 }
