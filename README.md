@@ -1,18 +1,13 @@
 # YamiboReaderLite
 
-<p align="center">
-  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="120" alt="300 Lite">
-</p>
+面向百合会论坛的非官方 Android 阅读客户端，应用内名称为 300 Lite。
 
+- 项目类型：Android 应用
+- 下载方式：<https://github.com/KrelinnBios/YamiboReaderLite/releases>
 
-<p align="center">
-  <strong>300 Lite</strong><br>
-  面向百合会论坛的非官方 Android 阅读客户端
-</p>
+## 项目简介
 
-
-> [!IMPORTANT]
-> YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
+YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
 
 当前 Lite 版本将百合会论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读整合在同一个应用中。其界面、功能和行为已经过调整，与上游项目并不完全相同；以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
 
@@ -31,16 +26,6 @@
 - 缓存维护：小说页面与漫画图片缓存、定期清理和版本更新检查。
 - 崩溃兜底：拦截后台线程异常以减少闪退，并记录崩溃日志便于排查问题。
 
-## 下载
-
-从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 APK。
-
-应用启动时会通过 GitHub Releases API 检查新版本，也可以在设置页随时手动检查更新。检测到更新后可以在应用内下载并调起系统安装器：下载优先走 GitHub 直链，连不上时自动按序回退多个镜像源，并严格校验下载到的版本与提示版本一致后才安装，避免装到错误版本；如果所有下载源或安装器启动均失败，应用会提供 Releases 手动下载入口。
-
-系统要求：Android 7.0（API 24）及以上。
-
-## 截图
-
 <p align="center">
   <img src="screenshots/1.png" width="19%" alt="漫画发现">
   <img src="screenshots/2.png" width="19%" alt="漫画目录编辑">
@@ -48,7 +33,6 @@
   <img src="screenshots/4.png" width="19%" alt="小说阅读">
   <img src="screenshots/5.png" width="19%" alt="浏览历史">
 </p>
-
 
 <p align="center">
   <img src="screenshots/6.png" width="19%" alt="论坛浏览">
@@ -58,14 +42,45 @@
   <img src="screenshots/10.png" width="19%" alt="黑名单">
 </p>
 
+## 使用方式
+
+### 安装使用
+
+从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 APK 后安装。
+
+系统要求：Android 7.0（API 24）及以上。
+
+应用启动时会通过 GitHub Releases API 检查新版本，也可以在设置页手动检查更新。检测到更新后可以在应用内下载并调起系统安装器；如果自动下载或安装器启动失败，应用会提供 Releases 手动下载入口。
+
+### 从源码构建
+
+需要 JDK 17 和 Android SDK 34。Windows 环境可执行：
+
+```powershell
+.\gradlew.bat --no-daemon assembleDebug
+```
+
+构建产物位于 `app/build/outputs/apk/` 下，APK 文件名固定为 `300 Lite.apk`。
+
+正式 Release 构建需要配置签名环境变量或 GitHub Actions Secrets，详见 [.github/workflows/build-apk.yml](./.github/workflows/build-apk.yml)。
+
+## 技术信息
+
+- 主要技术：Kotlin、Jetpack Compose、Android WebView、Retrofit/OkHttp。
+- Android 配置：`applicationId` 为 `com.krelinnbios.yamiboreaderlite`，`minSdk` 24，`targetSdk` 34。
+- 构建配置：Gradle Wrapper、Android Gradle Plugin、JDK 17、Android SDK 34。
+- 更新机制：通过 GitHub Releases API 检查版本，并对下载到的 APK 做版本与签名校验。
+- 上游来源：[prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)。
 
 ## 内容边界
 
-本项目与百合会论坛运营方无隶属关系，请遵守论坛规则及所在地法律法规。
+- 本项目为非官方客户端，与百合会论坛运营方无隶属关系。
+- 请遵守百合会论坛规则、版权要求以及所在地法律法规。
+- 本项目基于上游项目继续开发，相关来源与许可证信息请同时参考本仓库的 [LICENSE](./LICENSE) 和 [NOTICE](./NOTICE)。
 
 ## 许可协议
 
-本项目依据 [GNU AGPL-3.0](LICENSE) 发布。
+本项目依据 [GNU AGPL-3.0](./LICENSE) 发布。
 
 相关项目：
 
