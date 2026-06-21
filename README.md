@@ -1,13 +1,21 @@
 # YamiboReaderLite
 
-面向百合会论坛的非官方 Android 阅读客户端，应用内名称为 300 Lite。
+<p align="center">
+  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="120" alt="300 Lite">
+</p>
+
+<p align="center">
+  <strong>300 Lite</strong><br>
+  面向百合会论坛的非官方 Android 阅读客户端
+</p>
+
+> [!IMPORTANT]
+> YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
 
 - 项目类型：Android 应用
 - 下载方式：<https://github.com/KrelinnBios/YamiboReaderLite/releases>
 
 ## 项目简介
-
-YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
 
 当前 Lite 版本将百合会论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读整合在同一个应用中。其界面、功能和行为已经过调整，与上游项目并不完全相同；以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
 
