@@ -98,6 +98,18 @@ jobs:
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
 
+      # 校验产物确实被正确签名，避免「Gradle 没报错但实际未签名/签错」流出。
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          apksigner="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          if [ ! -x "$apksigner" ]; then
+            echo "❌ apksigner not found at $apksigner"
+            exit 1
+          fi
+          "$apksigner" verify --verbose --print-certs \
+            "app/build/outputs/apk/release/300 Lite.apk"
+
       - name: Prepare APK
         shell: bash
         run: |
