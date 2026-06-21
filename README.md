@@ -13,7 +13,7 @@
 > YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
 
 - 项目类型：Android 应用
-- 下载方式：<https://github.com/KrelinnBios/YamiboReaderLite/releases>
+- 下载方式：[Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases)
 
 ## 项目简介
 
