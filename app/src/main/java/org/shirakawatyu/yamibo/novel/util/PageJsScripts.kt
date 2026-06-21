@@ -1319,8 +1319,9 @@ $styleString
                             'a.yamibo-block-action{background:transparent!important;border:0!important;box-shadow:none!important;font:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
                             // 列表页：容器 <li> 不加任何样式类，直接复用站点 .threadlist_foot li 的胶囊样式
                             // （float:left、内边距、圆角、深色边框），从而与浏览数/回复数按钮完全对齐。
-                            // 内部 <a> 保持纯内联文本，字号随 foot 继承，和数字“95/12”同一基线。
-                            '.threadlist_foot li.yamibo-block-li a.yamibo-block-action{display:inline!important;padding:0!important;margin:0!important;line-height:inherit!important;}' +
+                            // 内部 <a> 按原生浏览/评论按钮的行高继承，只把图标和文字做水平居中。
+                            '.threadlist_foot li.yamibo-block-li a.yamibo-block-action{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:2px!important;padding:0!important;margin:0!important;line-height:inherit!important;vertical-align:baseline!important;color:inherit!important;}' +
+                            '.threadlist_foot li.yamibo-block-li .yamibo-block-icon{display:inline-block!important;width:1em!important;height:1em!important;line-height:1!important;margin:0!important;vertical-align:-0.125em!important;fill:currentColor!important;color:inherit!important;flex:0 0 auto!important;}' +
                             // 帖子页：按钮在用户名后内联显示，间距由前面插入的四个不可断空格决定，这里清零边距。
                             '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
@@ -1466,12 +1467,12 @@ $styleString
                         return action;
                     }
 
-                    // 列表页（大区帖子列表）的屏蔽按钮加上图标，与旁边的浏览数(dm-eye-fill)、
-                    // 评论数(dm-chat-s-fill)按钮保持一致；颜色由站点 .threadlist_foot i/a 规则统一。
+                    // 列表页（大区帖子列表）的屏蔽按钮加上闭眼图标，与旁边的浏览数(dm-eye-fill)、
+                    // 评论数(dm-chat-s-fill)按钮保持一致；颜色和字号由 .threadlist_foot 继承。
                     // 帖子页内的屏蔽按钮不走这里，保持纯文字。
                     // 屏蔽后整行会被隐藏、由占位提示里的「取消屏蔽」撤销，所以这里固定只显示「屏蔽」。
                     function setListActionLabel(action) {
-                        action.innerHTML = '<i class="dm-minus-c"></i>屏蔽';
+                        action.innerHTML = '<svg class="yamibo-block-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12,7c2.76,0 5,2.24 5,5 0,0.65 -0.13,1.26 -0.36,1.83l2.92,2.92c1.51,-1.26 2.7,-2.89 3.43,-4.75 -1.73,-4.39 -6,-7.5 -11,-7.5 -1.4,0 -2.74,0.25 -3.98,0.7l2.16,2.16C10.74,7.13 11.35,7 12,7zM2,4.27l2.28,2.28 0.46,0.46C3.08,8.3 1.78,10.02 1,12c1.73,4.39 6,7.5 11,7.5 1.55,0 3.03,-0.3 4.38,-0.84l0.42,0.42L19.73,22 21,20.73 3.27,3 2,4.27zM7.53,9.8l1.55,1.55c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.66 1.34,3 3,3 0.22,0 0.44,-0.03 0.65,-0.08l1.55,1.55c-0.67,0.33 -1.41,0.53 -2.2,0.53 -2.76,0 -5,-2.24 -5,-5 0,-0.79 0.2,-1.53 0.53,-2.2zM11.84,9.02l3.15,3.15 0.02,-0.16c0,-1.66 -1.34,-3 -3,-3l-0.17,0.01z"></path></svg><span class="yamibo-block-label">屏蔽</span>';
                     }
 
                     // 从行/楼层里尽量取作者用户名（带文字的「空间链接」）。
