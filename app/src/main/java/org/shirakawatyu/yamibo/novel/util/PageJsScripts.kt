@@ -1161,8 +1161,18 @@ $styleString
         return "$darkJs\n$lightJs"
     }
 
-    fun injectThemeCssIntoHtml(html: String, isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
-        val fixed = fixDesktopViewport(html)
+    /**
+     * @param desktopFitScale 电脑版页面要写入 viewport 的 initial-scale（把 1200px 布局缩放到屏宽）。
+     *   传 0 表示不写显式缩放、退回 loadWithOverviewMode 自动缩放。由调用方按实际屏宽算出（屏宽dp / 1200）。
+     */
+    fun injectThemeCssIntoHtml(
+        html: String,
+        isDark: Boolean,
+        darkThemeId: Int,
+        lightThemeId: Int,
+        desktopFitScale: Double = 0.0
+    ): String {
+        val fixed = fixDesktopViewport(html, desktopFitScale)
         return when {
             isDark -> injectDarkModeCssIntoHtml(fixed, darkThemeId)
             else -> injectLightModeCssIntoHtml(fixed, lightThemeId)
@@ -1176,16 +1186,22 @@ $styleString
      * 电脑版页面（Discuz 桌面模板，含 id="toptb"）的 body 是 min-width:1200px、.wp 固定 1200px 的宽版布局，
      * 但服务器仍下发 width=device-width 的 viewport meta。该 meta 会让 WebView 以 1.0 缩放在窄屏渲染 1200px 布局，
      * 导致右侧（含浮动的提交按钮等）被挤出屏幕看不到——而浏览器窗口够宽所以正常。
-     * 这里把它改成 width=1200，配合 useWideViewPort + loadWithOverviewMode 把整页缩放到屏宽，和浏览器表现一致。
-     * 手机版页面没有 id="toptb"，保持原 width=device-width 不动。会员 DIY 空间也是桌面布局，同样需要修正，
-     * 因此在 CSS 注入（含 DIY 早返回）之前先处理。
+     * 这里把它改成 width=1200，并写入按屏宽算出的 initial-scale，把整页确定性地缩放到屏宽（仅靠
+     * loadWithOverviewMode 在部分机型/页面上不会真正缩放）。手机版页面没有 id="toptb"，保持原
+     * width=device-width 不动。会员 DIY 空间也是桌面布局，同样需要修正，因此在 CSS 注入（含 DIY 早返回）之前先处理。
      */
-    private fun fixDesktopViewport(html: String): String {
+    private fun fixDesktopViewport(html: String, desktopFitScale: Double): String {
         if (!html.contains("id=\"toptb\"")) return html
         if (!VIEWPORT_META_REGEX.containsMatchIn(html)) return html
+        val content = if (desktopFitScale > 0.0) {
+            val scale = String.format(java.util.Locale.US, "%.3f", desktopFitScale)
+            "width=1200, initial-scale=$scale, user-scalable=yes"
+        } else {
+            "width=1200, user-scalable=yes"
+        }
         return VIEWPORT_META_REGEX.replace(
             html,
-            "<meta name=\"viewport\" content=\"width=1200, user-scalable=yes\">"
+            "<meta name=\"viewport\" content=\"$content\">"
         )
     }
 

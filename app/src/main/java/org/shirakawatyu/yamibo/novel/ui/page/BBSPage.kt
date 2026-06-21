@@ -337,11 +337,17 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
         ) {
             val html = YamiboRetrofit.proxyHtmlForDarkMode(request)
             if (html != null) {
+                // 电脑版页面整页缩放到屏宽所需的 initial-scale = 屏宽dp / 1200。
+                val dm = context.resources.displayMetrics
+                val widthPx = (view?.width ?: 0).takeIf { it > 0 } ?: dm.widthPixels
+                val widthDp = widthPx / dm.density
+                val desktopFitScale = if (widthDp > 0f) (widthDp / 1200f).toDouble() else 0.0
                 val modified = PageJsScripts.injectThemeCssIntoHtml(
                     html,
                     GlobalData.isDarkMode.value,
                     GlobalData.darkModeTheme.value,
-                    GlobalData.lightModeTheme.value
+                    GlobalData.lightModeTheme.value,
+                    desktopFitScale
                 )
                 return WebResourceResponse(
                     "text/html",
