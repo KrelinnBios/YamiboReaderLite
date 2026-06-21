@@ -1046,6 +1046,20 @@ object PageJsScripts {
                 var isMemberSpace = ($memberSpaceUrlExpression);
                 var enable = $enable && !isMemberSpace;
 
+                function yamiboUseResponsiveSpaceViewport() {
+                    if (!document.body) return;
+                    var cls = document.body.className || '';
+                    var isSpaceShell = document.body.id === 'space' || /\bpg_space(?:cp)?\b/.test(cls);
+                    if (!isSpaceShell) return;
+                    var meta = document.querySelector('meta[name="viewport"]');
+                    if (!meta) {
+                        meta = document.createElement('meta');
+                        meta.name = 'viewport';
+                        (document.head || document.documentElement).appendChild(meta);
+                    }
+                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=yes');
+                }
+
                 // 富文本编辑器（参与/回复主题）正文是独立的同源 iframe 文档，
                 // 主文档注入的 CSS 够不到它，需要单独往其 contentDocument 注入深色样式。
                 // 只在发帖/回复页（mod=post）处理，避免在其它页面空转。
@@ -1086,6 +1100,7 @@ object PageJsScripts {
                     yamiboStyleEditorFrames(false);
                     return;
                 }
+                yamiboUseResponsiveSpaceViewport();
                 if (existing) existing.remove();
                 var style = document.createElement('style');
                 style.id = styleId;
@@ -1192,18 +1207,29 @@ $styleString
     private val HEAD_OPEN_REGEX = Regex("<head\\b[^>]*>", RegexOption.IGNORE_CASE)
     private val TOPTB_ID_REGEX =
         Regex("""\bid\s*=\s*(?:"toptb"|'toptb'|toptb)(?=[\s>])""", RegexOption.IGNORE_CASE)
+    private val BODY_SPACE_ID_REGEX =
+        Regex("""<body\b[^>]*\bid\s*=\s*(?:"space"|'space'|space)(?=[\s>])""", RegexOption.IGNORE_CASE)
+    private val BODY_PG_SPACE_CLASS_REGEX =
+        Regex("""<body\b[^>]*\bclass\s*=\s*(["'])[^"']*\bpg_space(?:cp)?\b[^"']*\1""", RegexOption.IGNORE_CASE)
+
+    private fun shouldUseResponsiveSpaceViewport(html: String): Boolean {
+        if (MemberSpaceGuard.isMemberSpaceHtml(html)) return false
+        return BODY_SPACE_ID_REGEX.containsMatchIn(html) || BODY_PG_SPACE_CLASS_REGEX.containsMatchIn(html)
+    }
 
     /**
      * 电脑版页面（Discuz 桌面模板，含 id="toptb"）的 body 是 min-width:1200px、.wp 固定 1200px 的宽版布局，
      * 但服务器仍下发 width=device-width 的 viewport meta。该 meta 会让 WebView 以 1.0 缩放在窄屏渲染 1200px 布局，
      * 导致右侧（含浮动的提交按钮等）被挤出屏幕看不到——而浏览器窗口够宽所以正常。
-     * 这里把它改成 width=1200，并写入按屏宽算出的 initial-scale，把整页确定性地缩放到屏宽（仅靠
-     * loadWithOverviewMode 在部分机型/页面上不会真正缩放）。手机版页面没有 id="toptb"，保持原
-     * width=device-width 不动。会员 DIY 空间也是桌面布局，同样需要修正，因此在 CSS 注入（含 DIY 早返回）之前先处理。
+     * 普通 BLOG/空间页另有响应式 CSS 兜底，使用 width=device-width 才能避免三栏布局被裁切。
+     * 其它电脑版页面改成 width=1200，并写入按屏宽算出的 initial-scale，把整页确定性地缩放到屏宽。
+     * 仅靠 loadWithOverviewMode 在部分机型/页面上不会真正缩放。手机版页面没有 id="toptb"，保持原样。
      */
     fun applyDesktopViewportForWebView(html: String, desktopFitScale: Double = 0.0): String {
         if (!TOPTB_ID_REGEX.containsMatchIn(html)) return html
-        val content = if (desktopFitScale > 0.0) {
+        val content = if (shouldUseResponsiveSpaceViewport(html)) {
+            "width=device-width, initial-scale=1.0, user-scalable=yes"
+        } else if (desktopFitScale > 0.0) {
             val scale = String.format(java.util.Locale.US, "%.3f", desktopFitScale)
             "width=1200, initial-scale=$scale, user-scalable=yes"
         } else {
