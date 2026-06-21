@@ -69,6 +69,33 @@ class MemberSpaceGuardTest {
     }
 
     @Test
+    fun plainSpacePagesUseResponsiveViewport() {
+        val plainSpace = """
+            <html><head></head><body id="space"><div id="toptb"></div></body></html>
+        """.trimIndent()
+        val responsiveSpace = PageJsScripts.applyDesktopViewportForWebView(plainSpace, 0.3)
+        assertTrue(
+            responsiveSpace.contains(
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">"
+            )
+        )
+
+        val blogList = """
+            <html><head><meta name="viewport" content="width=device-width"></head>
+            <body id="nv_home" class="pg_space"><div id="toptb"></div></body></html>
+        """.trimIndent()
+        val responsiveBlog = PageJsScripts.applyDesktopViewportForWebView(blogList, 0.3)
+        assertTrue(responsiveBlog.contains("width=device-width, initial-scale=1.0, user-scalable=yes"))
+
+        val diySpace = """
+            <html><head></head><body id="space"><div id="toptb"></div>
+            <style>.a{background-image:url(https://bbs.yamibo.com/data/attachment/album/x.jpg)}</style></body></html>
+        """.trimIndent()
+        val fixedDiy = PageJsScripts.applyDesktopViewportForWebView(diySpace, 0.3)
+        assertTrue(fixedDiy.contains("width=1200, initial-scale=0.300, user-scalable=yes"))
+    }
+
+    @Test
     fun nonDesktopPagesKeepTheirViewport() {
         val mobile = "<html><head><meta name=\"viewport\" content=\"width=device-width\"></head><body id=\"nv_forum\"></body></html>"
         assertEquals(mobile, PageJsScripts.applyDesktopViewportForWebView(mobile, 0.3))
