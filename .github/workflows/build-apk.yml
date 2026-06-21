@@ -52,8 +52,10 @@ jobs:
       - name: Derive app version from release tag
         if: github.event_name == 'release'
         shell: bash
+        env:
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          tag="${GITHUB_REF_NAME}"
+          tag="${RELEASE_TAG_NAME:-${GITHUB_REF_NAME:-}}"
           if ! [[ "$tag" =~ ^v?[0-9]+(\.[0-9]+)*$ ]]; then
             echo "❌ Release tag '$tag' is not a version number (expected e.g. v1.0.1)."
             exit 1
