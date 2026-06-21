@@ -68,10 +68,14 @@ android {
 
     buildTypes {
         debug {
+            // 有正式签名材料时用 stable，否则回退到 AGP 自带的 debug 签名，
+            // 保证 debug 包始终被签名、可安装；不会因 stable 缺失而被置 null 变成未签名。
             signingConfig = signingConfigs.findByName("stable")
+                ?: signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
+            // release 只用正式签名；stable 缺失时保持 null（CI 会先校验 secrets，本地无密钥则产出未签名包）。
             signingConfig = signingConfigs.findByName("stable")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
