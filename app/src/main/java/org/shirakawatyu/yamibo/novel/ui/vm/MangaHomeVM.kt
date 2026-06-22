@@ -11,12 +11,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import org.jsoup.Jsoup
 import org.shirakawatyu.yamibo.novel.bean.MangaHomeItem
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.network.MangaApi
 import org.shirakawatyu.yamibo.novel.parser.MangaHtmlParser
 import org.shirakawatyu.yamibo.novel.ui.state.MangaHomeState
+import org.shirakawatyu.yamibo.novel.util.manga.MangaCoverSelector
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 
 class MangaHomeVM : ViewModel() {
@@ -302,24 +302,10 @@ class MangaHomeVM : ViewModel() {
     private suspend fun findFirstImage(tid: String): String? {
         val json = JSON.parseObject(api.getThreadDetailApi(tid).string())
         val posts = json.getJSONObject("Variables")?.getJSONArray("postlist") ?: return null
-        for (index in 0 until posts.size) {
-            val post = posts.getJSONObject(index)
-            val message = post.getString("message").orEmpty()
-            val image = Jsoup.parse(message)
-                .select("img[file], img[src]")
-                .firstOrNull()
-                ?.let { it.attr("file").ifBlank { it.attr("src") } }
-                ?.let(::absoluteUrl)
-            if (!image.isNullOrBlank()) return image
+        val messages = (0 until posts.size).map { index ->
+            posts.getJSONObject(index).getString("message").orEmpty()
         }
-        return null
-    }
-
-    private fun absoluteUrl(url: String): String = when {
-        url.startsWith("//") -> "https:$url"
-        url.startsWith("/") -> "https://bbs.yamibo.com$url"
-        url.startsWith("http") -> url
-        else -> "https://bbs.yamibo.com/$url"
+        return MangaCoverSelector.firstCoverUrl(messages)
     }
 
     private fun threadUrl(tid: String) =
