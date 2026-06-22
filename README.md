@@ -60,24 +60,9 @@
 
 应用启动时会通过 GitHub Releases API 检查新版本，也可以在设置页手动检查更新。检测到更新后可以在应用内下载并调起系统安装器；如果自动下载或安装器启动失败，应用会提供 Releases 手动下载入口。
 
-### 从源码构建
-
-需要 JDK 17 和 Android SDK 34。Windows 环境可执行：
-
-```powershell
-.\gradlew.bat --no-daemon assembleDebug
-```
-
-构建产物位于 `app/build/outputs/apk/` 下，APK 文件名固定为 `300 Lite.apk`。
-
-正式 Release 构建需要配置签名环境变量或 GitHub Actions Secrets，详见 [.github/workflows/build-apk.yml](./.github/workflows/build-apk.yml)。
-
 ## 技术信息
 
 - 技术栈：Kotlin、Jetpack Compose、Android WebView、Retrofit、OkHttp。
-- Android 配置：`applicationId` 为 `com.krelinnbios.yamiboreaderlite`，`minSdk` 24，`targetSdk` 34，`compileSdk` 34。
-- 构建工具：Gradle 8.13、Android Gradle Plugin 8.13.2、Kotlin 1.9.0、JDK 17。
-- 输出文件：APK 文件名固定为 `300 Lite.apk`。
 - 更新机制：通过 GitHub Releases API 检查版本，并对下载到的 APK 做版本与签名校验。
 - 上游来源：[prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)。
 
