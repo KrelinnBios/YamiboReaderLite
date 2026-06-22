@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     name: Build release APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -89,6 +89,11 @@ jobs:
         run: |
           mkdir -p .ci
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > .ci/yamibo-stable.jks
+
+      # 发版前先跑单元测试，核心模块（解析/URL/会话/屏蔽/更新解析等）出回归直接卡住，
+      # 避免坏版本打包发布后被应用内更新推送给用户。
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testReleaseUnitTest
 
       - name: Build release APK
         env:
