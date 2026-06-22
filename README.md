@@ -1,7 +1,7 @@
 # YamiboReaderLite
 
 <p align="center">
-  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="120" alt="300 Lite">
+  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="128" alt="300 Lite logo">
 </p>
 
 <p align="center">
@@ -16,10 +16,8 @@
 
 当前 Lite 版本将百合会论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读整合在同一个应用中。其界面、功能和行为已经过调整，与上游项目并不完全相同；以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
 
-## 内容与功能
+## 功能概览
 
-- 暗黑模式：经典蓝黑配色，原生界面与论坛网页（含电脑版帖子页）同步切换深色，可在设置中一键开关。
-- 底栏交互：下拉刷新当前页面；点击底栏图标可返回对应板块，长按则直接回到板块主页。
 - 论坛浏览：登录账号浏览百合会论坛，支持自动签到和 DNS 网络优化。
 - 链接直达：复制百合会帖子链接后回到应用即可一键打开，也支持从其他应用直接用本应用打开帖子链接。
 - 论坛屏蔽：屏蔽指定主题、楼层或用户，黑名单支持搜索与筛选。
@@ -28,8 +26,13 @@
 - 小说阅读：支持字号、行距、页边距、翻页方式、正文图片、简繁转换、章节目录跳转、进度记录和页面缓存。
 - 收藏管理：同步论坛收藏，支持分类、搜索、置顶、隐藏、删除、手动与自动更新检查和缓存清理。
 - 浏览历史：记录浏览历史，支持日期筛选、组合搜索和删除。
-- 缓存维护：小说页面与漫画图片缓存、定期清理和版本更新检查。
+- 缓存维护：维护小说页面与漫画图片缓存，支持定期清理。
+- 应用更新：通过 GitHub Releases 检查新版本，支持下载、校验 APK 和调起系统安装器。
+- 暗黑模式：经典蓝黑配色，原生界面与论坛网页同步切换深色。
+- 底栏交互：下拉刷新当前页面；点击底栏图标可返回对应板块，长按则直接回到板块主页。
 - 崩溃兜底：拦截后台线程异常以减少闪退，并记录崩溃日志便于排查问题。
+
+## 界面预览
 
 <p align="center">
   <img src="screenshots/1.png" width="19%" alt="漫画发现">
@@ -71,9 +74,10 @@
 
 ## 技术信息
 
-- 主要技术：Kotlin、Jetpack Compose、Android WebView、Retrofit/OkHttp。
-- Android 配置：`applicationId` 为 `com.krelinnbios.yamiboreaderlite`，`minSdk` 24，`targetSdk` 34。
-- 构建配置：Gradle Wrapper、Android Gradle Plugin、JDK 17、Android SDK 34。
+- 技术栈：Kotlin、Jetpack Compose、Android WebView、Retrofit、OkHttp。
+- Android 配置：`applicationId` 为 `com.krelinnbios.yamiboreaderlite`，`minSdk` 24，`targetSdk` 34，`compileSdk` 34。
+- 构建工具：Gradle 8.13、Android Gradle Plugin 8.13.2、Kotlin 1.9.0、JDK 17。
+- 输出文件：APK 文件名固定为 `300 Lite.apk`。
 - 更新机制：通过 GitHub Releases API 检查版本，并对下载到的 APK 做版本与签名校验。
 - 上游来源：[prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)。
 
