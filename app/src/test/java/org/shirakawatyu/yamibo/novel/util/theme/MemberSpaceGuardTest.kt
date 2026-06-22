@@ -82,10 +82,20 @@ class MemberSpaceGuardTest {
 
         val blogList = """
             <html><head><meta name="viewport" content="width=device-width"></head>
-            <body id="nv_home" class="pg_space"><div id="toptb"></div></body></html>
+            <body id="nv_home" class="pg_space"><div id="toptb"></div>
+            <div id="ct" class="ct3_a wp cl"><div class="appl"></div><div class="mn"></div><div class="sd"></div></div></body></html>
         """.trimIndent()
         val responsiveBlog = PageJsScripts.applyDesktopViewportForWebView(blogList, 0.3)
         assertTrue(responsiveBlog.contains("width=device-width, initial-scale=1.0, user-scalable=yes"))
+
+        val blogThreadList = """
+            <html><head><meta name="viewport" content="width=device-width"></head>
+            <body id="nv_home" class="pg_space"><div id="toptb"></div>
+            <div id="ct" class="ct2_a wp cl"><div class="appl"></div><div class="mn"><div class="tl"></div></div></div></body></html>
+        """.trimIndent()
+        val fixedBlogThreadList = PageJsScripts.applyDesktopViewportForWebView(blogThreadList, 0.3)
+        assertTrue(fixedBlogThreadList.contains("width=1200, initial-scale=0.300, user-scalable=yes"))
+        assertFalse(fixedBlogThreadList.contains("width=device-width"))
 
         val diySpace = """
             <html><head></head><body id="space"><div id="toptb"></div>
