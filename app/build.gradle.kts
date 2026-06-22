@@ -103,10 +103,14 @@ android {
         }
     }
 
-    applicationVariants.all {
-        outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
-                "300 Lite.apk"
+}
+
+// 固定 APK 名。AGP 8.13 的公开 VariantOutput 未暴露 outputFileName，故需 cast 到 impl。
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            (output as? com.android.build.api.variant.impl.VariantOutputImpl)
+                ?.outputFileName?.set("300 Lite.apk")
         }
     }
 }
