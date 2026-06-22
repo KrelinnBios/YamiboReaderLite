@@ -1051,6 +1051,7 @@ object PageJsScripts {
                     var cls = document.body.className || '';
                     var isSpaceShell = document.body.id === 'space' || /\bpg_space(?:cp)?\b/.test(cls);
                     if (!isSpaceShell) return;
+                    if (/\bpg_space\b/.test(cls) && document.querySelector('#ct.ct2_a .tl')) return;
                     var meta = document.querySelector('meta[name="viewport"]');
                     if (!meta) {
                         meta = document.createElement('meta');
@@ -1211,9 +1212,20 @@ $styleString
         Regex("""<body\b[^>]*\bid\s*=\s*(?:"space"|'space'|space)(?=[\s>])""", RegexOption.IGNORE_CASE)
     private val BODY_PG_SPACE_CLASS_REGEX =
         Regex("""<body\b[^>]*\bclass\s*=\s*(["'])[^"']*\bpg_space(?:cp)?\b[^"']*\1""", RegexOption.IGNORE_CASE)
+    private val CT2_A_CONTAINER_REGEX =
+        Regex("""<div\b[^>]*\bid\s*=\s*(?:"ct"|'ct'|ct)(?=[\s>])[^>]*\bclass\s*=\s*(["'])[^"']*\bct2_a\b[^"']*\1""", RegexOption.IGNORE_CASE)
+    private val THREAD_LIST_CONTAINER_REGEX =
+        Regex("""<div\b[^>]*\bclass\s*=\s*(["'])[^"']*\btl\b[^"']*\1""", RegexOption.IGNORE_CASE)
 
     private fun shouldUseResponsiveSpaceViewport(html: String): Boolean {
         if (MemberSpaceGuard.isMemberSpaceHtml(html)) return false
+        if (
+            BODY_PG_SPACE_CLASS_REGEX.containsMatchIn(html) &&
+            CT2_A_CONTAINER_REGEX.containsMatchIn(html) &&
+            THREAD_LIST_CONTAINER_REGEX.containsMatchIn(html)
+        ) {
+            return false
+        }
         return BODY_SPACE_ID_REGEX.containsMatchIn(html) || BODY_PG_SPACE_CLASS_REGEX.containsMatchIn(html)
     }
 
@@ -1319,9 +1331,11 @@ $styleString
                             'a.yamibo-block-action{background:transparent!important;border:0!important;box-shadow:none!important;font:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
                             // 列表页：容器 <li> 不加任何样式类，直接复用站点 .threadlist_foot li 的胶囊样式
                             // （float:left、内边距、圆角、深色边框），从而与浏览数/回复数按钮完全对齐。
-                            // 内部 <a> 按原生浏览/评论按钮的行高继承，只把图标和文字做水平居中。
-                            '.threadlist_foot li.yamibo-block-li a.yamibo-block-action{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:2px!important;padding:0!important;margin:0!important;line-height:inherit!important;vertical-align:baseline!important;color:inherit!important;}' +
-                            '.threadlist_foot li.yamibo-block-li .yamibo-block-icon{display:inline-block!important;width:1em!important;height:1em!important;line-height:1!important;margin:0!important;vertical-align:-0.125em!important;fill:currentColor!important;color:inherit!important;flex:0 0 auto!important;}' +
+                            // 内部 <a> 保持纯 inline（不要用 inline-flex，否则其原子盒在 baseline 上会撑高行盒，
+                            // 使屏蔽按钮比浏览/评论按钮高）；图标比照站点原生图标 .threadlist_foot li i（14px、
+                            // margin-right:3px、垂直居中），只在 22px 行盒内随文字排版，上下与邻居完全对齐。
+                            '.threadlist_foot li.yamibo-block-li a.yamibo-block-action{display:inline!important;padding:0!important;margin:0!important;line-height:inherit!important;vertical-align:baseline!important;color:inherit!important;}' +
+                            '.threadlist_foot li.yamibo-block-li .yamibo-block-icon{display:inline-block!important;width:14px!important;height:14px!important;line-height:1!important;margin:0 3px 0 0!important;vertical-align:middle!important;fill:currentColor!important;color:inherit!important;}' +
                             // 帖子页：按钮在用户名后内联显示，间距由前面插入的四个不可断空格决定，这里清零边距。
                             '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
