@@ -653,6 +653,7 @@ fun BBSPage(
     val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
     val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
     val currentUid = GlobalData.currentUid
+    val pullRefreshBridge = remember { WebViewPullRefreshBridge() }
 
     LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems, currentUid) {
         webView.evaluateJavascript(
@@ -672,6 +673,7 @@ fun BBSPage(
             ),
             null
         )
+        webView.evaluateJavascript(PageJsScripts.PULL_REFRESH_EDIT_FOCUS_JS, null)
     }
 
     val canConvertToReader = remember(BBSPageState.currentUrl, BBSPageState.pageTitle) {
@@ -744,6 +746,7 @@ fun BBSPage(
                 ),
                 null
             )
+            webView.evaluateJavascript(PageJsScripts.PULL_REFRESH_EDIT_FOCUS_JS, null)
         } catch (e: Throwable) {
             e.printStackTrace()
         }
@@ -1286,6 +1289,7 @@ fun BBSPage(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         setOnRefreshListener { triggerBbsPullRefresh() }
+                        guardWebViewPullRefresh(webView, pullRefreshBridge)
                         swipeRefresh = this
 
                         (webView.parent as? ViewGroup)?.removeView(webView)
@@ -1302,10 +1306,12 @@ fun BBSPage(
                         webView.addJavascriptInterface(nativeMangaApi, "NativeMangaApi")
                         webView.addJavascriptInterface(searchNavApi, "AndroidSearchNav")
                         webView.addJavascriptInterface(forumBlocklistApi, "AndroidForumBlocklist")
+                        webView.addJavascriptInterface(pullRefreshBridge, "AndroidPullRefreshGuard")
                         BBSPageState.markBbsContainerMounted()
                     }
                 },
                 update = { container ->
+                    container.guardWebViewPullRefresh(webView, pullRefreshBridge)
                     if (webView.parent !== container) {
                         (webView.parent as? ViewGroup)?.removeView(webView)
                         container.removeAllViews()
