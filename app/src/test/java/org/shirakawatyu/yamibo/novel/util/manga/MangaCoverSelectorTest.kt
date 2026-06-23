@@ -38,6 +38,26 @@ class MangaCoverSelectorTest {
     }
 
     @Test
+    fun firstCoverUrl_usesApiAttachmentWhenMessageHasNoImages() {
+        val attachmentUrl = MangaCoverSelector.attachmentImageUrl(
+            urlPrefix = "data/attachment/forum/",
+            attachmentPath = "202606/23/142457vx7wpmpw5225g2gg.jpg"
+        )
+
+        assertEquals(
+            "https://bbs.yamibo.com/data/attachment/forum/202606/23/142457vx7wpmpw5225g2gg.jpg",
+            attachmentUrl
+        )
+        assertEquals(
+            "https://bbs.yamibo.com/data/attachment/forum/202606/23/142457vx7wpmpw5225g2gg.jpg",
+            MangaCoverSelector.firstCoverUrl(
+                messages = listOf("<p>message without inline images</p>"),
+                attachmentUrls = listOfNotNull(attachmentUrl)
+            )
+        )
+    }
+
+    @Test
     fun firstCoverUrl_ignoresInlineAndBlobImages() {
         val message = """
             <img src="data:image/png;base64,AAAA">
