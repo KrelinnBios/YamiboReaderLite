@@ -301,11 +301,29 @@ class MangaHomeVM : ViewModel() {
 
     private suspend fun findFirstImage(tid: String): String? {
         val json = JSON.parseObject(api.getThreadDetailApi(tid).string())
-        val posts = json.getJSONObject("Variables")?.getJSONArray("postlist") ?: return null
-        val messages = (0 until posts.size).map { index ->
-            posts.getJSONObject(index).getString("message").orEmpty()
+        val variables = json.getJSONObject("Variables") ?: return null
+        val threadAuthorId = variables.getJSONObject("thread")?.getString("authorid").orEmpty()
+        val posts = variables.getJSONArray("postlist") ?: return null
+        val messages = mutableListOf<String>()
+        val attachmentUrls = mutableListOf<String>()
+
+        for (index in 0 until posts.size) {
+            val post = posts.getJSONObject(index) ?: continue
+            val postAuthorId = post.getString("authorid").orEmpty()
+            if (index != 0 && threadAuthorId.isNotBlank() && postAuthorId != threadAuthorId) continue
+
+            messages += post.getString("message").orEmpty()
+            val attachments = post.getJSONObject("attachments") ?: continue
+            attachments.keys.forEach { key ->
+                val attachment = attachments.getJSONObject(key) ?: return@forEach
+                MangaCoverSelector.attachmentImageUrl(
+                    urlPrefix = attachment.getString("url"),
+                    attachmentPath = attachment.getString("attachment")
+                )?.let(attachmentUrls::add)
+            }
         }
-        return MangaCoverSelector.firstCoverUrl(messages)
+
+        return MangaCoverSelector.firstCoverUrl(messages, attachmentUrls)
     }
 
     private fun threadUrl(tid: String) =
