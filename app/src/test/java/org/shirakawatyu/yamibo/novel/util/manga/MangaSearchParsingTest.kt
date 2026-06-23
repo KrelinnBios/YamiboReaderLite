@@ -158,7 +158,7 @@ class MangaSearchParsingTest {
         assertTrue(
             MangaTitleCleaner.matchesPublisher(
                 authorUid = "489445",
-                authorName = "Kakukuroi汉化组",
+                authorName = "发布者A",
                 publisherUid = "489445",
                 publisherName = null
             )
@@ -166,17 +166,17 @@ class MangaSearchParsingTest {
         assertTrue(
             MangaTitleCleaner.matchesPublisher(
                 authorUid = null,
-                authorName = "雨月星系汉化",
+                authorName = "发布者B",
                 publisherUid = null,
-                publisherName = "雨月星系汉化"
+                publisherName = "发布者B"
             )
         )
         assertFalse(
             MangaTitleCleaner.matchesPublisher(
                 authorUid = "123",
-                authorName = "Kakukuroi汉化组",
+                authorName = "发布者A",
                 publisherUid = null,
-                publisherName = "雨月星系汉化"
+                publisherName = "发布者B"
             )
         )
     }
