@@ -366,12 +366,12 @@ object UpdateCheckEngine {
                 if (overrideCleanBookName != null && overrideCleanBookName.isNotBlank() &&
                     overrideCleanBookName != mangaDir.cleanBookName
                 ) {
-                    val newKeyword = overrideSearchKeyword ?: mangaDir.searchKeyword ?: ""
                     mangaDir = repo.renameAndMergeDirectory(
                         mangaDir,
                         overrideCleanBookName,
-                        newKeyword,
+                        mangaDir.originalAuthor.orEmpty(),
                         mangaDir.translationGroup.orEmpty(),
+                        mangaDir.publisherName ?: mangaDir.publisherUid.orEmpty(),
                         tid
                     )
                 }
