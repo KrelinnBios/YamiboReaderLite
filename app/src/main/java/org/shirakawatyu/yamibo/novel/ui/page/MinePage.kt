@@ -1583,6 +1583,7 @@ fun MinePage(
                     val isAutoSignInEnabled = GlobalData.isAutoSignInEnabled.value
                     var cacheSizeBytes by remember { mutableStateOf(0L) }
                     var isClearingCache by remember { mutableStateOf(false) }
+                    var showClearCacheDialog by remember { mutableStateOf(false) }
 
                     fun formatFileSize(bytes: Long): String = when {
                         bytes < 1024L -> "$bytes B"
@@ -1759,16 +1760,7 @@ fun MinePage(
                                 }
 
                                 Button(
-                                    onClick = {
-                                        isClearingCache = true
-                                        scope.launch {
-                                            withContext(Dispatchers.IO) {
-                                                CacheMaintenance.clearAll(context)
-                                            }
-                                            cacheSizeBytes = 0L
-                                            isClearingCache = false
-                                        }
-                                    },
+                                    onClick = { showClearCacheDialog = true },
                                     enabled = !isClearingCache,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -1827,6 +1819,49 @@ fun MinePage(
                         },
                         dismissButton = {}
                     )
+
+                    if (showClearCacheDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearCacheDialog = false },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.primary,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
+                            title = { Text("清理缓存", fontSize = 18.sp) },
+                            text = {
+                                Text(
+                                    "确定要清理小说页面和漫画图片缓存吗？此操作不可撤销。",
+                                    fontSize = 15.sp
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showClearCacheDialog = false
+                                    isClearingCache = true
+                                    scope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                CacheMaintenance.clearAll(context)
+                                            }
+                                            cacheSizeBytes = 0L
+                                        } finally {
+                                            isClearingCache = false
+                                        }
+                                    }
+                                }) {
+                                    Text(
+                                        "确定",
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearCacheDialog = false }) {
+                                    Text("取消", fontSize = 15.sp)
+                                }
+                            }
+                        )
+                    }
                 }
 
                 MineDialogState.Blocklist -> {
