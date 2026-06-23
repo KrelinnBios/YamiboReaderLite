@@ -1959,6 +1959,66 @@ $styleString
             boot();
         })();
     """.trimIndent()
+
+    val PULL_REFRESH_EDIT_FOCUS_JS = """
+        (function() {
+            function yamiboIsEditableTarget(node) {
+                var el = node;
+                while (el && el.nodeType === 1) {
+                    var tag = (el.tagName || '').toLowerCase();
+                    if (tag === 'textarea' || tag === 'select') return true;
+                    if (tag === 'input') {
+                        var type = (el.type || '').toLowerCase();
+                        return type !== 'button' &&
+                            type !== 'checkbox' &&
+                            type !== 'radio' &&
+                            type !== 'submit' &&
+                            type !== 'reset' &&
+                            type !== 'file' &&
+                            type !== 'image' &&
+                            type !== 'color' &&
+                            type !== 'range';
+                    }
+                    if (el.isContentEditable || el.getAttribute('contenteditable') === 'true') return true;
+                    el = el.parentElement;
+                }
+                return false;
+            }
+
+            function yamiboNotifyPullRefreshGuard(focused) {
+                if (!window.AndroidPullRefreshGuard || !window.AndroidPullRefreshGuard.setEditableFocused) return;
+                try {
+                    window.AndroidPullRefreshGuard.setEditableFocused(!!focused);
+                } catch (e) {
+                }
+            }
+
+            function yamiboSyncPullRefreshGuard() {
+                yamiboNotifyPullRefreshGuard(yamiboIsEditableTarget(document.activeElement));
+            }
+
+            if (!window.__yamiboPullRefreshGuardInstalled) {
+                window.__yamiboPullRefreshGuardInstalled = true;
+                document.addEventListener('focusin', yamiboSyncPullRefreshGuard, true);
+                document.addEventListener('focusout', function() {
+                    setTimeout(yamiboSyncPullRefreshGuard, 120);
+                }, true);
+                document.addEventListener('touchstart', function(event) {
+                    if (yamiboIsEditableTarget(event.target)) {
+                        yamiboNotifyPullRefreshGuard(true);
+                    }
+                }, true);
+                document.addEventListener('pointerdown', function(event) {
+                    if (yamiboIsEditableTarget(event.target)) {
+                        yamiboNotifyPullRefreshGuard(true);
+                    }
+                }, true);
+                document.addEventListener('visibilitychange', yamiboSyncPullRefreshGuard, true);
+            }
+
+            yamiboSyncPullRefreshGuard();
+        })();
+    """.trimIndent()
     val BBS_COMMIT_BOOTSTRAP_JS by lazy {
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
@@ -1966,6 +2026,7 @@ $styleString
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
+            "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -1976,6 +2037,7 @@ $styleString
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
+            "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -1993,6 +2055,7 @@ $styleString
             "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
+            "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2001,6 +2064,7 @@ $styleString
         combineJs(
             "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
