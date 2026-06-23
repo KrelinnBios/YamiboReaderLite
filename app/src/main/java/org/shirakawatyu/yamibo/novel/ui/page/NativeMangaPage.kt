@@ -1474,14 +1474,26 @@ fun NativeMangaPage(
             if (showChapterList) {
                 val currentTid = currentItem?.tid ?: ""
                 val directory = mangaDirVM.currentDirectory
+                val selectedOriginalAuthor = directory?.originalAuthor.orEmpty()
                 val selectedGroup = directory?.translationGroup.orEmpty()
+                val selectedPublisherUid = directory?.publisherUid.orEmpty()
+                val selectedPublisherName = directory?.publisherName.orEmpty()
                 val displayChapters = directory?.chapters
                     ?.filter {
-                        selectedGroup.isBlank() ||
-                                MangaTitleCleaner.matchesTranslationGroup(
-                                    it.rawTitle,
-                                    selectedGroup
-                                )
+                        (selectedOriginalAuthor.isBlank() ||
+                                MangaTitleCleaner.matchesSearchQuery(it.rawTitle, selectedOriginalAuthor)) &&
+                                (selectedGroup.isBlank() ||
+                                        MangaTitleCleaner.matchesTranslationGroup(
+                                            it.rawTitle,
+                                            selectedGroup
+                                        )) &&
+                                (selectedPublisherUid.isBlank() && selectedPublisherName.isBlank() ||
+                                        MangaTitleCleaner.matchesPublisher(
+                                            authorUid = it.authorUid,
+                                            authorName = it.authorName,
+                                            publisherUid = selectedPublisherUid,
+                                            publisherName = selectedPublisherName
+                                        ))
                     }
                     ?.map {
                     MangaChapter(
@@ -1493,42 +1505,45 @@ fun NativeMangaPage(
                     )
                 } ?: emptyList()
 
-                val initialAuthor = remember(mangaDirVM.currentDirectory, currentTid) {
-                    val dir = mangaDirVM.currentDirectory
-                    if (dir?.searchKeyword != null && dir.searchKeyword != dir.cleanBookName) {
-                        dir.searchKeyword.replace(dir.cleanBookName, "").trim()
-                    } else {
-                        val chap = dir?.chapters?.find { it.tid == currentTid }
-                        if (chap != null) MangaTitleCleaner.extractAuthorPrefix(chap.rawTitle)
-                        else dir?.chapters?.lastOrNull()
-                            ?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) } ?: ""
-                    }
+                val currentDirectory = mangaDirVM.currentDirectory
+                val currentChapter = currentDirectory?.chapters?.find { it.tid == currentTid }
+                val initialOriginalAuthor = remember(currentDirectory, currentTid) {
+                    currentDirectory?.originalAuthor
+                        ?: currentChapter?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) }
+                            ?.takeIf { it.isNotBlank() }
+                        ?: currentDirectory?.chapters?.lastOrNull()
+                            ?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) }
+                            ?.takeIf { it.isNotBlank() }
+                        ?: currentDirectory?.searchKeyword.orEmpty()
                 }
-                val initialTranslationGroup = remember(
-                    mangaDirVM.currentDirectory,
-                    currentTid
-                ) {
-                    val dir = mangaDirVM.currentDirectory
-                    val currentChapter = dir?.chapters?.find { it.tid == currentTid }
+                val initialTranslationGroup = remember(currentDirectory, currentTid) {
                     currentChapter
                         ?.let { MangaTitleCleaner.extractTranslationGroup(it.rawTitle) }
                         ?.takeIf { it.isNotBlank() }
-                        ?: dir?.translationGroup.orEmpty()
+                        ?: currentDirectory?.translationGroup.orEmpty()
                 }
-
+                val initialPublisher = remember(currentDirectory, currentTid) {
+                    currentDirectory?.publisherName
+                        ?: currentDirectory?.publisherUid
+                        ?: currentChapter?.authorName
+                        ?: currentChapter?.authorUid
+                        ?: ""
+                }
                 MangaChapterPanel(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     title = mangaDirVM.currentDirectory?.cleanBookName ?: "目录",
-                    initialAuthor = initialAuthor,
+                    initialOriginalAuthor = initialOriginalAuthor,
                     initialTranslationGroup = initialTranslationGroup,
+                    initialPublisher = initialPublisher,
                     chapters = displayChapters,
                     isUpdating = mangaDirVM.isUpdatingDirectory,
                     onDismiss = { showChapterList = false; showUi = false },
-                    onTitleEdit = { newTitle, newAuthor, newTranslationGroup ->
+                    onTitleEdit = { newTitle, newOriginalAuthor, newTranslationGroup, newPublisher ->
                         mangaDirVM.updateDirectoryInfo(
                             newTitle.trim(),
-                            newAuthor.trim(),
-                            newTranslationGroup,
+                            newOriginalAuthor.trim(),
+                            newTranslationGroup.trim(),
+                            newPublisher.trim(),
                             currentTid
                         )
                     },
