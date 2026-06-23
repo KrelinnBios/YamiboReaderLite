@@ -32,5 +32,14 @@ data class MangaDirectory @JSONCreator constructor(
     val sourceFid: String? = null,
 
     @JSONField(name = "translationGroup")
-    val translationGroup: String? = null
+    val translationGroup: String? = null,
+
+    @JSONField(name = "originalAuthor")
+    val originalAuthor: String? = null,
+
+    @JSONField(name = "publisherUid")
+    val publisherUid: String? = null,
+
+    @JSONField(name = "publisherName")
+    val publisherName: String? = null
 )
