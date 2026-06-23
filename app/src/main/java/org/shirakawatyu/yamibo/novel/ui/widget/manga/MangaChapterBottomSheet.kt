@@ -75,13 +75,14 @@ data class MangaChapter(
 fun MangaChapterPanel(
     modifier: Modifier = Modifier,
     title: String,
-    initialAuthor: String,
+    initialOriginalAuthor: String,
     initialTranslationGroup: String,
+    initialPublisher: String,
     chapters: List<MangaChapter>,
     isUpdating: Boolean = false,
     onDismiss: () -> Unit,
     onChapterClick: (MangaChapter) -> Unit,
-    onTitleEdit: (String, String, String) -> Unit
+    onTitleEdit: (String, String, String, String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,12 +91,11 @@ fun MangaChapterPanel(
     var ascending by remember { mutableStateOf(MangaSettings.getSettings(context).isAscending) }
     var showEditDialog by remember { mutableStateOf(false) }
     var editTitleText by remember(title) { mutableStateOf(title) }
-    var editKeyword1 by remember(initialAuthor) { mutableStateOf(initialAuthor) }
-    var editKeyword2 by remember { mutableStateOf("") }
+    var editOriginalAuthor by remember(initialOriginalAuthor) { mutableStateOf(initialOriginalAuthor) }
     var editTranslationGroup by remember(initialTranslationGroup) {
         mutableStateOf(initialTranslationGroup)
     }
-    var showSecondKeyword by remember { mutableStateOf(false) }
+    var editPublisher by remember(initialPublisher) { mutableStateOf(initialPublisher) }
     var isTitleExpanded by remember { mutableStateOf(false) }
 
     val sorted = remember(chapters, ascending) {
@@ -133,44 +133,17 @@ fun MangaChapterPanel(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "确保书名不包含单章编号等信息",
+                        "留空的字段不会参与过滤，可按需要手动补充",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = editKeyword1,
-                            onValueChange = { editKeyword1 = it },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            label = { Text("关键词 1") }
-                        )
-                        if (showSecondKeyword) {
-                            OutlinedTextField(
-                                value = editKeyword2,
-                                onValueChange = { editKeyword2 = it },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f),
-                                label = { Text("关键词 2") }
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .padding(top = 8.dp)
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                                    .clickable { showSecondKeyword = true },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "+",
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    fontSize = 18.sp
-                                )
-                            }
-                        }
-                    }
+                    OutlinedTextField(
+                        value = editOriginalAuthor,
+                        onValueChange = { editOriginalAuthor = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("原作者") },
+                        singleLine = true
+                    )
                     OutlinedTextField(
                         value = editTitleText,
                         onValueChange = { editTitleText = it },
@@ -183,7 +156,14 @@ fun MangaChapterPanel(
                         value = editTranslationGroup,
                         onValueChange = { editTranslationGroup = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("汉化组（留空显示全部）") },
+                        label = { Text("汉化组") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = editPublisher,
+                        onValueChange = { editPublisher = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("发布者") },
                         singleLine = true
                     )
                 }
@@ -192,13 +172,11 @@ fun MangaChapterPanel(
                 TextButton(
                     onClick = {
                         if (editTitleText.isNotBlank()) {
-                            val keywords = listOf(editKeyword1.trim(), editKeyword2.trim())
-                                .filter(String::isNotEmpty)
-                                .joinToString(" ")
                             onTitleEdit(
                                 editTitleText.trim(),
-                                keywords,
-                                editTranslationGroup.trim()
+                                editOriginalAuthor.trim(),
+                                editTranslationGroup.trim(),
+                                editPublisher.trim()
                             )
                         }
                         showEditDialog = false
