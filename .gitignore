@@ -32,6 +32,3 @@ signing.properties
 .gh-cli/
 upload_github.ps1
 plan.txt
-
-# 论坛页面「另存为」的临时适配样本，不入库
-html/
