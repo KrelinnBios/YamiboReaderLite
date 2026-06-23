@@ -511,6 +511,7 @@ fun MinePage(
         }
     }
     val forumBlocklistApi = remember { ForumBlocklistJSInterface() }
+    val pullRefreshBridge = remember { WebViewPullRefreshBridge() }
 
     val mineWebView = remember(fromHistory, historyTargetUrl) {
         val isNew = minePageVM.cachedWebView == null
@@ -544,6 +545,7 @@ fun MinePage(
                     webView.removeJavascriptInterface("HistoryApi")
                     webView.removeJavascriptInterface("AndroidSearchNav")
                     webView.removeJavascriptInterface("AndroidForumBlocklist")
+                    webView.removeJavascriptInterface("AndroidPullRefreshGuard")
                 } catch (_: Exception) {
                 }
             }
@@ -554,6 +556,7 @@ fun MinePage(
             webView.addJavascriptInterface(searchNavApi, "AndroidSearchNav")
         }
         webView.addJavascriptInterface(forumBlocklistApi, "AndroidForumBlocklist")
+        webView.addJavascriptInterface(pullRefreshBridge, "AndroidPullRefreshGuard")
         webView.webChromeClient = webChromeClient
 
         webView
@@ -606,6 +609,7 @@ fun MinePage(
             ),
             null
         )
+        mineWebView.evaluateJavascript(PageJsScripts.PULL_REFRESH_EDIT_FOCUS_JS, null)
     }
 
     // 下拉小圆球跟随暗黑模式配色
@@ -645,6 +649,7 @@ fun MinePage(
                 null
             )
             injectForumBlocker(mineWebView)
+            mineWebView.evaluateJavascript(PageJsScripts.PULL_REFRESH_EDIT_FOCUS_JS, null)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -1408,6 +1413,7 @@ fun MinePage(
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         setOnRefreshListener { triggerMinePullRefresh() }
+                        guardWebViewPullRefresh(mineWebView, pullRefreshBridge)
                         swipeRefresh = this
                         (mineWebView.parent as? ViewGroup)?.removeView(mineWebView)
                         addView(
@@ -1419,7 +1425,8 @@ fun MinePage(
                         )
                     }
                 },
-                update = { _ ->
+                update = { container ->
+                    container.guardWebViewPullRefresh(mineWebView, pullRefreshBridge)
                     canGoBack = evaluateCanGoBack(mineWebView)
                     currentUrl = mineWebView.url
                     pageTitle = mineWebView.title ?: ""
