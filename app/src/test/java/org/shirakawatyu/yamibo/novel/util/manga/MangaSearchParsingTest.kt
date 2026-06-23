@@ -154,6 +154,33 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun publisherMatchingUsesUidOrExactName() {
+        assertTrue(
+            MangaTitleCleaner.matchesPublisher(
+                authorUid = "489445",
+                authorName = "Kakukuroi汉化组",
+                publisherUid = "489445",
+                publisherName = null
+            )
+        )
+        assertTrue(
+            MangaTitleCleaner.matchesPublisher(
+                authorUid = null,
+                authorName = "雨月星系汉化",
+                publisherUid = null,
+                publisherName = "雨月星系汉化"
+            )
+        )
+        assertFalse(
+            MangaTitleCleaner.matchesPublisher(
+                authorUid = "123",
+                authorName = "Kakukuroi汉化组",
+                publisherUid = null,
+                publisherName = "雨月星系汉化"
+            )
+        )
+    }
+    @Test
     fun mobileSearchParserReturnsCompleteTitleInsteadOfHighlightOnly() {
         val html = """
             <html><body id="search">
