@@ -265,6 +265,22 @@ class MangaTitleCleaner {
                 .any { matchesSearchQuery(rawText, it) }
         }
 
+        fun matchesPublisher(
+            authorUid: String?,
+            authorName: String?,
+            publisherUid: String?,
+            publisherName: String?
+        ): Boolean {
+            val targetUid = publisherUid?.trim().orEmpty()
+            val targetName = normalizeSearchText(publisherName.orEmpty())
+            if (targetUid.isBlank() && targetName.isBlank()) return true
+
+            val candidateUid = authorUid?.trim().orEmpty()
+            if (targetUid.isNotBlank() && candidateUid == targetUid) return true
+
+            val candidateName = normalizeSearchText(authorName.orEmpty())
+            return targetName.isNotBlank() && candidateName == targetName
+        }
         private fun normalizeSearchText(value: String): String =
             Normalizer.normalize(value, Normalizer.Form.NFKC)
                 .lowercase()
