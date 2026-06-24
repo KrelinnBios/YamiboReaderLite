@@ -48,4 +48,21 @@ interface MangaApi {
         @Query("tid") tid: String,
         @Query("page") page: Int = 1
     ): ResponseBody
+
+    // 获取帖子 PC 版 HTML（含 #threadindex 目录，移动版会去除）
+    @Headers("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    @GET("/forum.php?mod=viewthread&mobile=no")
+    suspend fun getThreadPcHtml(
+        @Query("tid") tid: String,
+        @Query("page") page: Int = 1
+    ): ResponseBody
+
+    // 获取"只看楼主"过滤后的帖子 HTML，PC 版
+    @Headers("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    @GET("/forum.php?mod=viewthread&mobile=no")
+    suspend fun getThreadHtmlByAuthor(
+        @Query("tid") tid: String,
+        @Query("authorid") authorId: String,
+        @Query("page") page: Int = 1
+    ): ResponseBody
 }
