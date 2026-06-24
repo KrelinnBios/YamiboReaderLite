@@ -15,12 +15,15 @@ import kotlinx.coroutines.withContext
 import org.shirakawatyu.yamibo.novel.bean.DirectoryStrategy
 import org.shirakawatyu.yamibo.novel.bean.MangaChapterItem
 import org.shirakawatyu.yamibo.novel.bean.MangaDirectory
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.network.MangaApi
 import org.shirakawatyu.yamibo.novel.parser.MangaHtmlParser
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import java.io.File
 import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Collections
 
 data class DirectoryUpdateResult(val directory: MangaDirectory, val searchPerformed: Boolean)
@@ -72,6 +75,13 @@ class DirectoryRepository private constructor(private val context: Context) {
                     ?: firstPost?.getString("author").nonBlank()
             )
         }.getOrDefault(ThreadAuthor())
+    }
+
+    /**
+     * 章节唯一键：跨帖时用 tid，单帖多章时用 tid-pid
+     */
+    private fun chapterUniqueKey(chapter: MangaChapterItem): String {
+        return if (chapter.pid != null) "${chapter.tid}-pid-${chapter.pid}" else chapter.tid
     }
 
     private fun chapterMatchesPublisher(
@@ -171,8 +181,8 @@ class DirectoryRepository private constructor(private val context: Context) {
     ): List<MangaChapterItem> {
         val map = LinkedHashMap<String, MangaChapterItem>()
 
-        old.forEach { map[it.tid] = it }
-        new.forEach { map[it.tid] = it }
+        old.forEach { map[chapterUniqueKey(it)] = it }
+        new.forEach { map[chapterUniqueKey(it)] = it }
 
         val sortedByTid = map.values.sortedBy { it.tid.toLongOrNull() ?: 0L }
 
@@ -347,6 +357,104 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
             }
 
+            // 提取 #threadindex 页内目录（单帖多章）
+            val threadindexLinks = MangaHtmlParser.extractThreadindexLinks(mobileHtml).map { chapter ->
+                if (chapter.authorUid.isNullOrBlank() && chapter.authorName.isNullOrBlank()) {
+                    chapter.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
+                } else {
+                    chapter
+                }
+            }
+
+            // ===== 尝试 PC 版 HTML #threadindex 目录（最可靠，但 OkHttp 拦截器会注入 mobile=2
+            // cookie，故用 HttpURLConnection 直接请求并清除 mobile cookie）=====
+            // 使用 forum.php?authorid=XXX（只看楼主）格式，与用户已验证的保存页面一致。
+            // #threadindex 只在第 1 页楼主首帖中出现，一次请求即可获取全部章节。
+            var pcHtmlThreadindexLinks = emptyList<MangaChapterItem>()
+            if (threadindexLinks.isEmpty() && detectedAuthor.uid != null) {
+                try {
+                    val pcUrlStr = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&page=1&authorid=${detectedAuthor.uid}"
+                    val pcUrl = URL(pcUrlStr)
+                    val conn = pcUrl.openConnection() as HttpURLConnection
+                    conn.apply {
+                        setRequestProperty("User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        setRequestProperty("Cookie",
+                            GlobalData.currentCookie.replace(Regex("mobile=[^;]+;?"), "").trimEnd(';').trim())
+                        connectTimeout = 15000
+                        readTimeout = 15000
+                    }
+                    if (conn.responseCode == 200) {
+                        val pcHtml = conn.inputStream.bufferedReader().readText()
+                        pcHtmlThreadindexLinks = MangaHtmlParser.extractThreadindexLinks(pcHtml).map { ch ->
+                            if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
+                                ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
+                            } else ch
+                        }
+                    }
+                    conn.disconnect()
+                    Log.d(LOG_TAG, "PC HTML threadindex: ${pcHtmlThreadindexLinks.size} links")
+                } catch (e: Exception) {
+                    Log.w(LOG_TAG, "PC HTML fetch failed", e)
+                }
+            }
+
+            // ===== 补充：PC HTML 也未获目录时，走 API 逐页扫描楼主发帖 =====
+            val supplementaryLinks = mutableListOf<MangaChapterItem>()
+            val needApiFallback = pcHtmlThreadindexLinks.isEmpty() && threadindexLinks.isEmpty() && (
+                    rawSamePageLinks.any { it.tid == tid } ||
+                            (rawSamePageLinks.isNotEmpty() && rawSamePageLinks.size < 5)
+                    )
+            if (needApiFallback && detectedAuthor.uid != null) {
+                Log.d(LOG_TAG, "API fallback: scanning tid=$tid authorUid=${detectedAuthor.uid}")
+                try {
+                    val firstPage = JSON.parseObject(mangaApi.getThreadDetailApi(tid, 1).string())
+                    val variables = firstPage.getJSONObject("Variables")
+                    val totalPages = (variables?.getJSONObject("thread")?.getString("maxposition")
+                        ?.toIntOrNull()?.let { (it + 19) / 20 }
+                        ?: variables?.getString("totalpage")?.toIntOrNull()
+                        ?: 99).coerceAtLeast(1)
+                    val seenAuthorPids = mutableSetOf<String>()
+                    var emptyPageCount = 0
+                    for (page in 1..totalPages) {
+                        val root = JSON.parseObject(mangaApi.getThreadDetailApi(tid, page).string())
+                        val postlist = root.getJSONObject("Variables")?.getJSONArray("postlist") ?: continue
+                        var pageFound = 0
+                        for (i in 0 until postlist.size) {
+                            val post = postlist.getJSONObject(i)
+                            val authorId = post.getString("authorid")
+                            if (authorId != detectedAuthor.uid) continue
+                            val pid = post.getString("pid") ?: continue
+                            if (pid in seenAuthorPids) continue
+                            seenAuthorPids.add(pid)
+                            pageFound++
+                            val msg = post.getString("message") ?: continue
+                            val title = org.jsoup.Jsoup.parse(msg).select("strong, b")
+                                .firstOrNull()?.text()?.trim()
+                            if (title.isNullOrBlank() || title.length > 100) continue
+                            val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                            val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                            supplementaryLinks.add(
+                                MangaChapterItem(tid, title, chapterNum, safeUrl,
+                                    authorUid = detectedAuthor.uid, authorName = detectedAuthor.name,
+                                    pid = pid)
+                            )
+                        }
+                        if (page == 1 && pageFound == 0) break
+                        if (page > 1 && pageFound == 0) {
+                            emptyPageCount++
+                            if (emptyPageCount >= 3) break
+                        } else {
+                            emptyPageCount = 0
+                        }
+                        Log.d(LOG_TAG, "API fallback: page $page author chaps=${supplementaryLinks.size}")
+                    }
+                    Log.d(LOG_TAG, "API fallback: total=${supplementaryLinks.size}")
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "API fallback failed", e)
+                }
+            }
+
             val currentChapter = MangaChapterItem(
                 tid = tid,
                 rawTitle = threadTitle,
@@ -356,20 +464,28 @@ class DirectoryRepository private constructor(private val context: Context) {
                 authorName = detectedAuthor.name
             )
 
-            val gatheredFromPage = (listOf(currentChapter) + rawSamePageLinks).distinctBy { it.tid }
+            val allLinks = rawSamePageLinks + threadindexLinks + pcHtmlThreadindexLinks + supplementaryLinks
+            Log.d(LOG_TAG, "rawSamePageLinks=${rawSamePageLinks.size} threadindex=${threadindexLinks.size} pcHtmlThreadindex=${pcHtmlThreadindexLinks.size} apiSupplementary=${supplementaryLinks.size}")
+            rawSamePageLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  raw[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
+            supplementaryLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  supp[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
+
+            val gatheredFromPage = (listOf(currentChapter) + allLinks).distinctBy { chapterUniqueKey(it) }
+            Log.d(LOG_TAG, "gatheredFromPage=${gatheredFromPage.size}")
 
             if (cachedDir != null) {
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
                 val detectedOriginalAuthor = MangaTitleCleaner.extractAuthorPrefix(threadTitle).takeIf { it.isNotBlank() }
+                val hasPageLinks = allLinks.isNotEmpty()
                 val newStrategy =
-                    if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && rawSamePageLinks.isNotEmpty()) {
+                    if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks) {
                         DirectoryStrategy.LINKS
                     } else cachedDir.strategy
 
-                val existingTids = cachedDir.chapters.map { it.tid }.toSet()
+                val existingChapterKeys = cachedDir.chapters.map { chapterUniqueKey(it) }.toSet()
+                Log.d(LOG_TAG, "cached chapters=${cachedDir.chapters.size} existingKeys=${existingChapterKeys.size} author='$detectedOriginalAuthor'")
 
-                val supplementaryChapters = gatheredFromPage.filter { it.tid !in existingTids }
-                val preferCurrentThreadMetadata = tid !in existingTids
+                val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
+                val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
 
                 val detectedOrSavedGroup = if (preferCurrentThreadMetadata) {
                     detectedGroup.takeIf { it.isNotBlank() } ?: cachedDir.translationGroup
@@ -391,11 +507,13 @@ class DirectoryRepository private constructor(private val context: Context) {
                 } else {
                     cachedDir.publisherName
                 }
+                Log.d(LOG_TAG, "filter originalAuthor='$detectedOrSavedOriginalAuthor' group='$detectedOrSavedGroup'")
                 val mergedAll = mergeAndSortChapters(cachedDir.chapters, supplementaryChapters)
+                Log.d(LOG_TAG, "mergedAll=${mergedAll.size} before filter")
                 val mergedChapters = filterChaptersByDirectoryConstraints(
                     chapters = mergedAll,
-                    originalAuthor = detectedOrSavedOriginalAuthor,
-                    translationGroup = detectedOrSavedGroup,
+                    originalAuthor = null,
+                    translationGroup = null,
                     publisherUid = detectedOrSavedPublisherUid,
                     publisherName = detectedOrSavedPublisherName,
                     keepUnknownPublisher = true
@@ -430,7 +548,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                 if (tagIds.isNotEmpty()) {
                     strategy = DirectoryStrategy.TAG
                     sourceKey = tagIds.joinToString(",")
-                } else if (rawSamePageLinks.isNotEmpty()) {
+                } else if (allLinks.isNotEmpty()) {
                     strategy = DirectoryStrategy.LINKS
                     sourceKey = cleanName
                 } else {
@@ -444,8 +562,8 @@ class DirectoryRepository private constructor(private val context: Context) {
                 val initialAll = mergeAndSortChapters(emptyList(), gatheredFromPage)
                 val initialChapters = filterChaptersByDirectoryConstraints(
                     chapters = initialAll,
-                    originalAuthor = detectedOriginalAuthor,
-                    translationGroup = detectedGroup,
+                    originalAuthor = null,
+                    translationGroup = null,
                     publisherUid = detectedAuthor.uid,
                     publisherName = detectedAuthor.name,
                     keepUnknownPublisher = true

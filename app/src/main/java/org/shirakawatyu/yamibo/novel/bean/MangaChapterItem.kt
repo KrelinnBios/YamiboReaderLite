@@ -29,5 +29,8 @@ data class MangaChapterItem @JSONCreator constructor(
     val groupIndex: Int = 0,
 
     @JSONField(name = "publishTime")
-    val publishTime: Long = 0L
+    val publishTime: Long = 0L,
+
+    @JSONField(name = "pid")
+    val pid: String? = null          // 帖子内楼层ID，单帖多章时用于区分（showcollapse_box pid / threadindex viewpid）
 )

@@ -34,23 +34,110 @@ class MangaHtmlParser {
         }
 
         /**
-         * 提取1楼正文中的所有内部 TID 超链接
+         * 提取1楼正文中的所有内部 TID 超链接（含 ptid 链接和 threadindex 目录）
          */
         fun extractSamePageLinks(html: String): List<MangaChapterItem> {
             val doc = Jsoup.parse(html)
             val messageDiv = doc.select(".message").firstOrNull() ?: return emptyList()
 
             val result = mutableListOf<MangaChapterItem>()
-            val links = messageDiv.select("a[href*='tid='], a[href*='thread-']")
+            val links = messageDiv.select(
+                "a[href*='tid='], a[href*='thread-'], a[href*='ptid=']"
+            )
 
             for (link in links) {
                 val url = link.attr("href")
                 val title = link.text()
+                if (title.isBlank()) continue
                 val tid = MangaTitleCleaner.extractTidFromUrl(url) ?: continue
                 val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                val pid = extractPidFromUrl(url)
                 val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
-                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null))
+                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
             }
+            return result
+        }
+
+        /**
+         * 从 URL 提取 pid（用于单帖多章时区分楼层）
+         * 匹配 mod=redirect&goto=findpost&ptid=TID&pid=PID 中的 pid
+         */
+        private fun extractPidFromUrl(url: String): String? {
+            return Regex("[?&]pid=(\\d+)").find(url)?.groupValues?.get(1)
+        }
+
+        /**
+         * 提取 #threadindex .tindex 目录（Discuz! 插件生成的页内目录）
+         * 这些链接的 href 为 javascript:;，通过 onclick 中的 viewpid 定位楼层。
+         * 章节标题可能在 <a> 内或直接为 <li> 文本，两者皆处理。
+         */
+        fun extractThreadindexLinks(html: String): List<MangaChapterItem> {
+            val doc = Jsoup.parse(html)
+            val items = doc.select("#threadindex .tindex li")
+            if (items.isEmpty()) return emptyList()
+
+            val result = mutableListOf<MangaChapterItem>()
+            for (li in items) {
+                val onclick = li.attr("onclick")
+                val viewPidMatch = Regex("viewpid=(\\d+)").find(onclick)
+                val tidMatch = Regex("tid=(\\d+)").find(onclick)
+                if (viewPidMatch == null || tidMatch == null) continue
+                val pid = viewPidMatch.groupValues[1]
+                val tid = tidMatch.groupValues[1]
+                val title = li.select("a").firstOrNull()?.text()?.takeIf { it.isNotBlank() }
+                    ?: li.text().trim().takeIf { it.isNotBlank() }
+                    ?: continue
+                val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
+            }
+            return result
+        }
+
+        /**
+         * 从"只看楼主"过滤后的 HTML 中提取所有楼主发帖，识别为小说章节。
+         * 每层楼取首个 <strong>/<b> 文本作为章节标题，pid 作为章节ID。
+         */
+        fun extractChaptersFromAuthorFilteredHtml(
+            html: String,
+            tid: String
+        ): List<MangaChapterItem> {
+            val doc = Jsoup.parse(html)
+            val result = mutableListOf<MangaChapterItem>()
+
+            // PC 版：table[id^=pid]
+            val pcPosts = doc.select("table[id^=pid]")
+            for (table in pcPosts) {
+                val pid = table.attr("id").removePrefix("pid")
+                if (pid.isNullOrBlank()) continue
+                val tds = table.select(".t_fsz .t_f, .t_msgfont, .message")
+                for (td in tds) {
+                    val titleEl = td.select("strong, b").firstOrNull() ?: continue
+                    val title = titleEl.text().trim()
+                    if (title.isBlank() || title.length > 100) continue
+                    val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                    val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                    result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
+                }
+            }
+
+            // 移动版：div[id^=post_] 内的 .message / .t_f
+            if (result.isEmpty()) {
+                val mobilePosts = doc.select("div[id^=post_]")
+                for (post in mobilePosts) {
+                    val postId = post.attr("id")
+                    val pid = postId.removePrefix("post_")
+                    if (pid.isNullOrBlank()) continue
+                    val message = post.select(".message, .t_f, #postmessage_$pid").firstOrNull() ?: continue
+                    val titleEl = message.select("strong, b").firstOrNull() ?: continue
+                    val title = titleEl.text().trim()
+                    if (title.isBlank() || title.length > 100) continue
+                    val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                    val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                    result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
+                }
+            }
+
             return result
         }
 

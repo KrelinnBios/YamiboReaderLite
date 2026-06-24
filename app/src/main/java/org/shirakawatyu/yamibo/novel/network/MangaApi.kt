@@ -6,6 +6,7 @@ import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MangaApi {
@@ -46,6 +47,23 @@ interface MangaApi {
     @GET("/api/mobile/index.php?module=viewthread&version=4")
     suspend fun getThreadDetailApi(
         @Query("tid") tid: String,
+        @Query("page") page: Int = 1
+    ): ResponseBody
+
+    // 获取帖子 PC 版 HTML（SEO URL 格式，含 #threadindex 目录，移动版会去除）
+    @Headers("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    @GET("/thread-{tid}-1-1.html")
+    suspend fun getThreadPcHtml(
+        @Path("tid") tid: String
+    ): ResponseBody
+
+    // 获取"只看楼主"过滤后的帖子 HTML（PC 版，用 forum.php 格式以便加 authorid）
+    @Headers("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+    @GET("/forum.php")
+    suspend fun getThreadHtmlByAuthor(
+        @Query("mod") mod: String = "viewthread",
+        @Query("tid") tid: String,
+        @Query("authorid") authorId: String,
         @Query("page") page: Int = 1
     ): ResponseBody
 }
