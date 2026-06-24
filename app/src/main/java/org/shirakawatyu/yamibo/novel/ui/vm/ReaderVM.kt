@@ -1233,6 +1233,29 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         """^(?:序章|楔子|引子|尾声|尾聲|后记|後記|番外|第[零〇一二三四五六七八九十百千万兩两\d]+(?:章|节|節|卷|篇|幕|话|話|回))"""
     )
 
+    // 「Episode N / EP N / Chapter N」式分话标记：部分译者（如《一周一次买下同班同学》《如果你愿意成为我的朋友》）
+    // 用英文标记分话，既不是「第N话」也不是居中大字号，原先识别不到。这类楼层与已识别到的中文标题（如「序章」）
+    // 混排时，会因没有自己的标题而全部并入上一章，导致目录只剩第一章。标记可能在楼层正文首行，也可能紧跟在一行
+    // 子标题之后（如先一行「仙台同学的价格正好五千元」再一行「Episode 1」），故扫描正文前几行。
+    private val episodeHeadingRegex = Regex(
+        """^(?:episode|ep|chapter)\b\s*\.?\s*(\d+)""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** 扫描楼层正文前几行，提取「Episode N」式分话标记，归一化为「Episode N」（取不到返回 null）。 */
+    private fun extractEpisodeHeading(postText: String): String? {
+        postText.lineSequence()
+            .map { it.replace(Regex("\\s+"), " ").trim() }
+            .filter { it.isNotBlank() }
+            .take(3)
+            .forEach { line ->
+                episodeHeadingRegex.find(line)?.let { match ->
+                    return "Episode ${match.groupValues[1]}"
+                }
+            }
+        return null
+    }
+
     /** 从单个楼层中提取「标题样式」文本（取不到或过长则返回 null）。 */
     private fun extractStructuralHeading(node: org.jsoup.nodes.Element): String? {
         return node.selectFirst(chapterHeadingSelector)?.text()
@@ -1332,9 +1355,17 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     if (dateHeading != null) {
                         convertChineseIfNeeded(dateHeading, translationMode) to true
                     } else {
-                        // 3) 居中/大字号的装饰性标题：软标题，连续同名才合并
-                        extractStructuralHeading(messageNodes[i])
-                            ?.let { convertChineseIfNeeded(it, translationMode) to false }
+                        // 3) 「Episode N」式英文分话标记：每话一个楼层，硬分章
+                        val episodeHeading = extractEpisodeHeading(
+                            convertedTexts.getOrElse(i) { rawTexts[i] }
+                        )
+                        if (episodeHeading != null) {
+                            episodeHeading to true
+                        } else {
+                            // 4) 居中/大字号的装饰性标题：软标题，连续同名才合并
+                            extractStructuralHeading(messageNodes[i])
+                                ?.let { convertChineseIfNeeded(it, translationMode) to false }
+                        }
                     }
                 }
             }
