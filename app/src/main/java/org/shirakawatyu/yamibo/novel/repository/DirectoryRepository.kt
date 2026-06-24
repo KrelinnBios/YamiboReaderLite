@@ -12,11 +12,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import org.shirakawatyu.yamibo.novel.bean.DirectoryStrategy
 import org.shirakawatyu.yamibo.novel.bean.MangaChapterItem
 import org.shirakawatyu.yamibo.novel.bean.MangaDirectory
-import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.network.MangaApi
 import org.shirakawatyu.yamibo.novel.parser.MangaHtmlParser
@@ -365,80 +363,53 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
             }
 
-            // ===== 补充：移动版 HTML 常缺失 #threadindex，改拉 PC HTML =====
-            // Discuz! cookie 中若含 mobile=2，服务器会返回移动版（不含 #threadindex），
-            // 因此需要手动构造 OkHttp 请求、清除 cookie 中的 mobile 值、显式追加 &mobile=no。
+            // ===== 补充：移动版 HTML 常缺失单帖多章，改走 API 逐页扫描楼主发帖 =====
+            // API 端点 api/mobile/index.php?module=viewthread 已通过稳定验证
+            // （resolveThreadAuthor 使用），不存在 cookie/插件渲染问题。
             val supplementaryLinks = mutableListOf<MangaChapterItem>()
-            val needPcFallback = threadindexLinks.isEmpty() && (
+            val needApiFallback = threadindexLinks.isEmpty() && (
                     rawSamePageLinks.any { it.tid == tid } ||
                             (rawSamePageLinks.isNotEmpty() && rawSamePageLinks.size < 5)
                     )
-            if (needPcFallback) {
+            if (needApiFallback && detectedAuthor.uid != null) {
+                Log.d(LOG_TAG, "API fallback: scanning tid=$tid authorUid=${detectedAuthor.uid}")
                 try {
-                    val pcUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=no"
-                    Log.d(LOG_TAG, "PC fallback: fetching $pcUrl")
-                    val rawCookie = GlobalData.currentCookie
-                    val cleanCookie = rawCookie.replace(Regex("(^|;)\\s*mobile=[^;]*"), "")
-                    val req = Request.Builder()
-                        .url(pcUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                        .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                        .header("Referer", "https://bbs.yamibo.com/")
-                        .also { builder ->
-                            if (cleanCookie.isNotBlank()) builder.header("Cookie", cleanCookie)
+                    val firstPage = JSON.parseObject(mangaApi.getThreadDetailApi(tid, 1).string())
+                    val variables = firstPage.getJSONObject("Variables")
+                    val totalPages = (variables?.getJSONObject("thread")?.getString("maxposition")
+                        ?.toIntOrNull()?.let { (it + 19) / 20 }
+                        ?: variables?.getString("totalpage")?.toIntOrNull()
+                        ?: 39).coerceIn(1, 20)
+                    val seenAuthorPids = mutableSetOf<String>()
+                    for (page in 1..totalPages) {
+                        val root = JSON.parseObject(mangaApi.getThreadDetailApi(tid, page).string())
+                        val postlist = root.getJSONObject("Variables")?.getJSONArray("postlist") ?: continue
+                        val isFirstPage = page == 1
+                        for (i in 0 until postlist.size) {
+                            val post = postlist.getJSONObject(i)
+                            val authorId = post.getString("authorid")
+                            if (authorId != detectedAuthor.uid) continue
+                            val pid = post.getString("pid") ?: continue
+                            if (pid in seenAuthorPids) continue
+                            seenAuthorPids.add(pid)
+                            val msg = post.getString("message") ?: continue
+                            val title = org.jsoup.Jsoup.parse(msg).select("strong, b")
+                                .firstOrNull()?.text()?.trim()
+                            if (title.isNullOrBlank() || title.length > 100) continue
+                            val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                            val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                            supplementaryLinks.add(
+                                MangaChapterItem(tid, title, chapterNum, safeUrl,
+                                    authorUid = detectedAuthor.uid, authorName = detectedAuthor.name,
+                                    pid = pid)
+                            )
                         }
-                        .get()
-                        .build()
-                    val resp = YamiboRetrofit.okHttpClient.newCall(req).execute()
-                    val pcHtml = if (resp.isSuccessful) resp.body?.string() else null
-                    if (pcHtml != null) {
-                        val pcLinks = MangaHtmlParser.extractThreadindexLinks(pcHtml).map { ch ->
-                            if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
-                                ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
-                            } else ch
-                        }
-                        supplementaryLinks.addAll(pcLinks)
-                        Log.d(LOG_TAG, "PC fallback: threadindex links=${pcLinks.size}")
-
-                        if (supplementaryLinks.size < 10 && detectedAuthor.uid != null) {
-                            Log.d(LOG_TAG, "PC fallback: scanning author posts uid=${detectedAuthor.uid}")
-                            val totalPages = MangaHtmlParser.extractTotalPages(pcHtml)
-                            val maxPages = totalPages.coerceIn(1, 20)
-                            for (page in 1..maxPages) {
-                                val authorUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&authorid=${detectedAuthor.uid}&page=$page&mobile=no"
-                                val authReq = Request.Builder()
-                                    .url(authorUrl)
-                                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                                    .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                                    .header("Referer", "https://bbs.yamibo.com/")
-                                    .also { builder ->
-                                        if (cleanCookie.isNotBlank()) builder.header("Cookie", cleanCookie)
-                                    }
-                                    .get()
-                                    .build()
-                                val authResp = YamiboRetrofit.okHttpClient.newCall(authReq).execute()
-                                val authorHtml = if (authResp.isSuccessful) authResp.body?.string() else null
-                                if (authorHtml != null) {
-                                    val authorChaps = MangaHtmlParser
-                                        .extractChaptersFromAuthorFilteredHtml(authorHtml, tid)
-                                        .map { ch ->
-                                            if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
-                                                ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
-                                            } else ch
-                                        }
-                                    supplementaryLinks.addAll(authorChaps)
-                                    Log.d(LOG_TAG, "PC fallback: page $page author chaps=${authorChaps.size}")
-                                }
-                            }
-                            Log.d(LOG_TAG, "PC fallback: total supplementary=${supplementaryLinks.size}")
-                        }
-                    } else {
-                        Log.w(LOG_TAG, "PC fallback: HTTP ${resp.code} for tid=$tid")
+                        if (!isFirstPage && supplementaryLinks.isEmpty()) break
+                        Log.d(LOG_TAG, "API fallback: page $page author chaps=${supplementaryLinks.size}")
                     }
+                    Log.d(LOG_TAG, "API fallback: total=${supplementaryLinks.size}")
                 } catch (e: Exception) {
-                    Log.e(LOG_TAG, "PC fallback failed", e)
+                    Log.e(LOG_TAG, "API fallback failed", e)
                 }
             }
 
