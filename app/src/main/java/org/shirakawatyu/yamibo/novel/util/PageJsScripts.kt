@@ -1058,7 +1058,7 @@ object PageJsScripts {
                         meta.name = 'viewport';
                         (document.head || document.documentElement).appendChild(meta);
                     }
-                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=yes');
+                    meta.setAttribute('content', 'width=device-width, user-scalable=yes');
                 }
 
                 // 富文本编辑器（参与/回复主题）正文是独立的同源 iframe 文档，
@@ -1233,14 +1233,17 @@ $styleString
      * 电脑版页面（Discuz 桌面模板，含 id="toptb"）的 body 是 min-width:1200px、.wp 固定 1200px 的宽版布局，
      * 但服务器仍下发 width=device-width 的 viewport meta。该 meta 会让 WebView 以 1.0 缩放在窄屏渲染 1200px 布局，
      * 导致右侧（含浮动的提交按钮等）被挤出屏幕看不到——而浏览器窗口够宽所以正常。
-     * 普通 BLOG/空间页另有响应式 CSS 兜底，使用 width=device-width 才能避免三栏布局被裁切。
+     * 普通 BLOG/空间页（含个人空间首页、个人资料页）使用 width=device-width，但绝不能写死
+     * initial-scale=1.0——这些页面的 .wp 仍是固定 1200px，并非真正响应式，靠 loadWithOverviewMode
+     * 缩到屏宽（亮色模式正是用服务器自带的 width=device-width + overview 正常显示）。一旦写死
+     * initial-scale=1.0 就会顶掉 overview 缩放，导致暗黑下 1200px 版面 1:1 溢出、右侧被裁切。
      * 其它电脑版页面改成 width=1200，并写入按屏宽算出的 initial-scale，把整页确定性地缩放到屏宽。
-     * 仅靠 loadWithOverviewMode 在部分机型/页面上不会真正缩放。手机版页面没有 id="toptb"，保持原样。
+     * 手机版页面没有 id="toptb"，保持原样。
      */
     fun applyDesktopViewportForWebView(html: String, desktopFitScale: Double = 0.0): String {
         if (!TOPTB_ID_REGEX.containsMatchIn(html)) return html
         val content = if (shouldUseResponsiveSpaceViewport(html)) {
-            "width=device-width, initial-scale=1.0, user-scalable=yes"
+            "width=device-width, user-scalable=yes"
         } else if (desktopFitScale > 0.0) {
             val scale = String.format(java.util.Locale.US, "%.3f", desktopFitScale)
             "width=1200, initial-scale=$scale, user-scalable=yes"
