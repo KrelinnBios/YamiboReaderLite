@@ -439,56 +439,76 @@ class YamiboRetrofit {
                 if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
                 // mod=redirect（如「我的回复」的 goto=findpost）走代理，跟随重定向后从 Location 提取
                 // #pidXXX 锚点、注入锚点滚动脚本，使暗黑下首屏即深色（无闪回原色）且锚点跳转正常工作。
+                //
+                // okHttpClient 没有 CookieJar：若让它自动跟随重定向，中途响应的 Set-Cookie 不会带到后续
+                // 请求上。Discuz 的「电脑版/手机版」切换正是「Set-Cookie: mobile=... + 302」，自动跟随会
+                // 让跟随后的请求仍用旧 cookie，服务器返回切换前的模板——表现为暗黑下点「电脑版」要点两次
+                // （第一次只把 cookie 同步进了 CookieManager，第二次才生效）。亮色模式由 WebView 原生导航，
+                // 其自带 cookie 处理会跨重定向带上新 cookie，故一次到位。
+                // 这里关闭自动跟随，手动逐跳把 Set-Cookie 同步进 CookieManager，并用其最新值作为下一跳的
+                // Cookie，使切换一次到位；普通页面无重定向，循环只跑一跳，行为与原先一致。
                 return try {
-                    val reqBuilder = okhttp3.Request.Builder().url(urlStr)
-                    request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
-                    // 确保使用 WebView CookieManager 中的最新 cookie（优于可能过时的缓存值）
-                    if (reqBuilder.build().header("Cookie") == null) {
-                        val cmCookie = android.webkit.CookieManager.getInstance().getCookie(urlStr)
-                        if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
-                    }
-                    if (reqBuilder.build().header("Referer").isNullOrBlank()) {
-                        reqBuilder.header("Referer", "https://bbs.yamibo.com/")
-                    }
-                    // 签到页是动态状态页：强制向服务器重新校验，避免 OkHttp 磁盘缓存命中旧响应，
-                    // 导致显示的签到状态与后台自动签到后的真实状态不一致。
-                    if (urlStr.contains("zqlj_sign", ignoreCase = true)) {
-                        reqBuilder.header("Cache-Control", "no-cache")
-                    }
-                    val response = okHttpClient.newCall(reqBuilder.build()).execute()
-                    if (response.isSuccessful) {
-                        syncSetCookieToWebView(response)
-                        val body = response.body?.string()
-                        response.body?.close()
-                        if (body != null) {
-                            val anchor = extractAnchorFromRedirectChain(response)
-                            if (anchor != null) {
-                                return injectAnchorScrollScript(body, anchor)
-                            }
+                    val cm = android.webkit.CookieManager.getInstance()
+                    val manualRedirectClient = okHttpClient.newBuilder()
+                        .followRedirects(false)
+                        .followSslRedirects(false)
+                        .build()
+
+                    var currentUrl = urlStr
+                    var anchor: String? = null
+                    var hops = 0
+                    while (true) {
+                        val reqBuilder = okhttp3.Request.Builder().url(currentUrl)
+                        // 仅首跳沿用 WebView 原请求头；后续跳为服务器重定向目标，用干净请求头即可。
+                        if (hops == 0) {
+                            request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
                         }
-                        body
-                    } else {
-                        null
+                        // 始终用 CookieManager 中的最新 cookie（含上一跳刚同步进去的切换 cookie）
+                        val cmCookie = cm.getCookie(currentUrl)
+                        if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
+                        if (reqBuilder.build().header("Referer").isNullOrBlank()) {
+                            reqBuilder.header("Referer", "https://bbs.yamibo.com/")
+                        }
+                        // 签到页是动态状态页：强制向服务器重新校验，避免 OkHttp 磁盘缓存命中旧响应，
+                        // 导致显示的签到状态与后台自动签到后的真实状态不一致。
+                        if (currentUrl.contains("zqlj_sign", ignoreCase = true)) {
+                            reqBuilder.header("Cache-Control", "no-cache")
+                        }
+
+                        val response = manualRedirectClient.newCall(reqBuilder.build()).execute()
+                        // 先把本跳 Set-Cookie 同步进 CookieManager，供下一跳与 WebView 使用
+                        syncSetCookieToWebView(response)
+
+                        if (response.isRedirect) {
+                            val location = response.header("Location")
+                            val resolved = location?.let { response.request.url.resolve(it) }
+                            response.close()
+                            if (resolved == null || hops >= 8) return null
+                            if (anchor == null && location.contains('#')) {
+                                anchor = location.substring(location.indexOf('#'))
+                            }
+                            currentUrl = resolved.toString()
+                            hops++
+                            continue
+                        }
+
+                        if (!response.isSuccessful) {
+                            response.close()
+                            return null
+                        }
+                        val body = response.body?.string()
+                        response.close()
+                        return if (body != null && anchor != null) {
+                            injectAnchorScrollScript(body, anchor)
+                        } else {
+                            body
+                        }
                     }
+                    @Suppress("UNREACHABLE_CODE")
+                    null
                 } catch (_: Exception) {
                     null
                 }
-        }
-
-        /** 遍历 OkHttp 响应链，提取首个带 #fragment 的 Location 值（如 #pid123456）。*/
-        private fun extractAnchorFromRedirectChain(response: okhttp3.Response): String? {
-            var resp: okhttp3.Response? = response
-            while (resp != null) {
-                val location = resp.header("Location")
-                if (location != null) {
-                    val hashIndex = location.indexOf('#')
-                    if (hashIndex >= 0) {
-                        return location.substring(hashIndex)
-                    }
-                }
-                resp = resp.priorResponse
-            }
-            return null
         }
 
         /** 在 HTML 中注入锚点滚动脚本，保留 #pidXXX 跳转。*/
