@@ -437,6 +437,12 @@ class YamiboRetrofit {
         fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
             val urlStr = request.url.toString()
             if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
+            // mod=redirect（如「我的回复」的 goto=findpost、goto=lastpost）是纯服务端跳转端点，
+            // 唯一作用是返回带 #pidXXX 锚点的 Location。若在此用 OkHttp 跟完跳转、把最终页 HTML
+            // 返回给原始重定向 URL，WebView 文档地址仍是无锚点的重定向 URL，就丢了锚点、只停在帖子
+            // 顶部（亮色不走代理、WebView 原生跟跳转、锚点保留，所以亮色能跳到楼层）。这里放行给
+            // WebView 原生跟跳转以保留锚点滚动；暗黑主题仍由各页 onPageCommitVisible 的 getThemeSetJs 注入。
+            if (urlStr.contains("mod=redirect", ignoreCase = true)) return null
             return try {
                 val reqBuilder = okhttp3.Request.Builder().url(urlStr)
                 request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
