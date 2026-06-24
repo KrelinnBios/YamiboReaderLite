@@ -433,7 +433,9 @@ class MangaTitleCleaner {
          * 从 URL 提取 tid (用于去重唯一键)
          */
         fun extractTidFromUrl(url: String): String? {
-            val match = Regex("tid=(\\d+)").find(url) ?: Regex("thread-(\\d+)-").find(url)
+            val match = Regex("tid=(\\d+)").find(url)
+                ?: Regex("thread-(\\d+)-").find(url)
+                ?: Regex("[?&]ptid=(\\d+)").find(url)
             return match?.groupValues?.get(1)
         }
 
