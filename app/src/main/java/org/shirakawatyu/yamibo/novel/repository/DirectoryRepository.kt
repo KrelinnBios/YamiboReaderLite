@@ -74,6 +74,13 @@ class DirectoryRepository private constructor(private val context: Context) {
         }.getOrDefault(ThreadAuthor())
     }
 
+    /**
+     * 章节唯一键：跨帖时用 tid，单帖多章时用 tid-pid
+     */
+    private fun chapterUniqueKey(chapter: MangaChapterItem): String {
+        return if (chapter.pid != null) "${chapter.tid}-pid-${chapter.pid}" else chapter.tid
+    }
+
     private fun chapterMatchesPublisher(
         chapter: MangaChapterItem,
         publisherUid: String?,
@@ -171,8 +178,8 @@ class DirectoryRepository private constructor(private val context: Context) {
     ): List<MangaChapterItem> {
         val map = LinkedHashMap<String, MangaChapterItem>()
 
-        old.forEach { map[it.tid] = it }
-        new.forEach { map[it.tid] = it }
+        old.forEach { map[chapterUniqueKey(it)] = it }
+        new.forEach { map[chapterUniqueKey(it)] = it }
 
         val sortedByTid = map.values.sortedBy { it.tid.toLongOrNull() ?: 0L }
 
@@ -347,6 +354,15 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
             }
 
+            // 提取 #threadindex 页内目录（单帖多章）
+            val threadindexLinks = MangaHtmlParser.extractThreadindexLinks(mobileHtml).map { chapter ->
+                if (chapter.authorUid.isNullOrBlank() && chapter.authorName.isNullOrBlank()) {
+                    chapter.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
+                } else {
+                    chapter
+                }
+            }
+
             val currentChapter = MangaChapterItem(
                 tid = tid,
                 rawTitle = threadTitle,
@@ -356,20 +372,22 @@ class DirectoryRepository private constructor(private val context: Context) {
                 authorName = detectedAuthor.name
             )
 
-            val gatheredFromPage = (listOf(currentChapter) + rawSamePageLinks).distinctBy { it.tid }
+            val allLinks = rawSamePageLinks + threadindexLinks
+            val gatheredFromPage = (listOf(currentChapter) + allLinks).distinctBy { chapterUniqueKey(it) }
 
             if (cachedDir != null) {
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
                 val detectedOriginalAuthor = MangaTitleCleaner.extractAuthorPrefix(threadTitle).takeIf { it.isNotBlank() }
+                val hasPageLinks = allLinks.isNotEmpty()
                 val newStrategy =
-                    if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && rawSamePageLinks.isNotEmpty()) {
+                    if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks) {
                         DirectoryStrategy.LINKS
                     } else cachedDir.strategy
 
-                val existingTids = cachedDir.chapters.map { it.tid }.toSet()
+                val existingChapterKeys = cachedDir.chapters.map { chapterUniqueKey(it) }.toSet()
 
-                val supplementaryChapters = gatheredFromPage.filter { it.tid !in existingTids }
-                val preferCurrentThreadMetadata = tid !in existingTids
+                val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
+                val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
 
                 val detectedOrSavedGroup = if (preferCurrentThreadMetadata) {
                     detectedGroup.takeIf { it.isNotBlank() } ?: cachedDir.translationGroup
@@ -430,7 +448,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                 if (tagIds.isNotEmpty()) {
                     strategy = DirectoryStrategy.TAG
                     sourceKey = tagIds.joinToString(",")
-                } else if (rawSamePageLinks.isNotEmpty()) {
+                } else if (allLinks.isNotEmpty()) {
                     strategy = DirectoryStrategy.LINKS
                     sourceKey = cleanName
                 } else {
