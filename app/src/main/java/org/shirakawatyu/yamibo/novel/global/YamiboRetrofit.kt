@@ -433,43 +433,71 @@ class YamiboRetrofit {
         }
         // 是否排除暗黑改为按页面内容判断（只排除自定义 DIY 空间）：所有 bbs 主框架页都照常
         // 经代理抓取，再由 injectThemeCssIntoHtml → MemberSpaceGuard.isMemberSpaceHtml 决定
-        // 注不注入。普通空间也能变深色，只有用了自定义背景图的 DIY 空间保持原样。
-        fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
-            val urlStr = request.url.toString()
-            if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
-            // mod=redirect（如「我的回复」的 goto=findpost、goto=lastpost）是纯服务端跳转端点，
-            // 唯一作用是返回带 #pidXXX 锚点的 Location。若在此用 OkHttp 跟完跳转、把最终页 HTML
-            // 返回给原始重定向 URL，WebView 文档地址仍是无锚点的重定向 URL，就丢了锚点、只停在帖子
-            // 顶部（亮色不走代理、WebView 原生跟跳转、锚点保留，所以亮色能跳到楼层）。这里放行给
-            // WebView 原生跟跳转以保留锚点滚动；暗黑主题仍由各页 onPageCommitVisible 的 getThemeSetJs 注入。
-            if (urlStr.contains("mod=redirect", ignoreCase = true)) return null
-            return try {
-                val reqBuilder = okhttp3.Request.Builder().url(urlStr)
-                request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
-                // 确保使用 WebView CookieManager 中的最新 cookie（优于可能过时的缓存值）
-                if (reqBuilder.build().header("Cookie") == null) {
-                    val cmCookie = android.webkit.CookieManager.getInstance().getCookie(urlStr)
-                    if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
-                }
-                if (reqBuilder.build().header("Referer").isNullOrBlank()) {
-                    reqBuilder.header("Referer", "https://bbs.yamibo.com/")
-                }
-                // 签到页是动态状态页：强制向服务器重新校验，避免 OkHttp 磁盘缓存命中旧响应，
-                // 导致显示的签到状态与后台自动签到后的真实状态不一致。
-                if (urlStr.contains("zqlj_sign", ignoreCase = true)) {
-                    reqBuilder.header("Cache-Control", "no-cache")
-                }
-                val response = okHttpClient.newCall(reqBuilder.build()).execute()
-                if (response.isSuccessful) {
-                    syncSetCookieToWebView(response)
-                    val body = response.body?.string()
-                    response.body?.close()
-                    body
-                } else {
+            // 注不注入。普通空间也能变深色，只有用了自定义背景图的 DIY 空间保持原样。
+            fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
+                val urlStr = request.url.toString()
+                if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
+                // mod=redirect（如「我的回复」的 goto=findpost）走代理，跟随重定向后从 Location 提取
+                // #pidXXX 锚点、注入锚点滚动脚本，使暗黑下首屏即深色（无闪回原色）且锚点跳转正常工作。
+                return try {
+                    val reqBuilder = okhttp3.Request.Builder().url(urlStr)
+                    request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
+                    // 确保使用 WebView CookieManager 中的最新 cookie（优于可能过时的缓存值）
+                    if (reqBuilder.build().header("Cookie") == null) {
+                        val cmCookie = android.webkit.CookieManager.getInstance().getCookie(urlStr)
+                        if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
+                    }
+                    if (reqBuilder.build().header("Referer").isNullOrBlank()) {
+                        reqBuilder.header("Referer", "https://bbs.yamibo.com/")
+                    }
+                    // 签到页是动态状态页：强制向服务器重新校验，避免 OkHttp 磁盘缓存命中旧响应，
+                    // 导致显示的签到状态与后台自动签到后的真实状态不一致。
+                    if (urlStr.contains("zqlj_sign", ignoreCase = true)) {
+                        reqBuilder.header("Cache-Control", "no-cache")
+                    }
+                    val response = okHttpClient.newCall(reqBuilder.build()).execute()
+                    if (response.isSuccessful) {
+                        syncSetCookieToWebView(response)
+                        val body = response.body?.string()
+                        response.body?.close()
+                        if (body != null) {
+                            val anchor = extractAnchorFromRedirectChain(response)
+                            if (anchor != null) {
+                                return injectAnchorScrollScript(body, anchor)
+                            }
+                        }
+                        body
+                    } else {
+                        null
+                    }
+                } catch (_: Exception) {
                     null
                 }
-            } catch (_: Exception) {
-                null
+        }
+
+        /** 遍历 OkHttp 响应链，提取首个带 #fragment 的 Location 值（如 #pid123456）。*/
+        private fun extractAnchorFromRedirectChain(response: okhttp3.Response): String? {
+            var resp: okhttp3.Response? = response
+            while (resp != null) {
+                val location = resp.header("Location")
+                if (location != null) {
+                    val hashIndex = location.indexOf('#')
+                    if (hashIndex >= 0) {
+                        return location.substring(hashIndex)
+                    }
+                }
+                resp = resp.priorResponse
+            }
+            return null
+        }
+
+        /** 在 HTML 中注入锚点滚动脚本，保留 #pidXXX 跳转。*/
+        private fun injectAnchorScrollScript(html: String, anchor: String): String {
+            val script = "<script>setTimeout(function(){location.hash='${anchor.substringAfter("#")}';},80);</script>"
+            return if (html.contains("</body>")) {
+                html.replace("</body>", "$script</body>")
+            } else {
+                html + script
             }
         }
 
