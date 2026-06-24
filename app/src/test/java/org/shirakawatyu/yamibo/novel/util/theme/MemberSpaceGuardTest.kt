@@ -73,12 +73,15 @@ class MemberSpaceGuardTest {
         val plainSpace = """
             <html><head></head><body id="space"><div id="toptb"></div></body></html>
         """.trimIndent()
+        // 空间页用 width=device-width 但不写死 initial-scale，交给 loadWithOverviewMode 缩放，
+        // 避免 1200px 版面 1:1 溢出（暗黑电脑版主页显示异常的根因）。
         val responsiveSpace = PageJsScripts.applyDesktopViewportForWebView(plainSpace, 0.3)
         assertTrue(
             responsiveSpace.contains(
-                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=yes\">"
+                "<meta name=\"viewport\" content=\"width=device-width, user-scalable=yes\">"
             )
         )
+        assertFalse(responsiveSpace.contains("initial-scale"))
 
         val blogList = """
             <html><head><meta name="viewport" content="width=device-width"></head>
@@ -86,7 +89,8 @@ class MemberSpaceGuardTest {
             <div id="ct" class="ct3_a wp cl"><div class="appl"></div><div class="mn"></div><div class="sd"></div></div></body></html>
         """.trimIndent()
         val responsiveBlog = PageJsScripts.applyDesktopViewportForWebView(blogList, 0.3)
-        assertTrue(responsiveBlog.contains("width=device-width, initial-scale=1.0, user-scalable=yes"))
+        assertTrue(responsiveBlog.contains("width=device-width, user-scalable=yes"))
+        assertFalse(responsiveBlog.contains("initial-scale"))
 
         val blogThreadList = """
             <html><head><meta name="viewport" content="width=device-width"></head>
