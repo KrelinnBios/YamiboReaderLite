@@ -365,35 +365,51 @@ class DirectoryRepository private constructor(private val context: Context) {
 
             // ===== 补充：移动版 HTML 常缺失 #threadindex，改拉 PC HTML =====
             val supplementaryLinks = mutableListOf<MangaChapterItem>()
-            val isSingleThreadMultiChapter = rawSamePageLinks.any { it.tid == tid }
-            if (threadindexLinks.isEmpty() && isSingleThreadMultiChapter) {
-                runCatching {
+            val needPcFallback = threadindexLinks.isEmpty() && (
+                    rawSamePageLinks.any { it.tid == tid } ||
+                            (rawSamePageLinks.isNotEmpty() && rawSamePageLinks.size < 5)
+                    )
+            if (needPcFallback) {
+                try {
+                    Log.d(LOG_TAG, "PC fallback: fetching PC HTML for tid=$tid")
                     val pcHtml = mangaApi.getThreadPcHtml(tid).string()
-                    val pcLinks = MangaHtmlParser.extractThreadindexLinks(pcHtml).map { ch ->
-                        if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
-                            ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
-                        } else ch
-                    }
-                    supplementaryLinks.addAll(pcLinks)
-
-                    // PC threadindex 仍不够 → 尝试"只看楼主"逐帖扫描章节标题
-                    if (supplementaryLinks.size < 10 && detectedAuthor.uid != null) {
-                        val totalPages = MangaHtmlParser.extractTotalPages(pcHtml)
-                        val maxPages = totalPages.coerceIn(1, 20)
-                        for (page in 1..maxPages) {
-                            val authorHtml = mangaApi.getThreadHtmlByAuthor(
-                                tid, detectedAuthor.uid, page
-                            ).string()
-                            val authorChaps = MangaHtmlParser
-                                .extractChaptersFromAuthorFilteredHtml(authorHtml, tid)
-                                .map { ch ->
-                                    if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
-                                        ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
-                                    } else ch
-                                }
-                            supplementaryLinks.addAll(authorChaps)
+                    if (pcHtml.isNotBlank()) {
+                        val pcLinks = MangaHtmlParser.extractThreadindexLinks(pcHtml).map { ch ->
+                            if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
+                                ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
+                            } else ch
                         }
+                        supplementaryLinks.addAll(pcLinks)
+                        Log.d(LOG_TAG, "PC fallback: threadindex links=${pcLinks.size}")
+
+                        // PC threadindex 仍不够 → 尝试"只看楼主"逐帖扫描章节标题
+                        if (supplementaryLinks.size < 10 && detectedAuthor.uid != null) {
+                            Log.d(LOG_TAG, "PC fallback: scanning author posts uid=${detectedAuthor.uid}")
+                            val totalPages = MangaHtmlParser.extractTotalPages(pcHtml)
+                            val maxPages = totalPages.coerceIn(1, 20)
+                            for (page in 1..maxPages) {
+                                val authorHtml = mangaApi.getThreadHtmlByAuthor(
+                                    tid = tid,
+                                    authorId = detectedAuthor.uid,
+                                    page = page
+                                ).string()
+                                val authorChaps = MangaHtmlParser
+                                    .extractChaptersFromAuthorFilteredHtml(authorHtml, tid)
+                                    .map { ch ->
+                                        if (ch.authorUid.isNullOrBlank() && ch.authorName.isNullOrBlank()) {
+                                            ch.copy(authorUid = detectedAuthor.uid, authorName = detectedAuthor.name)
+                                        } else ch
+                                    }
+                                supplementaryLinks.addAll(authorChaps)
+                                Log.d(LOG_TAG, "PC fallback: page $page author chaps=${authorChaps.size}")
+                            }
+                            Log.d(LOG_TAG, "PC fallback: total supplementary=${supplementaryLinks.size}")
+                        }
+                    } else {
+                        Log.w(LOG_TAG, "PC fallback: empty PC HTML")
                     }
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "PC fallback failed", e)
                 }
             }
 
