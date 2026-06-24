@@ -423,7 +423,12 @@ class DirectoryRepository private constructor(private val context: Context) {
             )
 
             val allLinks = rawSamePageLinks + threadindexLinks + supplementaryLinks
+            Log.d(LOG_TAG, "rawSamePageLinks=${rawSamePageLinks.size} threadindexLinks=${threadindexLinks.size} supplementaryLinks=${supplementaryLinks.size}")
+            rawSamePageLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  raw[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
+            supplementaryLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  supp[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
+
             val gatheredFromPage = (listOf(currentChapter) + allLinks).distinctBy { chapterUniqueKey(it) }
+            Log.d(LOG_TAG, "gatheredFromPage=${gatheredFromPage.size}")
 
             if (cachedDir != null) {
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
@@ -435,6 +440,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     } else cachedDir.strategy
 
                 val existingChapterKeys = cachedDir.chapters.map { chapterUniqueKey(it) }.toSet()
+                Log.d(LOG_TAG, "cached chapters=${cachedDir.chapters.size} existingKeys=${existingChapterKeys.size} author='$detectedOriginalAuthor'")
 
                 val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
                 val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
@@ -459,11 +465,13 @@ class DirectoryRepository private constructor(private val context: Context) {
                 } else {
                     cachedDir.publisherName
                 }
+                Log.d(LOG_TAG, "filter originalAuthor='$detectedOrSavedOriginalAuthor' group='$detectedOrSavedGroup'")
                 val mergedAll = mergeAndSortChapters(cachedDir.chapters, supplementaryChapters)
+                Log.d(LOG_TAG, "mergedAll=${mergedAll.size} before filter")
                 val mergedChapters = filterChaptersByDirectoryConstraints(
                     chapters = mergedAll,
-                    originalAuthor = detectedOrSavedOriginalAuthor,
-                    translationGroup = detectedOrSavedGroup,
+                    originalAuthor = null,
+                    translationGroup = null,
                     publisherUid = detectedOrSavedPublisherUid,
                     publisherName = detectedOrSavedPublisherName,
                     keepUnknownPublisher = true
@@ -512,8 +520,8 @@ class DirectoryRepository private constructor(private val context: Context) {
                 val initialAll = mergeAndSortChapters(emptyList(), gatheredFromPage)
                 val initialChapters = filterChaptersByDirectoryConstraints(
                     chapters = initialAll,
-                    originalAuthor = detectedOriginalAuthor,
-                    translationGroup = detectedGroup,
+                    originalAuthor = null,
+                    translationGroup = null,
                     publisherUid = detectedAuthor.uid,
                     publisherName = detectedAuthor.name,
                     keepUnknownPublisher = true
