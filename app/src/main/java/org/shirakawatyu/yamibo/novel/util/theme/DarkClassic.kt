@@ -414,6 +414,8 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".appl span a { color: #8099b2 !important; }",
     "/* 双栏布局：浅色竖线贴图换成纯色边框（贴图是浅灰分隔线，深色下必须去掉） */",
     ".ct2_a, .ct3_a { border-color: #274766 !important; background-image: none !important; }",
+    "/* spacecp 控制面板页（发布日志/上传/资料等，#ct.ct3_a）窄屏 reflow：站点把 .mn 写死 775px、.sd float right 220px，而 .wp 在窄屏是 width:auto，导致主表单溢出、侧栏(资料完成度/最近来访)浮到右沿压住「发布」按钮。这里取消浮动、宽度自适应，让主表单与侧栏纵向堆叠。 */",
+    ".pg_space .ct3_a .mn, .pg_space .ct3_a .sd { float: none !important; width: auto !important; margin-left: 0 !important; }",
     "/* 个人资料编辑页（pg_spacecp）表单与表格 */",
     ".exfm { background: #1f2c3d !important; border-color: #3c5677 !important; }",
     ".sinf { border-right-color: #274766 !important; }",
