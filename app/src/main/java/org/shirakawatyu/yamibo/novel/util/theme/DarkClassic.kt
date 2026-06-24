@@ -240,7 +240,9 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".float-menu-item { background: rgba(51, 51, 51, 0.85) !important; color: #c7d8ea !important; }",
     ".float-menu-item svg { fill: #c7d8ea !important; color: #c7d8ea !important; }",
     ".scrolltop, #scrolltop, #scrolltop a { background: #274766 !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
-    "#mask { background: rgba(0,0,0,0.7) !important; }",
+    // #mask 是 Discuz 所有弹层共用的整屏遮罩。原先染成 rgba(0,0,0,0.7)，导致点楼层弹回复菜单时
+    // 整屏盖一层很重的黑遮罩；亮色模式不注入这条、用 Discuz 默认遮罩，几乎看不见。去掉这条覆盖让
+    // 暗黑下 #mask 与亮色一致（只显示回复菜单、无刺眼遮罩）。不要再加回此规则。
     "/* === 閫氱敤鏂囨湰瑕嗙洊 === */",
     "strong, b, .strong { color: #edf4fb !important; }",
     "sup, sub { color: #acbed1 !important; }",
