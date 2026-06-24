@@ -34,22 +34,60 @@ class MangaHtmlParser {
         }
 
         /**
-         * 提取1楼正文中的所有内部 TID 超链接
+         * 提取1楼正文中的所有内部 TID 超链接（含 ptid 链接和 threadindex 目录）
          */
         fun extractSamePageLinks(html: String): List<MangaChapterItem> {
             val doc = Jsoup.parse(html)
             val messageDiv = doc.select(".message").firstOrNull() ?: return emptyList()
 
             val result = mutableListOf<MangaChapterItem>()
-            val links = messageDiv.select("a[href*='tid='], a[href*='thread-']")
+            val links = messageDiv.select(
+                "a[href*='tid='], a[href*='thread-'], a[href*='ptid=']"
+            )
 
             for (link in links) {
                 val url = link.attr("href")
                 val title = link.text()
+                if (title.isBlank()) continue
                 val tid = MangaTitleCleaner.extractTidFromUrl(url) ?: continue
                 val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                val pid = extractPidFromUrl(url)
                 val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
-                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null))
+                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
+            }
+            return result
+        }
+
+        /**
+         * 从 URL 提取 pid（用于单帖多章时区分楼层）
+         * 匹配 mod=redirect&goto=findpost&ptid=TID&pid=PID 中的 pid
+         */
+        private fun extractPidFromUrl(url: String): String? {
+            return Regex("[?&]pid=(\\d+)").find(url)?.groupValues?.get(1)
+        }
+
+        /**
+         * 提取 #threadindex .tindex 目录（Discuz! 插件生成的页内目录）
+         * 这些链接的 href 为 javascript:;，通过 onclick 中的 viewpid 定位楼层
+         */
+        fun extractThreadindexLinks(html: String): List<MangaChapterItem> {
+            val doc = Jsoup.parse(html)
+            val items = doc.select("#threadindex .tindex li")
+            if (items.isEmpty()) return emptyList()
+
+            val result = mutableListOf<MangaChapterItem>()
+            for (li in items) {
+                val onclick = li.attr("onclick")
+                val viewPidMatch = Regex("viewpid=(\\d+)").find(onclick)
+                val tidMatch = Regex("tid=(\\d+)").find(onclick)
+                if (viewPidMatch == null || tidMatch == null) continue
+                val pid = viewPidMatch.groupValues[1]
+                val tid = tidMatch.groupValues[1]
+                val link = li.select("a").firstOrNull()
+                val title = link?.text()?.takeIf { it.isNotBlank() } ?: continue
+                val chapterNum = MangaTitleCleaner.extractChapterNum(title)
+                val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
             }
             return result
         }
