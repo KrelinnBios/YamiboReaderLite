@@ -13,6 +13,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,11 +22,69 @@ import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
+import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 
 open class YamiboWebViewClient : WebViewClient() {
 
     companion object {
         private val pendingNames = ConcurrentHashMap<String, String>()
+        private val anchorForUrl = ConcurrentHashMap<String, String>()
+
+        fun consumeAnchor(url: String): String? = anchorForUrl.remove(url.substringBefore('#'))
+
+        private fun processGotoFindpost(view: WebView, urlStr: String) {
+            val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1) ?: return
+            val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
+            val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+            val threadUrl = if (pid != null) "$baseUrl#pid$pid" else baseUrl
+            anchorForUrl[baseUrl] = if (pid != null) "#pid$pid" else ""
+
+            view.post {
+                CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+                    try {
+                        val cm = CookieManager.getInstance()
+                        val client = okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(10, TimeUnit.SECONDS)
+                            .readTimeout(10, TimeUnit.SECONDS)
+                            .followRedirects(true)
+                            .followSslRedirects(true)
+                            .build()
+
+                        val reqBuilder = okhttp3.Request.Builder().url(baseUrl)
+                        val cookie = cm.getCookie(baseUrl)
+                        if (!cookie.isNullOrEmpty()) reqBuilder.header("Cookie", cookie)
+
+                        val response = client.newCall(reqBuilder.build()).execute()
+                        val rawHtml = response.body?.string()
+                        response.close()
+
+                        if (rawHtml != null) {
+                            val dm = view.context.resources.displayMetrics
+                            val widthPx = view.width.takeIf { it > 0 } ?: dm.widthPixels
+                            val scale = PageJsScripts.calculateDesktopFitScale(widthPx, dm.density)
+                            val themed = PageJsScripts.injectThemeCssIntoHtml(
+                                rawHtml,
+                                GlobalData.isDarkMode.value,
+                                GlobalData.darkModeTheme.value,
+                                GlobalData.lightModeTheme.value,
+                                scale
+                            )
+                            val scrollJs = if (pid != null) {
+                                "<script>setTimeout(function(){location.hash='$pid';},80);</script>"
+                            } else ""
+                            val modifiedHtml = if (themed.contains("</body>")) {
+                                themed.replace("</body>", "$scrollJs</body>")
+                            } else {
+                                themed + scrollJs
+                            }
+                            view.post {
+                                view.loadDataWithBaseURL(threadUrl, modifiedHtml, "text/html", "UTF-8", null)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
 
         private fun normalizeAttachmentAid(aid: String?): String? {
             if (aid.isNullOrBlank()) return null
@@ -176,6 +235,25 @@ open class YamiboWebViewClient : WebViewClient() {
         """.trimIndent()
 
         view?.evaluateJavascript(injectJs, null)
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        val urlStr = request?.url?.toString() ?: ""
+        if (urlStr.contains("goto=findpost", ignoreCase = true) && view != null) {
+            processGotoFindpost(view, urlStr)
+            return true
+        }
+        return super.shouldOverrideUrlLoading(view, request)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+        val safeUrl = url ?: ""
+        if (safeUrl.contains("goto=findpost", ignoreCase = true) && view != null) {
+            processGotoFindpost(view, safeUrl)
+            return true
+        }
+        return super.shouldOverrideUrlLoading(view, safeUrl)
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
