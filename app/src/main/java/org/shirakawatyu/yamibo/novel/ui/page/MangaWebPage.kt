@@ -283,6 +283,9 @@ fun MangaWebPage(
     }
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
     LaunchedEffect(isDarkMode) {
+        mangaWebView.setBackgroundColor(
+            if (isDarkMode) 0xFF0D141D.toInt() else android.graphics.Color.TRANSPARENT
+        )
         mangaWebView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
