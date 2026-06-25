@@ -518,6 +518,10 @@ fun MinePage(
         val isNew = minePageVM.cachedWebView == null
         val webView = minePageVM.getOrAcquireWebView(context)
 
+        if (GlobalData.isDarkMode.value) {
+            webView.setBackgroundColor(0xFF0D141D.toInt())
+        }
+
         if (isNew) {
             webView.settings.apply {
                 javaScriptEnabled = true
@@ -593,6 +597,9 @@ fun MinePage(
     }
 
     LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems) {
+        mineWebView.setBackgroundColor(
+            if (isDarkMode) 0xFF0D141D.toInt() else android.graphics.Color.TRANSPARENT
+        )
         mineWebView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
