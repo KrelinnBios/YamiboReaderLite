@@ -26,12 +26,6 @@ open class YamiboWebViewClient : WebViewClient() {
 
     companion object {
         private val pendingNames = ConcurrentHashMap<String, String>()
-        private val pendingAnchors = ConcurrentHashMap<String, String>()
-
-        fun consumePendingAnchor(url: String): String? {
-            val base = url.substringBefore('#')
-            return pendingAnchors.remove(base)
-        }
 
         private fun normalizeAttachmentAid(aid: String?): String? {
             if (aid.isNullOrBlank()) return null
@@ -182,37 +176,6 @@ open class YamiboWebViewClient : WebViewClient() {
         """.trimIndent()
 
         view?.evaluateJavascript(injectJs, null)
-    }
-
-    private fun handleGotoFindpost(view: WebView, urlStr: String) {
-        val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1) ?: return
-        val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
-        val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
-        if (pid != null) {
-            pendingAnchors[baseUrl] = "#pid$pid"
-            view.evaluateJavascript("window.location.href='$baseUrl#pid$pid'", null)
-        } else {
-            view.evaluateJavascript("window.location.href='$baseUrl'", null)
-        }
-    }
-
-    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-        val urlStr = request?.url?.toString() ?: ""
-        if (urlStr.contains("goto=findpost", ignoreCase = true) && view != null) {
-            handleGotoFindpost(view, urlStr)
-            return true
-        }
-        return super.shouldOverrideUrlLoading(view, request)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-        val safeUrl = url ?: ""
-        if (safeUrl.contains("goto=findpost", ignoreCase = true) && view != null) {
-            handleGotoFindpost(view, safeUrl)
-            return true
-        }
-        return super.shouldOverrideUrlLoading(view, safeUrl)
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
