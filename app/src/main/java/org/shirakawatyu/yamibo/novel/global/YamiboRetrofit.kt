@@ -437,10 +437,6 @@ class YamiboRetrofit {
             fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
                 val urlStr = request.url.toString()
                 if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
-                // mod=redirect（如「我的回复」的 goto=findpost）不走代理。这类 URL 由各页面
-                // shouldOverrideUrlLoading 截获，提取 ptid/pid 后直接跳转到最终帖子 URL，避免
-                // 原生跟 302 时从缓存闪原色、也避免代理内容与 URL 不一致导致 MinePage 状态机冲突。
-                if (urlStr.contains("goto=findpost", ignoreCase = true)) return null
                 // okHttpClient 没有 CookieJar：若让它自动跟随重定向，中途响应的 Set-Cookie 不会带到后续
                 // 请求上。Discuz 的「电脑版/手机版」切换正是「Set-Cookie: mobile=... + 302」，自动跟随会
                 // 让跟随后的请求仍用旧 cookie，服务器返回切换前的模板——表现为暗黑下点「电脑版」要点两次
@@ -456,11 +452,8 @@ class YamiboRetrofit {
                         .build()
 
                     var currentUrl = urlStr
-                    // 优先从原始 URL 的 #fragment 提取锚点；若 WebView 剥离了 fragment（shouldInterceptRequest
-                    // 常见行为），则从 YamiboWebViewClient 的 pending 映射中消费。
                     var anchor: String? = urlStr.substringAfter('#', "")
                         .takeIf { it.isNotBlank() }?.let { "#$it" }
-                        ?: org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient.consumePendingAnchor(urlStr)
                     var hops = 0
                     while (true) {
                         val reqBuilder = okhttp3.Request.Builder().url(currentUrl)
@@ -504,7 +497,7 @@ class YamiboRetrofit {
                         val body = response.body?.string()
                         response.close()
                         return if (body != null && anchor != null) {
-                            injectAnchorScrollScript(body, anchor)
+                            injectAnchorScrollScript(body, anchor, currentUrl)
                         } else {
                             body
                         }
@@ -516,9 +509,10 @@ class YamiboRetrofit {
                 }
         }
 
-        /** 在 HTML 中注入锚点滚动脚本，保留 #pidXXX 跳转。*/
-        private fun injectAnchorScrollScript(html: String, anchor: String): String {
-            val script = "<script>setTimeout(function(){location.hash='${anchor.substringAfter("#")}';},80);</script>"
+        /** 在 HTML 中注入锚点滚动脚本 + URL 修正（history.replaceState），保留 #pidXXX 跳转。*/
+        private fun injectAnchorScrollScript(html: String, anchor: String, finalUrl: String): String {
+            val targetUrl = finalUrl.substringBefore('#')
+            val script = "<script>history.replaceState(null,'','$targetUrl');setTimeout(function(){location.hash='${anchor.substringAfter("#")}';},80);</script>"
             return if (html.contains("</body>")) {
                 html.replace("</body>", "$script</body>")
             } else {
