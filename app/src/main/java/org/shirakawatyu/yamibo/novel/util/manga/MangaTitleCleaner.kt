@@ -373,6 +373,11 @@ class MangaTitleCleaner {
                     ?: Regex("第\\s*$NUM(?=[\\s:：,，.。!！?？|｜\\-—]|$)").find(cleanTitle)?.let {
                         parseNumber(it.groupValues[1])
                     }
+                    // 规则 3.3: 无"第"无"话"的纯 X-Y (如"向笨蛋告白 2-1")。必须先于规则4匹配，
+                    // 否则规则4只截取横杠后半段（如"-1"→1），把横杠前的章号（2）丢掉。
+                    ?: Regex("(?<![\\d.])$ARABIC\\s*[-—]\\s*$ARABIC(?!\\d)").find(cleanTitle)?.let {
+                        parseNumber(it.groupValues[1]) + (parseNumber(it.groupValues[2]) / 100f)
+                    }
                     // 规则 4: 分隔符后跟数字 (限制为纯阿拉伯数字 ARABIC)
                     ?: Regex("[-—|｜]\\s*$ARABIC(?:\\s|\\.|$)").find(cleanTitle)?.let {
                         it.groupValues[1].toFloatOrNull() ?: 0f
