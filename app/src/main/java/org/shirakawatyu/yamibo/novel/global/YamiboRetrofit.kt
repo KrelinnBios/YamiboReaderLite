@@ -437,8 +437,16 @@ class YamiboRetrofit {
             fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
                 val urlStr = request.url.toString()
                 if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
-                // mod=redirect（如「我的回复」的 goto=findpost）走代理，跟随重定向后从 Location 提取
-                // #pidXXX 锚点、注入锚点滚动脚本，使暗黑下首屏即深色（无闪回原色）且锚点跳转正常工作。
+                // mod=redirect（如「我的回复」的 goto=findpost）不走代理：让 WebView 像原色模式那样原生跟随
+                // 302 落到真正的帖子 URL（#pidXXX 锚点由服务器重定向保留），那一跳的帖子页再被本代理正常注入
+                // 深色样式。曾用「代理内容替换：URL 停在 findpost、内容换成帖子」实现首屏即深色，但暗黑下点
+                // 「我的回复」会瞬间被弹回列表、甚至到不了楼层（URL 与内容不一致与 MinePage 状态机冲突）。
+                // 改为原生跳转后行为与原色一致，只是多一跳重定向（可能有极短闪烁），换来导航正确。
+                if (urlStr.contains("mod=redirect", ignoreCase = true) ||
+                    urlStr.contains("goto=findpost", ignoreCase = true)
+                ) {
+                    return null
+                }
                 //
                 // okHttpClient 没有 CookieJar：若让它自动跟随重定向，中途响应的 Set-Cookie 不会带到后续
                 // 请求上。Discuz 的「电脑版/手机版」切换正是「Set-Cookie: mobile=... + 302」，自动跟随会
