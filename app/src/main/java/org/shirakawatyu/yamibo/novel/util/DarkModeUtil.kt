@@ -46,6 +46,9 @@ data class DarkThemeColors(
         tertiary = tertiary,
         background = background,
         surface = surface,
+        // 必须显式映射 surfaceVariant：否则它会回落到 Material3 默认的灰色，与蓝黑主题不搭
+        // （搜索框背景、未开启开关 yamiboSwitchColors.uncheckedTrackColor 等都用它）。统一为面板色 #223247。
+        surfaceVariant = surfaceVariant,
         onPrimary = onPrimary,
         onPrimaryContainer = onSecondary,
         onSecondary = onSecondary,
