@@ -285,6 +285,9 @@ fun OtherWebPage(
         }
     }
     LaunchedEffect(isDarkMode) {
+        otherWebView.setBackgroundColor(
+            if (isDarkMode) 0xFF0D141D.toInt() else android.graphics.Color.TRANSPARENT
+        )
         otherWebView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
