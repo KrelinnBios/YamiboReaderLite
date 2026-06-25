@@ -190,9 +190,9 @@ open class YamiboWebViewClient : WebViewClient() {
         val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
         if (pid != null) {
             pendingAnchors[baseUrl] = "#pid$pid"
-            view.post { view.loadUrl("$baseUrl#pid$pid") }
+            view.evaluateJavascript("window.location.href='$baseUrl#pid$pid'", null)
         } else {
-            view.post { view.loadUrl(baseUrl) }
+            view.evaluateJavascript("window.location.href='$baseUrl'", null)
         }
     }
 
