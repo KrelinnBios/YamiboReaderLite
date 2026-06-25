@@ -132,6 +132,7 @@ import org.shirakawatyu.yamibo.novel.R
 import org.shirakawatyu.yamibo.novel.ui.component.ReaderProgressSlider
 import org.shirakawatyu.yamibo.novel.ui.component.ReaderSettingSlider
 import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
+import org.shirakawatyu.yamibo.novel.ui.state.GlobalChapter
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
 import org.shirakawatyu.yamibo.novel.ui.theme.ReaderTheme
 import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
@@ -315,6 +316,10 @@ fun ReaderPage(
         var pendingReaderReturnJump by remember(url) {
             mutableStateOf(ReaderReturnBridge.takePendingJumpForUrl(url))
         }
+        // 章节目录里点「其它论坛页」的章节时的跨页跳转：切到目标论坛页加载后，按页内序号定位。
+        var pendingChapterJump by remember(url) {
+            mutableStateOf<GlobalChapter?>(null)
+        }
         val lifecycleOwner = LocalLifecycleOwner.current
         val lifecycleState by lifecycleOwner.lifecycle.currentStateAsState()
         val isAnimationFinished = lifecycleState == Lifecycle.State.RESUMED
@@ -359,6 +364,38 @@ fun ReaderPage(
                 readerVM.onPageChange(pagerState, scope)
             }
             pendingReaderReturnJump = null
+        }
+        LaunchedEffect(
+            pendingChapterJump,
+            hasRealContent,
+            uiState.currentView,
+            uiState.chapterList,
+            uiState.htmlList.size,
+            uiState.isVerticalMode,
+            readerVM.showLoadingScrim
+        ) {
+            val jump = pendingChapterJump ?: return@LaunchedEffect
+            if (uiState.currentView != jump.webPage) {
+                readerVM.onSetView(jump.webPage)
+                return@LaunchedEffect
+            }
+            // 必须等目标页彻底加载完（loadFinished 置 showLoadingScrim=false）再定位，
+            // 否则可能用切页瞬间仍是旧页的 chapterList 误算位置。
+            if (readerVM.showLoadingScrim || !hasRealContent) return@LaunchedEffect
+
+            val targetIndex = (uiState.chapterList.getOrNull(jump.orderInPage)?.startIndex ?: 0)
+                .coerceIn(0, (uiState.htmlList.size - 1).coerceAtLeast(0))
+
+            awaitFrame()
+            awaitFrame()
+            if (uiState.isVerticalMode) {
+                lazyListState.scrollToItem(targetIndex)
+                readerVM.onVerticalPageSettled(targetIndex)
+            } else if (pagerState.pageCount > targetIndex) {
+                pagerState.scrollToPage(targetIndex)
+                readerVM.onPageChange(pagerState, scope)
+            }
+            pendingChapterJump = null
         }
         LaunchedEffect(showSettings) {
             if (isExiting) return@LaunchedEffect
@@ -537,19 +574,28 @@ fun ReaderPage(
             drawerContent = {
                 ChapterDrawerContent(
                     drawerState = drawerState,
-                    chapterList = uiState.chapterList,
+                    globalChapters = uiState.globalChapters,
+                    currentChapterList = uiState.chapterList,
+                    currentWebPage = uiState.currentView,
                     currentPageIndex = currentPageIndex,
-                    pageCount = uiState.htmlList.size,
-                    isVerticalMode = uiState.isVerticalMode,
-                    onChapterClick = { index ->
-                        scope.launch {
-                            if (uiState.isVerticalMode) {
-                                lazyListState.scrollToItem(index)
-                            } else {
-                                pagerState.scrollToPage(index)
-                            }
-                        }
+                    isIndexing = uiState.globalChapterIndexing,
+                    onChapterClick = { chapter ->
                         readerVM.toggleChapterDrawer(false)
+                        if (chapter.webPage == uiState.currentView) {
+                            // 本论坛页内：直接滚到该章在当前页的起始片。
+                            val startIndex = uiState.chapterList
+                                .getOrNull(chapter.orderInPage)?.startIndex ?: 0
+                            scope.launch {
+                                if (uiState.isVerticalMode) {
+                                    lazyListState.scrollToItem(startIndex)
+                                } else {
+                                    pagerState.scrollToPage(startIndex)
+                                }
+                            }
+                        } else {
+                            // 其它论坛页：交给 pending-jump，切页加载后再定位。
+                            pendingChapterJump = chapter
+                        }
                     }
                 )
             }
@@ -1029,20 +1075,33 @@ fun ReaderSettingsBar(
 @Composable
 fun ChapterDrawerContent(
     drawerState: DrawerState,
-    chapterList: List<ChapterInfo>,
+    globalChapters: List<GlobalChapter>,
+    currentChapterList: List<ChapterInfo>,
+    currentWebPage: Int,
     currentPageIndex: Int,
-    pageCount: Int,
-    isVerticalMode: Boolean,
-    onChapterClick: (index: Int) -> Unit
+    isIndexing: Boolean,
+    onChapterClick: (chapter: GlobalChapter) -> Unit
 ) {
     val lazyListState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    // 按当前页码定位所在章节，而不是按标题——否则重名章节（如多个「现在 – 2044年」）
-    // 总会高亮到第一个同名章节。
-    val currentChapterIndex = remember(currentPageIndex, chapterList) {
-        chapterList.indexOfLast { it.startIndex <= currentPageIndex }.coerceAtLeast(0)
+    // 全书目录尚未建立时（刚打开/单页书）回退展示当前论坛页的章节。
+    val chapters = remember(globalChapters, currentChapterList, currentWebPage) {
+        if (globalChapters.isNotEmpty()) {
+            globalChapters
+        } else {
+            currentChapterList.mapIndexed { i, c -> GlobalChapter(currentWebPage, i, c.title) }
+        }
     }
-    LaunchedEffect(drawerState.targetValue) {
+    // 当前阅读位置对应的章节：先按当前页码定位「页内章节序号」（重名章节不会全高亮第一个），
+    // 再在全书目录里找同论坛页、同序号的项。
+    val currentChapterIndex = remember(chapters, currentWebPage, currentPageIndex, currentChapterList) {
+        val localOrder = currentChapterList
+            .indexOfLast { it.startIndex <= currentPageIndex }
+            .coerceAtLeast(0)
+        chapters.indexOfFirst { it.webPage == currentWebPage && it.orderInPage == localOrder }
+            .takeIf { it >= 0 }
+            ?: chapters.indexOfLast { it.webPage <= currentWebPage }.coerceAtLeast(0)
+    }
+    LaunchedEffect(drawerState.targetValue, currentChapterIndex) {
         if (drawerState.targetValue == DrawerValue.Open) {
             val scrollOffsetItems = 4
             val targetIndex = (currentChapterIndex - scrollOffsetItems).coerceAtLeast(0)
@@ -1064,8 +1123,8 @@ fun ChapterDrawerContent(
             state = lazyListState
         ) {
             itemsIndexed(
-                items = chapterList,
-                key = { _, chapter -> "${chapter.title}_${chapter.startIndex}" }
+                items = chapters,
+                key = { index, chapter -> "${chapter.webPage}_${chapter.orderInPage}_$index" }
             ) { index, chapter ->
                 val isSelected = index == currentChapterIndex
                 NavigationDrawerItem(
@@ -1091,7 +1150,7 @@ fun ChapterDrawerContent(
                         }
                     },
                     selected = isSelected,
-                    onClick = { onChapterClick(chapter.startIndex) },
+                    onClick = { onChapterClick(chapter) },
                     badge = {
                         if (isSelected) {
                             Box(
@@ -1104,6 +1163,16 @@ fun ChapterDrawerContent(
                     },
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
+            }
+            if (isIndexing) {
+                item(key = "yamibo_indexing_hint") {
+                    Text(
+                        text = "目录补全中…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    )
+                }
             }
         }
     }

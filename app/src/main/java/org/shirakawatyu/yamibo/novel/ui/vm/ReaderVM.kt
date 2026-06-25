@@ -36,6 +36,7 @@ import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.ui.page.typefaceFromMode
 import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
+import org.shirakawatyu.yamibo.novel.ui.state.GlobalChapter
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
@@ -196,6 +197,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     private var diskCacheCurrentPage: Int = 0
     private var automaticCacheMaxPage: Int = 0
     private var currentRawHtml: String? = null
+
+    // ==================== 全书章节目录（跨论坛页聚合） ====================
+    // 论坛页 -> 该页章节标题序列；随当前页加载与后台磁盘缓存逐页补全。
+    private val pageChapterTitles = java.util.concurrent.ConcurrentHashMap<Int, List<String>>()
+    private var globalIndexUrl: String? = null
+    private var globalIndexCollectorJob: Job? = null
 
     /**
      * 非普通收藏入口的缓存身份。
@@ -501,6 +508,16 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             url = FavoriteUtil.normalizeUrl(cleanUrl)
             maxWidth = initWidth
             maxHeight = initHeight
+
+            // 切换书籍：重置全书目录索引状态。
+            globalIndexCollectorJob?.cancel()
+            globalIndexCollectorJob = null
+            globalIndexUrl = null
+            pageChapterTitles.clear()
+            _uiState.value = _uiState.value.copy(
+                globalChapters = emptyList(),
+                globalChapterIndexing = false
+            )
 
             updateCachedPagesFromIndex(localCache.index.value)
 
@@ -941,6 +958,8 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 paginateContent(isFromCache, targetView)
             }
 
+            recordPageChapters(targetView, chapters)
+
             if (isPreloading) {
                 if (targetView != viewBeingPreloaded) {
                     Log.w(logTag, "Preload mismatch: expected $viewBeingPreloaded, got $targetView")
@@ -1160,6 +1179,8 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 nextChapterList = chapters
                 nextRawHtml = combinedHtml
 
+                recordPageChapters(targetView, chapters)
+
                 val currentList = _uiState.value.htmlList
                 if (currentList.isNotEmpty()) {
                     val modified = currentList.dropLast(1).toMutableList().also {
@@ -1265,6 +1286,51 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             ?.takeIf { it.isNotBlank() && it.length <= 24 }
     }
 
+    // 引导标题栏检测用：遇到这些标签视为「正文/换行开始」，标题段到此结束。
+    private val titleBarBreakTags = setOf(
+        "div", "p", "br", "table", "ul", "ol", "blockquote", "center", "hr", "img"
+    )
+    // 标题不应以引号/括号/项目符号开头（那是对话或正文），也不应以句末标点结尾。
+    private val titleBarLeadingDeny = "「『（(《〈【[“\"'*—-…~·".toSet()
+    private val titleBarTrailingDeny = "。！？!?".toSet()
+
+    /**
+     * 提取楼层「引导标题栏」：作者把分话标题写在正文第一段（第一个 div/p/br 等块级中断）之前，
+     * 常见为 <strong>夏梦4</strong>、<font size=3>望春 5</font>、秋惑3、即使没有羽翼 1 等短中文标题。
+     * 这类标题字号多为 3，既非居中也非大字号，extractStructuralHeading 认不到；写法又有「加粗/不加粗、
+     * 与正文相连/<br> 分隔」多种变体，纯靠 firstLine 也不稳。这里按 DOM 取「首个块级中断前的短文本」统一覆盖。
+     * 仅当引导段「短且不像正文/对话」时才返回，避免把正文首句误判成标题。
+     */
+    private fun extractLeadingTitleBar(node: org.jsoup.nodes.Element): String? {
+        val sb = StringBuilder()
+        for (child in node.childNodes()) {
+            when (child) {
+                is org.jsoup.nodes.TextNode -> sb.append(child.text())
+                is org.jsoup.nodes.Element -> {
+                    if (child.tagName().lowercase() in titleBarBreakTags) {
+                        // i.pstatus 删除后开头可能残留 <br>，标题在其后，先跳过。
+                        if (sb.isBlank() && child.tagName().lowercase() == "br") continue
+                        return finalizeTitleBar(sb.toString())
+                    }
+                    // 内联元素（strong/b/font/i/a/span 等）取其文本继续累积。
+                    sb.append(child.text())
+                }
+                else -> {}
+            }
+            // 引导段过长说明这是正文而非标题，放弃。
+            if (sb.length > 40) return null
+        }
+        return finalizeTitleBar(sb.toString())
+    }
+
+    private fun finalizeTitleBar(raw: String): String? {
+        val title = raw.replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
+        if (title.isEmpty() || title.length > 24) return null
+        if (title.first() in titleBarLeadingDeny) return null
+        if (title.last() in titleBarTrailingDeny) return null
+        return title
+    }
+
     private fun convertChineseIfNeeded(text: String, translationMode: Int): String {
         if (text.isBlank()) return text
         return when (translationMode) {
@@ -1362,9 +1428,16 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                         if (episodeHeading != null) {
                             episodeHeading to true
                         } else {
-                            // 4) 居中/大字号的装饰性标题：软标题，连续同名才合并
-                            extractStructuralHeading(messageNodes[i])
-                                ?.let { convertChineseIfNeeded(it, translationMode) to false }
+                            // 4) 引导式中文标题栏（<strong>夏梦4</strong>/<font>秋惑3</font> 等，字号非 5/6/7）：
+                            //    软标题，连续同名才合并。覆盖后期改用中文标题栏分话的长篇。
+                            val titleBar = extractLeadingTitleBar(messageNodes[i])
+                            if (titleBar != null) {
+                                convertChineseIfNeeded(titleBar, translationMode) to false
+                            } else {
+                                // 5) 居中/大字号的装饰性标题：软标题，连续同名才合并
+                                extractStructuralHeading(messageNodes[i])
+                                    ?.let { convertChineseIfNeeded(it, translationMode) to false }
+                            }
                         }
                     }
                 }
@@ -1548,6 +1621,91 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
         }
         return chapterList
+    }
+
+    // ==================== 全书章节目录构建 ====================
+
+    /** 从解析后的 Content 列表抽取「按出现顺序的章节标题序列」，与 buildChapterList 的分章规则一致。 */
+    private fun chapterTitleSequence(content: List<Content>): List<String> {
+        val titles = mutableListOf<String>()
+        var lastTitle: String? = null
+        for (c in content) {
+            val title = c.chapterTitle
+            if (title != null && title != "footer" && (c.chapterStart || title != lastTitle)) {
+                titles.add(title)
+                lastTitle = title
+            }
+        }
+        return titles
+    }
+
+    /** 记录某论坛页的章节标题序列并刷新全书目录；同时确保后台索引收集器已启动。 */
+    private fun recordPageChapters(page: Int, chapters: List<ChapterInfo>) {
+        if (page < 1) return
+        val titles = chapters.map { it.title }
+        if (pageChapterTitles[page] == titles) {
+            ensureGlobalIndexCollector()
+            return
+        }
+        pageChapterTitles[page] = titles
+        publishGlobalChapters()
+        ensureGlobalIndexCollector()
+    }
+
+    /** 把各页章节标题按论坛页升序拍平成全书目录，写入 state。 */
+    private fun publishGlobalChapters() {
+        val maxPage = _uiState.value.maxWebView.coerceAtLeast(1)
+        val global = pageChapterTitles.toSortedMap().flatMap { (page, titles) ->
+            titles.mapIndexed { order, title -> GlobalChapter(page, order, title) }
+        }
+        val indexedPages = pageChapterTitles.keys.count { it in 1..maxPage }
+        _uiState.value = _uiState.value.copy(
+            globalChapters = global,
+            globalChapterIndexing = indexedPages < maxPage
+        )
+    }
+
+    /**
+     * 启动「全书目录」后台收集器：观察本地磁盘缓存（由自动缓存逐页填充），
+     * 每当有新论坛页被缓存就解析其章节标题并入全书目录。复用已缓存数据，不额外发网络请求。
+     */
+    private fun ensureGlobalIndexCollector() {
+        if (url.isBlank()) return
+        if (globalIndexUrl == url && globalIndexCollectorJob?.isActive == true) return
+        globalIndexUrl = url
+        globalIndexCollectorJob?.cancel()
+        globalIndexCollectorJob = viewModelScope.launch {
+            localCache.index.collect {
+                indexCachedPages()
+            }
+        }
+    }
+
+    /** 解析所有「已磁盘缓存但尚未入全书目录」的论坛页，补全章节标题。 */
+    private suspend fun indexCachedPages() {
+        val cachedPages = localCache.getCachedPageNumsCompat(
+            primaryUrl = url,
+            aliasUrls = readerIdentityAliases()
+        )
+        val translationMode = _uiState.value.translationMode
+        var changed = false
+        for (page in cachedPages) {
+            if (pageChapterTitles.containsKey(page)) continue
+            val data = withContext(Dispatchers.IO) {
+                localCache.loadPageCompat(
+                    primaryUrl = url,
+                    pageNum = page,
+                    aliasUrls = readerIdentityAliases()
+                )
+            }
+            if (data == null || !isCurrentReaderCache(data)) continue
+            val content = withContext(readerLayoutDispatcher) {
+                parseHtmlToContentList(data.htmlContent, translationMode, false)
+            }
+            pageChapterTitles[page] = chapterTitleSequence(content)
+            changed = true
+        }
+        if (changed) publishGlobalChapters()
     }
 
     private fun processPageChange(newPage: Int) {
@@ -1989,6 +2147,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
                 val pageToScrollTo = resolvePageAnchor(anchor, newPages, newChapters, preferChapterProgress = true)
                 applyRepaginatedContent(newPages, newChapters, pageToScrollTo)
+
+                // 简繁切换后标题需跟随字体：清空并用新字体重建全书目录（当前页即时更新，
+                // 其余已缓存页按新简繁模式重新解析；indexCachedPages 读取的是最新 translationMode）。
+                pageChapterTitles.clear()
+                recordPageChapters(_uiState.value.currentView, newChapters)
+                indexCachedPages()
             }
         }
     }

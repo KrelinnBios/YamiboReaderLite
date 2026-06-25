@@ -18,6 +18,18 @@ data class ChapterInfo(
 )
 
 /**
+ * 全书章节信息（跨论坛页聚合）。
+ * @param webPage 该章节所在的论坛页（currentView）
+ * @param orderInPage 该章节在所在论坛页内的序号（从 0 开始），与该页 chapterList 的下标一致，用于跨页跳转定位
+ * @param title 章节标题
+ */
+data class GlobalChapter(
+    val webPage: Int,
+    val orderInPage: Int,
+    val title: String
+)
+
+/**
  * 数据类，表示阅读器的状态信息
  *
  * @property htmlList HTML内容列表，默认为空列表
@@ -43,6 +55,10 @@ data class ReaderState(
     val htmlList: List<Content> = listOf(),
     val currentView: Int = 1,
     val initPage: Int = 0,
+    // 全书章节目录（跨所有论坛页聚合）。随后台缓存逐页补全；为空时 UI 回退用当前页 chapterList。
+    val globalChapters: List<GlobalChapter> = listOf(),
+    // 全书目录是否仍在补全（已索引论坛页数 < maxWebView）。
+    val globalChapterIndexing: Boolean = false,
     val lineHeight: TextUnit = 43.sp,
     val padding: Dp = 16.dp,
     val fontSize: TextUnit = 24.sp,
