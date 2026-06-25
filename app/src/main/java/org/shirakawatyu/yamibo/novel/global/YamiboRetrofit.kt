@@ -456,9 +456,11 @@ class YamiboRetrofit {
                         .build()
 
                     var currentUrl = urlStr
-                    // 先尝试从原始 URL 的 #fragment 提取锚点（直接加载的帖子 URL 可能带 #pidXXX）
+                    // 优先从原始 URL 的 #fragment 提取锚点；若 WebView 剥离了 fragment（shouldInterceptRequest
+                    // 常见行为），则从 YamiboWebViewClient 的 pending 映射中消费。
                     var anchor: String? = urlStr.substringAfter('#', "")
                         .takeIf { it.isNotBlank() }?.let { "#$it" }
+                        ?: org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient.consumePendingAnchor(urlStr)
                     var hops = 0
                     while (true) {
                         val reqBuilder = okhttp3.Request.Builder().url(currentUrl)
