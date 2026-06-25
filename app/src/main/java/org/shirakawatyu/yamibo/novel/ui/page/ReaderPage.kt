@@ -51,8 +51,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,6 +70,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1101,10 +1106,30 @@ fun ChapterDrawerContent(
             .takeIf { it >= 0 }
             ?: chapters.indexOfLast { it.webPage <= currentWebPage }.coerceAtLeast(0)
     }
-    LaunchedEffect(drawerState.targetValue, currentChapterIndex) {
+    var ascending by rememberSaveable { mutableStateOf(true) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+
+    // 过滤+排序：保留每章「原始序号」(原 chapters 下标) 用于显示编号与高亮，只改变展示顺序与可见项。
+    val processed = remember(chapters, query, ascending) {
+        val q = query.trim()
+        val base = chapters.mapIndexed { i, c -> i to c }
+        val filtered = if (q.isEmpty()) {
+            base
+        } else {
+            base.filter { (i, c) ->
+                // 按「序号」(列表编号 i+1) 或「章节号/标题文字」匹配
+                (i + 1).toString().contains(q) || c.title.contains(q, ignoreCase = true)
+            }
+        }
+        if (ascending) filtered else filtered.reversed()
+    }
+    val currentDisplayIndex = remember(processed, currentChapterIndex) {
+        processed.indexOfFirst { it.first == currentChapterIndex }.coerceAtLeast(0)
+    }
+    LaunchedEffect(drawerState.targetValue, currentDisplayIndex) {
         if (drawerState.targetValue == DrawerValue.Open) {
-            val scrollOffsetItems = 4
-            val targetIndex = (currentChapterIndex - scrollOffsetItems).coerceAtLeast(0)
+            val targetIndex = (currentDisplayIndex - 4).coerceAtLeast(0)
             lazyListState.scrollToItem(index = targetIndex)
         }
     }
@@ -1113,20 +1138,56 @@ fun ChapterDrawerContent(
         drawerContainerColor = MaterialTheme.colorScheme.surface,
         drawerContentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        Text(
-            "章节目录",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (searchActive) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("搜索序号 / 章节号") },
+                    singleLine = true
+                )
+            } else {
+                Text(
+                    "章节目录",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            // 正序 / 倒序 切换（图形化）
+            IconButton(onClick = { ascending = !ascending }) {
+                Icon(
+                    imageVector = if (ascending) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                    contentDescription = if (ascending) "当前正序，点按倒序" else "当前倒序，点按正序"
+                )
+            }
+            // 搜索开关（图形化）
+            IconButton(onClick = {
+                searchActive = !searchActive
+                if (!searchActive) query = ""
+            }) {
+                Icon(
+                    imageVector = if (searchActive) Icons.Default.Close else Icons.Default.Search,
+                    contentDescription = if (searchActive) "关闭搜索" else "搜索章节"
+                )
+            }
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = lazyListState
         ) {
             itemsIndexed(
-                items = chapters,
-                key = { index, chapter -> "${chapter.webPage}_${chapter.orderInPage}_$index" }
-            ) { index, chapter ->
-                val isSelected = index == currentChapterIndex
+                items = processed,
+                key = { _, pair -> "${pair.second.webPage}_${pair.second.orderInPage}_${pair.first}" }
+            ) { _, pair ->
+                val originalIndex = pair.first
+                val chapter = pair.second
+                val isSelected = originalIndex == currentChapterIndex
                 NavigationDrawerItem(
                     label = {
                         Row(
@@ -1134,7 +1195,7 @@ fun ChapterDrawerContent(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = (index + 1).toString(),
+                                text = (originalIndex + 1).toString(),
                                 modifier = Modifier.width(48.dp),
                                 color = MaterialTheme.colorScheme.primary,
                                 fontSize = 12.sp,
@@ -1164,7 +1225,17 @@ fun ChapterDrawerContent(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
-            if (isIndexing) {
+            if (processed.isEmpty() && query.isNotBlank()) {
+                item(key = "yamibo_no_result") {
+                    Text(
+                        text = "未找到匹配的章节",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                    )
+                }
+            }
+            if (isIndexing && query.isBlank()) {
                 item(key = "yamibo_indexing_hint") {
                     Text(
                         text = "目录补全中…",

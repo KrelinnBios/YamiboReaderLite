@@ -1243,10 +1243,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         )
     }
 
-    // 作者排版章节小标题的特征：居中、大字号（size>=5）或标题标签。这些才是真正的章节标题，
-    // 而促销链接、致谢、正文叙述句等不会用这种排版。
+    // 作者排版章节小标题的特征：居中、大字号（size>=4）或标题标签。这些才是真正的章节标题，
+    // 而促销链接、致谢、正文叙述句等不会用这种排版。size=4 用于《我憧憬着莉莉》这类
+    // 标题写成 <font size=4>#第三话</font> 的小说（正文虽也可能 size=4，但 selectFirst 取到的
+    // 首个 size=4 元素就是标题，且 24 字上限会挡掉整段正文）。
     private val chapterHeadingSelector =
-        "h1, h2, h3, center, div[align=center], font[size=5], font[size=6], font[size=7]"
+        "h1, h2, h3, center, div[align=center], font[size=4], font[size=5], font[size=6], font[size=7]"
 
     // 纯文本章节标题：楼层首行以「第N章/节/卷/篇/幕/话/回」或「序章/楔子/引子/尾声/后记/番外」开头。
     // 用于《主仆百合》这类不用居中大字号、而是直接写「第一章 造化弄人」的小说。
@@ -1263,12 +1265,17 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         RegexOption.IGNORE_CASE
     )
 
-    /** 扫描楼层正文前几行，提取「Episode N」式分话标记，归一化为「Episode N」（取不到返回 null）。 */
+    /**
+     * 扫描楼层正文前若干行，提取「Episode N」式分话标记，归一化为「Episode N」（取不到返回 null）。
+     * 扫 8 行而非 3 行：部分楼层在 episode 标记前会先放几行译者注/七夕彩蛋/分隔线
+     * （如《同班同学》episode 155 前有两行注释加一行「---」）。正文段落带缩进、不会以 episode 开头，
+     * 故多扫几行仍安全。
+     */
     private fun extractEpisodeHeading(postText: String): String? {
         postText.lineSequence()
             .map { it.replace(Regex("\\s+"), " ").trim() }
             .filter { it.isNotBlank() }
-            .take(3)
+            .take(8)
             .forEach { line ->
                 episodeHeadingRegex.find(line)?.let { match ->
                     return "Episode ${match.groupValues[1]}"
@@ -1282,6 +1289,8 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         return node.selectFirst(chapterHeadingSelector)?.text()
             ?.replace(' ', ' ')
             ?.replace(Regex("\\s+"), " ")
+            ?.trim()
+            ?.replace(Regex("^[#＃]+\\s*"), "")
             ?.trim()
             ?.takeIf { it.isNotBlank() && it.length <= 24 }
     }
@@ -1325,10 +1334,11 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
     private fun finalizeTitleBar(raw: String): String? {
         val title = raw.replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
-        if (title.isEmpty() || title.length > 24) return null
-        if (title.first() in titleBarLeadingDeny) return null
-        if (title.last() in titleBarTrailingDeny) return null
-        return title
+        val cleaned = title.replace(Regex("^[#＃]+\\s*"), "").trim()
+        if (cleaned.isEmpty() || cleaned.length > 24) return null
+        if (cleaned.first() in titleBarLeadingDeny) return null
+        if (cleaned.last() in titleBarTrailingDeny) return null
+        return cleaned
     }
 
     private fun convertChineseIfNeeded(text: String, translationMode: Int): String {
