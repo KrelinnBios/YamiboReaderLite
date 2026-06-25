@@ -26,6 +26,12 @@ open class YamiboWebViewClient : WebViewClient() {
 
     companion object {
         private val pendingNames = ConcurrentHashMap<String, String>()
+        private val pendingAnchors = ConcurrentHashMap<String, String>()
+
+        fun consumePendingAnchor(url: String): String? {
+            val base = url.substringBefore('#')
+            return pendingAnchors.remove(base)
+        }
 
         private fun normalizeAttachmentAid(aid: String?): String? {
             if (aid.isNullOrBlank()) return null
@@ -184,12 +190,13 @@ open class YamiboWebViewClient : WebViewClient() {
             val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1)
             if (ptid != null) {
                 val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
-                val finalUrl = if (pid != null) {
-                    "https://bbs.yamibo.com/thread-$ptid-1-1.html#pid$pid"
+                val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                if (pid != null) {
+                    pendingAnchors[baseUrl] = "#pid$pid"
+                    view.loadUrl("$baseUrl#pid$pid")
                 } else {
-                    "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                    view.loadUrl(baseUrl)
                 }
-                view.loadUrl(finalUrl)
                 return true
             }
         }
@@ -203,12 +210,13 @@ open class YamiboWebViewClient : WebViewClient() {
             val ptid = Regex("[?&]ptid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
             if (ptid != null) {
                 val pid = Regex("[?&]pid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
-                val finalUrl = if (pid != null) {
-                    "https://bbs.yamibo.com/thread-$ptid-1-1.html#pid$pid"
+                val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                if (pid != null) {
+                    pendingAnchors[baseUrl] = "#pid$pid"
+                    view.loadUrl("$baseUrl#pid$pid")
                 } else {
-                    "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                    view.loadUrl(baseUrl)
                 }
-                view.loadUrl(finalUrl)
                 return true
             }
         }
