@@ -9,6 +9,7 @@ import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.util.concurrent.ConcurrentHashMap
@@ -175,6 +176,43 @@ open class YamiboWebViewClient : WebViewClient() {
         """.trimIndent()
 
         view?.evaluateJavascript(injectJs, null)
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        val urlStr = request?.url?.toString() ?: ""
+        if (urlStr.contains("goto=findpost", ignoreCase = true) && view != null) {
+            val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1)
+            if (ptid != null) {
+                val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
+                val finalUrl = if (pid != null) {
+                    "https://bbs.yamibo.com/thread-$ptid-1-1.html#pid$pid"
+                } else {
+                    "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                }
+                view.loadUrl(finalUrl)
+                return true
+            }
+        }
+        return super.shouldOverrideUrlLoading(view, request)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+        val safeUrl = url ?: ""
+        if (safeUrl.contains("goto=findpost", ignoreCase = true) && view != null) {
+            val ptid = Regex("[?&]ptid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
+            if (ptid != null) {
+                val pid = Regex("[?&]pid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
+                val finalUrl = if (pid != null) {
+                    "https://bbs.yamibo.com/thread-$ptid-1-1.html#pid$pid"
+                } else {
+                    "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+                }
+                view.loadUrl(finalUrl)
+                return true
+            }
+        }
+        return super.shouldOverrideUrlLoading(view, safeUrl)
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
