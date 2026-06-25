@@ -374,7 +374,9 @@ fun createBbsWebView(context: Context, chromeClient: WebChromeClient? = null): W
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         )
-        setBackgroundColor(Color.TRANSPARENT)
+        setBackgroundColor(
+            if (GlobalData.isDarkMode.value) 0xFF0D141D.toInt() else Color.TRANSPARENT
+        )
         setLayerType(WebView.LAYER_TYPE_HARDWARE, null)
         settings.apply {
             javaScriptEnabled = true
