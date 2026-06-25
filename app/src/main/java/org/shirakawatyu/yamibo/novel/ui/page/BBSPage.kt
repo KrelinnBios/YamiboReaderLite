@@ -656,6 +656,9 @@ fun BBSPage(
     val pullRefreshBridge = remember { WebViewPullRefreshBridge() }
 
     LaunchedEffect(isDarkMode, isForumBlocklistEnabled, forumBlockedItems, currentUid) {
+        webView.setBackgroundColor(
+            if (isDarkMode) 0xFF0D141D.toInt() else android.graphics.Color.TRANSPARENT
+        )
         webView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
