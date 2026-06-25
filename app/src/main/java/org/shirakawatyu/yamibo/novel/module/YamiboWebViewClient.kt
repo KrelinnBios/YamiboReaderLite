@@ -184,21 +184,23 @@ open class YamiboWebViewClient : WebViewClient() {
         view?.evaluateJavascript(injectJs, null)
     }
 
+    private fun handleGotoFindpost(view: WebView, urlStr: String) {
+        val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1) ?: return
+        val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
+        val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
+        if (pid != null) {
+            pendingAnchors[baseUrl] = "#pid$pid"
+            view.post { view.loadUrl("$baseUrl#pid$pid") }
+        } else {
+            view.post { view.loadUrl(baseUrl) }
+        }
+    }
+
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
         val urlStr = request?.url?.toString() ?: ""
         if (urlStr.contains("goto=findpost", ignoreCase = true) && view != null) {
-            val ptid = Regex("[?&]ptid=(\\d+)").find(urlStr)?.groupValues?.get(1)
-            if (ptid != null) {
-                val pid = Regex("[?&]pid=(\\d+)").find(urlStr)?.groupValues?.get(1)
-                val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
-                if (pid != null) {
-                    pendingAnchors[baseUrl] = "#pid$pid"
-                    view.loadUrl("$baseUrl#pid$pid")
-                } else {
-                    view.loadUrl(baseUrl)
-                }
-                return true
-            }
+            handleGotoFindpost(view, urlStr)
+            return true
         }
         return super.shouldOverrideUrlLoading(view, request)
     }
@@ -207,18 +209,8 @@ open class YamiboWebViewClient : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
         val safeUrl = url ?: ""
         if (safeUrl.contains("goto=findpost", ignoreCase = true) && view != null) {
-            val ptid = Regex("[?&]ptid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
-            if (ptid != null) {
-                val pid = Regex("[?&]pid=(\\d+)").find(safeUrl)?.groupValues?.get(1)
-                val baseUrl = "https://bbs.yamibo.com/thread-$ptid-1-1.html"
-                if (pid != null) {
-                    pendingAnchors[baseUrl] = "#pid$pid"
-                    view.loadUrl("$baseUrl#pid$pid")
-                } else {
-                    view.loadUrl(baseUrl)
-                }
-                return true
-            }
+            handleGotoFindpost(view, safeUrl)
+            return true
         }
         return super.shouldOverrideUrlLoading(view, safeUrl)
     }
