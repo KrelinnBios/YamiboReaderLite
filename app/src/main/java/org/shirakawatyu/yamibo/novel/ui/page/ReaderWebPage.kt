@@ -365,6 +365,9 @@ fun ReaderWebPage(
         }
     }
     LaunchedEffect(isDarkMode) {
+        readerWebView.setBackgroundColor(
+            if (isDarkMode) 0xFF0D141D.toInt() else android.graphics.Color.TRANSPARENT
+        )
         readerWebView.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 isDarkMode,
