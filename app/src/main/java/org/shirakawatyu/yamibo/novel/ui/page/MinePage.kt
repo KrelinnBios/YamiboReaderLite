@@ -3,6 +3,7 @@ package org.shirakawatyu.yamibo.novel.ui.page
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -1790,7 +1791,16 @@ fun MinePage(
                                 Row {
                                     TextButton(
                                         onClick = {
-                                            // 点击后立即关闭设置弹窗，检查在后台进行，结果用 Toast/弹窗呈现
+                                            mineDialog = MineDialogState.None
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/KrelinnBios/YamiboReaderLite/issues/new"))
+                                            )
+                                        }
+                                    ) {
+                                        Text("反馈")
+                                    }
+                                    TextButton(
+                                        onClick = {
                                             mineDialog = MineDialogState.None
                                             YamiboToast.show(message = "正在检查更新…")
                                             scope.launch {
