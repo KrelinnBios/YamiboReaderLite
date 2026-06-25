@@ -509,14 +509,13 @@ class YamiboRetrofit {
                 }
         }
 
-        /** 在 HTML 中注入锚点滚动脚本 + URL 修正（history.replaceState），保留 #pidXXX 跳转。*/
+        /** 在 HTML 中注入锚点滚动脚本，保留 #pidXXX 跳转。*/
         private fun injectAnchorScrollScript(html: String, anchor: String, finalUrl: String): String {
-            val targetUrl = finalUrl.substringBefore('#')
-            val script = "<script>history.replaceState(null,'','$targetUrl');setTimeout(function(){location.hash='${anchor.substringAfter("#")}';},80);</script>"
+            val scroll = "<script>setTimeout(function(){location.hash='${anchor.substringAfter("#")}';},80);</script>"
             return if (html.contains("</body>")) {
-                html.replace("</body>", "$script</body>")
+                html.replace("</body>", "$scroll</body>")
             } else {
-                html + script
+                html + scroll
             }
         }
 
