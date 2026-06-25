@@ -95,7 +95,8 @@
 
 - 只有一套深色主题：经典蓝黑 `DarkThemeColors.CLASSIC`，主色 `#4EA1FF`、背景 `#0D141D`、面板 `#182332`。不引入多套深色主题。
 - 论坛网页深色规则全部位于 `util/theme/DarkClassic.kt`，加载时 HTML 代理注入（`proxyHtmlForDarkMode` + `injectThemeCssIntoHtml`）与运行时 JS 注入（`getThemeSetJs`）必须共用同一份 CSS。
-- 原色（浅色）模式**不再是零注入**：会注入一份**极小**的覆盖（`util/theme/LightClassic.kt` 的 `LIGHT_MODE_CSS_RULES_CLASSIC`），目前**仅**统一正文链接颜色。同样走 `injectThemeCssIntoHtml` / `getThemeSetJs` 两条路径，不要往里塞与"链接统一"无关的规则，浅色模式整体应保持论坛原样。
+- 原色（浅色）模式**不再是零注入**：会注入一份**极小**的覆盖（`util/theme/LightClassic.kt` 的 `LIGHT_MODE_CSS_RULES_CLASSIC`），其**主题部分仅**统一正文链接颜色。同样走 `injectThemeCssIntoHtml` / `getThemeSetJs` 两条路径，不要往浅色**主题**规则里塞与"链接统一"无关的颜色/样式，浅色模式整体应保持论坛原样。
+- **结构性布局修复**（与主题无关，如 spacecp `#ct.ct3_a` 窄屏 reflow）统一放在 `util/theme/ThemeLayoutFix.kt` 的 `STRUCTURAL_LAYOUT_FIX_CSS_RULES`，并被**暗黑与浅色两个列表都拼接**（`DARK_MODE_CSS_RULES_CLASSIC` 末尾 `.map{...}` 之后、`LIGHT_MODE_CSS_RULES_CLASSIC` 末尾）。这类修复只改 `float`/`width`/`margin` 等布局、**绝不碰颜色与 `background-image`**，目的是让 blog/个人主页等页在暗黑与浅色下布局一致——不要再把布局修复只写进 DarkClassic（那会造成两模式不一致）。
 - CSS 规则字符串末尾会统一执行 `background:` → `background-color:` 重写。规则中可以写 `background:`，但**绝不能覆盖站点的 `background-image`**，轮播图、头像和会员自定义背景依赖它。
 - CSS 规则字符串中**不能出现单引号**，否则会破坏 JS 注入字符串拼接。
 - 只有**自定义 DIY 会员空间**才不启用暗黑模式（保留作者亲手设计的版面）；判定改为**按页面内容**：页面是 `body#space` 且使用了 `data/attachment` 的自定义背景图。普通空间（如「xxx的空间」，只有 `static/image` 默认图、无自定义背景）以及帖子、版块、手机版个人中心等所有其它页面都照常启用暗黑。不要再用 URL（`space-uid-N`/`mod=space&uid=` 等）来排除——那会误伤无自定义的普通空间，让它们也变不了深色。
