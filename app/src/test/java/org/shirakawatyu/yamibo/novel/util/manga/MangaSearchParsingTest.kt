@@ -110,6 +110,15 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun bareDashChapterNumberKeepsLeadingChapterDigit() {
+        // 无"第"无"话"的纯 X-Y 格式（如"向笨蛋告白 2-1"）曾被规则4只截取横杠后半段，
+        // 算出 1 而不是 2.01，导致同书多章节号倒退（2,1,2,1,2...）。
+        assertEquals(2.01f, MangaTitleCleaner.extractChapterNum("向笨蛋告白 2-1"))
+        assertEquals(2.02f, MangaTitleCleaner.extractChapterNum("向笨蛋告白2-2"))
+        assertEquals(5.01f, MangaTitleCleaner.extractChapterNum("向笨蛋告白5-1"))
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))
