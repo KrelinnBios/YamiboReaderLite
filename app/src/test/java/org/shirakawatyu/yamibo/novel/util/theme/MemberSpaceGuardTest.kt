@@ -83,14 +83,16 @@ class MemberSpaceGuardTest {
         )
         assertFalse(responsiveSpace.contains("initial-scale"))
 
-        val blogList = """
+        // spacecp / BLOG 个人主页（#ct.ct3_a）是定宽多栏布局：device-width 下 .mn 溢出、侧栏摞到主内容上
+        // （暗黑与原色不一致），改用 width=1200 + initial-scale 缩放，两栏并排、与原色一致。
+        val blogSpacecp = """
             <html><head><meta name="viewport" content="width=device-width"></head>
             <body id="nv_home" class="pg_space"><div id="toptb"></div>
             <div id="ct" class="ct3_a wp cl"><div class="appl"></div><div class="mn"></div><div class="sd"></div></div></body></html>
         """.trimIndent()
-        val responsiveBlog = PageJsScripts.applyDesktopViewportForWebView(blogList, 0.3)
-        assertTrue(responsiveBlog.contains("width=device-width, user-scalable=yes"))
-        assertFalse(responsiveBlog.contains("initial-scale"))
+        val fixedBlogSpacecp = PageJsScripts.applyDesktopViewportForWebView(blogSpacecp, 0.3)
+        assertTrue(fixedBlogSpacecp.contains("width=1200, initial-scale=0.300, user-scalable=yes"))
+        assertFalse(fixedBlogSpacecp.contains("width=device-width"))
 
         val blogThreadList = """
             <html><head><meta name="viewport" content="width=device-width"></head>

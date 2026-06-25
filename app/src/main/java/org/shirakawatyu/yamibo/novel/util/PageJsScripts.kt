@@ -1052,6 +1052,8 @@ object PageJsScripts {
                     var isSpaceShell = document.body.id === 'space' || /\bpg_space(?:cp)?\b/.test(cls);
                     if (!isSpaceShell) return;
                     if (/\bpg_space\b/.test(cls) && document.querySelector('#ct.ct2_a .tl')) return;
+                    // ct3_a（spacecp / BLOG 个人主页）走 HTML 代理写好的 width=1200 缩放，运行时别再改回 device-width。
+                    if (document.querySelector('#ct.ct3_a')) return;
                     var meta = document.querySelector('meta[name="viewport"]');
                     if (!meta) {
                         meta = document.createElement('meta');
@@ -1214,11 +1216,17 @@ $styleString
         Regex("""<body\b[^>]*\bclass\s*=\s*(["'])[^"']*\bpg_space(?:cp)?\b[^"']*\1""", RegexOption.IGNORE_CASE)
     private val CT2_A_CONTAINER_REGEX =
         Regex("""<div\b[^>]*\bid\s*=\s*(?:"ct"|'ct'|ct)(?=[\s>])[^>]*\bclass\s*=\s*(["'])[^"']*\bct2_a\b[^"']*\1""", RegexOption.IGNORE_CASE)
+    private val CT3_A_CONTAINER_REGEX =
+        Regex("""<div\b[^>]*\bid\s*=\s*(?:"ct"|'ct'|ct)(?=[\s>])[^>]*\bclass\s*=\s*(["'])[^"']*\bct3_a\b[^"']*\1""", RegexOption.IGNORE_CASE)
     private val THREAD_LIST_CONTAINER_REGEX =
         Regex("""<div\b[^>]*\bclass\s*=\s*(["'])[^"']*\btl\b[^"']*\1""", RegexOption.IGNORE_CASE)
 
     private fun shouldUseResponsiveSpaceViewport(html: String): Boolean {
         if (MemberSpaceGuard.isMemberSpaceHtml(html)) return false
+        // spacecp / 个人主页 BLOG 等 #ct.ct3_a 页是「.appl + .mn(固定 775px float) + .sd(固定 220px float)」
+        // 的定宽多栏布局。device-width 下 .mn 溢出、侧栏摞到主内容上（暗黑下表现为单栏堆叠，与原色不一致）。
+        // 这类页改走 width=1200 + initial-scale 的确定性缩放：两栏并排(775+220<1200)整页缩到屏宽，与原色一致。
+        if (CT3_A_CONTAINER_REGEX.containsMatchIn(html)) return false
         if (
             BODY_PG_SPACE_CLASS_REGEX.containsMatchIn(html) &&
             CT2_A_CONTAINER_REGEX.containsMatchIn(html) &&

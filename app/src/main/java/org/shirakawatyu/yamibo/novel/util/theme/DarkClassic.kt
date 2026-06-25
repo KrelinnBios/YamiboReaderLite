@@ -414,7 +414,6 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".appl span a { color: #8099b2 !important; }",
     "/* 双栏布局：浅色竖线贴图换成纯色边框（贴图是浅灰分隔线，深色下必须去掉） */",
     ".ct2_a, .ct3_a { border-color: #274766 !important; background-image: none !important; }",
-    // ct3_a 窄屏 reflow 已移到与主题无关的 STRUCTURAL_LAYOUT_FIX_CSS_RULES（暗黑/浅色共用），见本列表末尾拼接。
     "/* 个人资料编辑页（pg_spacecp）表单与表格 */",
     ".exfm { background: #1f2c3d !important; border-color: #3c5677 !important; }",
     ".sinf { border-right-color: #274766 !important; }",
@@ -533,4 +532,4 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
 ).map { rule ->
     // Keep site-supplied background images while changing only their backing color.
     rule.replace("background:", "background-color:")
-} + STRUCTURAL_LAYOUT_FIX_CSS_RULES
+}

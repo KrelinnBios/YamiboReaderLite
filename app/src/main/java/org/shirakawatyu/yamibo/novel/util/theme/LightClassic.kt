@@ -7,12 +7,9 @@ package org.shirakawatyu.yamibo.novel.util.theme
  * 链接色 #6E2B19。楼主常把链接用 <font color> 或内联 color 上成五颜六色，浅色下同样会
  * 显得杂乱，这里强制统一（含链接内部的 font / 内联 color 子元素），与暗黑模式逻辑对应。
  * 只改文字颜色，绝不触碰 background-image。
- *
- * 末尾拼接的 [STRUCTURAL_LAYOUT_FIX_CSS_RULES] 是与主题无关的结构性布局修复（暗黑/浅色共用），
- * 不属于「浅色主题」，只为让 blog/个人主页等页面在两种模式下布局一致，不改任何颜色。
  */
 val LIGHT_MODE_CSS_RULES_CLASSIC = listOf(
     "/* === Unify post-content link colors to the site default link color === */",
     ".message a, .postmessage a, .t_f a, .t_msgfont a { color: #6E2B19 !important; }",
     ".message a font, .message a font[color], .message a [style*=\"color\"], .postmessage a font, .postmessage a font[color], .postmessage a [style*=\"color\"], .t_f a font, .t_f a font[color], .t_f a [style*=\"color\"], .t_msgfont a font, .t_msgfont a font[color], .t_msgfont a [style*=\"color\"] { color: #6E2B19 !important; }"
-) + STRUCTURAL_LAYOUT_FIX_CSS_RULES
+)
