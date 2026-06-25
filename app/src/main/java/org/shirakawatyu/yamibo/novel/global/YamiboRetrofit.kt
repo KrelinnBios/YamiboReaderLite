@@ -437,10 +437,10 @@ class YamiboRetrofit {
             fun proxyHtmlForDarkMode(request: android.webkit.WebResourceRequest): String? {
                 val urlStr = request.url.toString()
                 if (request.method != "GET" || !urlStr.startsWith("https://bbs.yamibo.com")) return null
-                // mod=redirect（如「我的回复」的 goto=findpost）由下方手动跟随重定向循环处理：
-                // 本函数用 followRedirects(false) 手动逐跳，提取最终页 HTML 注入暗黑 CSS 后返回，
-                // 避免 WebView 原生跟 302 时从缓存获取原色页面闪一下。最终页的 #pid 锚点通过
-                // injectAnchorScrollScript 注入的 JS 滚动到对应楼层。
+                // mod=redirect（如「我的回复」的 goto=findpost）不走代理。这类 URL 由各页面
+                // shouldOverrideUrlLoading 截获，提取 ptid/pid 后直接跳转到最终帖子 URL，避免
+                // 原生跟 302 时从缓存闪原色、也避免代理内容与 URL 不一致导致 MinePage 状态机冲突。
+                if (urlStr.contains("goto=findpost", ignoreCase = true)) return null
                 // okHttpClient 没有 CookieJar：若让它自动跟随重定向，中途响应的 Set-Cookie 不会带到后续
                 // 请求上。Discuz 的「电脑版/手机版」切换正是「Set-Cookie: mobile=... + 302」，自动跟随会
                 // 让跟随后的请求仍用旧 cookie，服务器返回切换前的模板——表现为暗黑下点「电脑版」要点两次
