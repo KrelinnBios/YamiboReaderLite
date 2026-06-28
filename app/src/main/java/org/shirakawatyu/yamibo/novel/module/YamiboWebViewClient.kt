@@ -5,10 +5,15 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.util.concurrent.ConcurrentHashMap
@@ -20,6 +25,7 @@ import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
+import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 
 open class YamiboWebViewClient : WebViewClient() {
 
@@ -124,10 +130,101 @@ open class YamiboWebViewClient : WebViewClient() {
 
     private var currentCookie = ""
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val themeFlashHandler = Handler(Looper.getMainLooper())
+    private var themeFlashRevealRunnable: Runnable? = null
+    private var isSuppressingThemeFlash = false
+    private var suppressedThemeFlashUrl: String? = null
 
     init {
         scope.launch {
             currentCookie = GlobalData.cookieFlow.first()
+        }
+    }
+
+    private fun isYamiboForumUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val host = runCatching { Uri.parse(url).host.orEmpty().lowercase() }.getOrDefault("")
+        return host == "bbs.yamibo.com" || host == "m.yamibo.com" ||
+                host == "www.yamibo.com" || host == "yamibo.com"
+    }
+
+    private fun documentBase(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        return url.substringBefore("#").removeSuffix("/")
+    }
+
+    private fun isSameDocumentBase(firstUrl: String?, secondUrl: String?): Boolean {
+        val firstBase = documentBase(firstUrl) ?: return false
+        val secondBase = documentBase(secondUrl) ?: return false
+        return firstBase == secondBase
+    }
+
+    private fun isSameDocumentNavigation(currentUrl: String?, nextUrl: String?): Boolean {
+        return isSameDocumentBase(currentUrl, nextUrl) &&
+                currentUrl?.substringAfter("#", "") != nextUrl?.substringAfter("#", "")
+    }
+
+    private fun shouldSuppressThemeFlash(view: WebView?, url: String?): Boolean {
+        // 只遮住 WebView 首帧，不接管 URL；findpost 重定向仍由 WebView 原生处理以保留楼层定位。
+        if (!GlobalData.isDarkMode.value) return false
+        if (url.isNullOrBlank() || url == "about:blank" || url.startsWith("data:") || url.contains("warmup=true")) return false
+        if (!isYamiboForumUrl(url)) return false
+        val currentUrl = try {
+            view?.url
+        } catch (_: Throwable) {
+            null
+        }
+        return !isSameDocumentNavigation(currentUrl, url)
+    }
+
+    private fun suppressThemeFlashIfNeeded(view: WebView?, url: String?) {
+        themeFlashRevealRunnable?.let { themeFlashHandler.removeCallbacks(it) }
+        themeFlashRevealRunnable = null
+        if (!shouldSuppressThemeFlash(view, url)) {
+            revealThemeFlashSuppression(view, delayMs = 0L)
+            return
+        }
+        isSuppressingThemeFlash = true
+        suppressedThemeFlashUrl = url
+        view?.animate()?.cancel()
+        view?.setBackgroundColor(0xFF0D141D.toInt())
+        view?.alpha = 0f
+    }
+
+    private fun injectCurrentTheme(view: WebView?, currentUrl: String?) {
+        if (!GlobalData.isDarkMode.value && GlobalData.lightModeTheme.value <= 0) return
+        val themeUrl = currentUrl ?: try {
+            view?.url
+        } catch (_: Throwable) {
+            null
+        }
+        if (!isYamiboForumUrl(themeUrl)) return
+        view?.evaluateJavascript(
+            PageJsScripts.getThemeSetJs(
+                GlobalData.isDarkMode.value,
+                GlobalData.darkModeTheme.value,
+                GlobalData.lightModeTheme.value
+            ),
+            null
+        )
+    }
+
+    private fun revealThemeFlashSuppression(view: WebView?, delayMs: Long = 96L) {
+        if (!isSuppressingThemeFlash) return
+        themeFlashRevealRunnable?.let { themeFlashHandler.removeCallbacks(it) }
+        val targetView = view
+        val reveal = Runnable {
+            targetView?.animate()?.cancel()
+            targetView?.alpha = 1f
+            isSuppressingThemeFlash = false
+            suppressedThemeFlashUrl = null
+            themeFlashRevealRunnable = null
+        }
+        themeFlashRevealRunnable = reveal
+        if (delayMs <= 0L) {
+            reveal.run()
+        } else {
+            themeFlashHandler.postDelayed(reveal, delayMs)
         }
     }
 
@@ -178,6 +275,7 @@ open class YamiboWebViewClient : WebViewClient() {
     }
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+        suppressThemeFlashIfNeeded(view, url)
         val targetCookie = currentCookie.ifBlank {
             GlobalData.currentCookie
         }
@@ -195,6 +293,8 @@ open class YamiboWebViewClient : WebViewClient() {
 
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         applyHideCss(view, url)
+        injectCurrentTheme(view, url)
+        revealThemeFlashSuppression(view)
         super.onPageCommitVisible(view, url)
     }
 
@@ -212,6 +312,8 @@ open class YamiboWebViewClient : WebViewClient() {
             }
         }
         super.onPageFinished(view, url)
+        injectCurrentTheme(view, url)
+        revealThemeFlashSuppression(view)
 
         view?.evaluateJavascript(
             """
@@ -256,5 +358,38 @@ open class YamiboWebViewClient : WebViewClient() {
     override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
         super.doUpdateVisitedHistory(view, url, isReload)
         applyHideCss(view, url)
+    }
+
+    override fun onReceivedError(
+        view: WebView?,
+        request: WebResourceRequest?,
+        error: WebResourceError?
+    ) {
+        super.onReceivedError(view, request, error)
+        if (request?.isForMainFrame == true) revealThemeFlashSuppression(view, delayMs = 0L)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onReceivedError(
+        view: WebView?,
+        errorCode: Int,
+        description: String?,
+        failingUrl: String?
+    ) {
+        super.onReceivedError(view, errorCode, description, failingUrl)
+        if (isSameDocumentBase(failingUrl, suppressedThemeFlashUrl) ||
+            isSameDocumentBase(failingUrl, try { view?.url } catch (_: Throwable) { null })
+        ) {
+            revealThemeFlashSuppression(view, delayMs = 0L)
+        }
+    }
+
+    override fun onReceivedHttpError(
+        view: WebView?,
+        request: WebResourceRequest?,
+        errorResponse: WebResourceResponse?
+    ) {
+        super.onReceivedHttpError(view, request, errorResponse)
+        if (request?.isForMainFrame == true) revealThemeFlashSuppression(view, delayMs = 0L)
     }
 }
