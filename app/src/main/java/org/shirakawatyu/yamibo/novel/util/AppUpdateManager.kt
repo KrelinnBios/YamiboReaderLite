@@ -191,6 +191,17 @@ object AppUpdateManager {
         }
     }
 
+    fun openCachedInstaller(context: Context, info: AppUpdateInfo): Result<Unit> = runCatching {
+        val appContext = context.applicationContext
+        val updateDir = File(appContext.externalCacheDir ?: appContext.cacheDir, "update")
+        val safeVersionName = info.versionName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val apkFile = File(updateDir, "300 Lite-$safeVersionName.apk")
+        if (!apkFile.exists()) {
+            throw IOException("未找到已下载的安装包，请重新下载")
+        }
+        openInstaller(appContext, apkFile)
+    }
+
     fun openReleasesPage(context: Context): Result<Unit> = runCatching {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(RELEASES_PAGE_URL)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
