@@ -129,40 +129,53 @@ fun AppUpdateDialog(
             }
         },
         confirmButton = {
-            Button(
-                enabled = state != UpdateDownloadState.DOWNLOADING,
-                onClick = {
-                    scope.launch {
-                        state = UpdateDownloadState.DOWNLOADING
-                        failureMessage = ""
-                        downloadProgress = null
-                        AppUpdateManager.downloadAndOpenInstaller(
-                            context,
-                            info,
-                            onProgress = { downloadProgress = it }
-                        )
-                            .onSuccess {
-                                state = UpdateDownloadState.INSTALLER_OPENED
-                            }
-                            .onFailure { error ->
-                                failureMessage = error.message ?: "未知错误"
-                                state = UpdateDownloadState.FAILED
-                            }
+            if (state != UpdateDownloadState.INSTALLER_OPENED) {
+                Button(
+                    enabled = state != UpdateDownloadState.DOWNLOADING,
+                    onClick = {
+                        scope.launch {
+                            state = UpdateDownloadState.DOWNLOADING
+                            failureMessage = ""
+                            downloadProgress = null
+                            AppUpdateManager.downloadAndOpenInstaller(
+                                context,
+                                info,
+                                onProgress = { downloadProgress = it }
+                            )
+                                .onSuccess {
+                                    state = UpdateDownloadState.INSTALLER_OPENED
+                                }
+                                .onFailure { error ->
+                                    failureMessage = error.message ?: "未知错误"
+                                    state = UpdateDownloadState.FAILED
+                                }
+                        }
                     }
+                ) {
+                    Text(
+                        when (state) {
+                            UpdateDownloadState.DOWNLOADING -> "下载中"
+                            UpdateDownloadState.FAILED -> "重试自动更新"
+                            UpdateDownloadState.READY -> "下载并安装"
+                            else -> ""
+                        }
+                    )
                 }
-            ) {
-                Text(
-                    when (state) {
-                        UpdateDownloadState.DOWNLOADING -> "下载中"
-                        UpdateDownloadState.INSTALLER_OPENED -> "重新打开安装器"
-                        UpdateDownloadState.FAILED -> "重试自动更新"
-                        UpdateDownloadState.READY -> "下载并安装"
-                    }
-                )
             }
         },
         dismissButton = {
             Row {
+                if (state == UpdateDownloadState.INSTALLER_OPENED) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                AppUpdateManager.openCachedInstaller(context, info)
+                            }
+                        }
+                    ) {
+                        Text("重新打开安装器")
+                    }
+                }
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
                     onClick = {
