@@ -6,12 +6,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -129,40 +128,10 @@ fun AppUpdateDialog(
             }
         },
         confirmButton = {
-            Button(
-                enabled = state != UpdateDownloadState.DOWNLOADING,
-                onClick = {
-                    scope.launch {
-                        state = UpdateDownloadState.DOWNLOADING
-                        failureMessage = ""
-                        downloadProgress = null
-                        AppUpdateManager.downloadAndOpenInstaller(
-                            context,
-                            info,
-                            onProgress = { downloadProgress = it }
-                        )
-                            .onSuccess {
-                                state = UpdateDownloadState.INSTALLER_OPENED
-                            }
-                            .onFailure { error ->
-                                failureMessage = error.message ?: "未知错误"
-                                state = UpdateDownloadState.FAILED
-                            }
-                    }
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    when (state) {
-                        UpdateDownloadState.DOWNLOADING -> "下载中"
-                        UpdateDownloadState.INSTALLER_OPENED -> "重新打开安装器"
-                        UpdateDownloadState.FAILED -> "重试自动更新"
-                        UpdateDownloadState.READY -> "下载并安装"
-                    }
-                )
-            }
-        },
-        dismissButton = {
-            Row {
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
                     onClick = {
@@ -170,13 +139,48 @@ fun AppUpdateDialog(
                         onDismiss()
                     }
                 ) {
-                    Text("手动下载")
+                    Text("手动下载", maxLines = 1, softWrap = false)
                 }
+                Spacer(Modifier.width(8.dp))
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
                     onClick = onDismiss
                 ) {
-                    Text("稍后")
+                    Text("稍后", maxLines = 1, softWrap = false)
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    enabled = state != UpdateDownloadState.DOWNLOADING,
+                    onClick = {
+                        scope.launch {
+                            state = UpdateDownloadState.DOWNLOADING
+                            failureMessage = ""
+                            downloadProgress = null
+                            AppUpdateManager.downloadAndOpenInstaller(
+                                context,
+                                info,
+                                onProgress = { downloadProgress = it }
+                            )
+                                .onSuccess {
+                                    state = UpdateDownloadState.INSTALLER_OPENED
+                                }
+                                .onFailure { error ->
+                                    failureMessage = error.message ?: "未知错误"
+                                    state = UpdateDownloadState.FAILED
+                                }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = when (state) {
+                            UpdateDownloadState.DOWNLOADING -> "下载中"
+                            UpdateDownloadState.INSTALLER_OPENED -> "重新打开安装器"
+                            UpdateDownloadState.FAILED -> "重试自动更新"
+                            UpdateDownloadState.READY -> "下载并安装"
+                        },
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }
