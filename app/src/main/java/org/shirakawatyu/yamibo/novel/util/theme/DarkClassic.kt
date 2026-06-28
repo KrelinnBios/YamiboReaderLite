@@ -348,7 +348,6 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".pg_viewthread #ct, .pg_viewthread #postlist, .pg_viewthread .pl, .pg_viewthread .pi, .pg_viewthread .pil, .pg_viewthread .pti, .pg_viewthread .po, .pg_viewthread .pob, .pg_viewthread .pdbt, .pg_viewthread .psth, .pg_viewthread .sign, .pg_viewthread .plc, .pg_viewthread .pls, .pg_viewthread .pct, .pg_viewthread .pcb, .pg_viewthread .plhin, .pg_viewthread .pm2, .pg_viewthread .tns, .pg_viewthread .tns th, .pg_viewthread .tns td, .pg_viewthread .t_fsz, .pg_viewthread .ad, .pg_viewthread .t_table, .pg_viewthread .t_table td, .pg_viewthread .p_tbl td, .pg_viewthread .cgtl td, .pg_viewthread .cgtl th, .pg_viewthread .cgtl caption { border-color: #274766 !important; }",
     "/* === 评分区（rate）=== */",
     ".rate, .ratc, .ratl, .ratl_l, .ratl th, .ratl td { background: #182332 !important; color: #c7d8ea !important; border-color: #274766 !important; }",
-    ".rate table td, .rate .list td { background: transparent !important; color: #c7d8ea !important; }",
     ".rate a, .ratl a { color: #7dbdf2 !important; }",
     "/* === 点评 / 评论列表 === */",
     ".cmmnt, .cm, .psti { background: #1f2c3d !important; color: #c7d8ea !important; border-color: #274766 !important; }",
