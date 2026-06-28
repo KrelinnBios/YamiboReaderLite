@@ -14,7 +14,9 @@
 
 ## 项目简介
 
-当前 Lite 版本将百合会论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读整合在同一个应用中。其界面、功能和行为已经过调整，与上游项目并不完全相同；以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
+YamiboReaderLite 是面向百合会论坛的非官方 Android 阅读客户端。当前 Lite 版本将论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读整合在同一个应用中，并在界面、功能和行为上做了持续调整。
+
+以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
 
 ## 功能概览
 
@@ -56,7 +58,11 @@
 
 从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 APK 后安装。
 
-系统要求：Android 7.0（API 24）及以上。
+### 系统要求
+
+Android 7.0（API 24）及以上。
+
+### 更新方式
 
 应用启动时会通过 GitHub Releases API 检查新版本，也可以在设置页手动检查更新。检测到更新后可以在应用内下载并调起系统安装器；如果自动下载或安装器启动失败，应用会提供 Releases 手动下载入口。
 
