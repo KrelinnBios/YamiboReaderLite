@@ -1,7 +1,16 @@
 # IDE
 .idea/
+.agents/
 .claude/
+.vscode/
 *.iml
+
+# Local agent instructions
+AGENTS.md
+agents.md
+CLAUDE.md
+Claude.md
+claude.md
 
 # Gradle
 .gradle/
