@@ -165,17 +165,6 @@ fun AppUpdateDialog(
         },
         dismissButton = {
             Row {
-                if (state == UpdateDownloadState.INSTALLER_OPENED) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                AppUpdateManager.openCachedInstaller(context, info)
-                            }
-                        }
-                    ) {
-                        Text("重新打开安装器")
-                    }
-                }
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
                     onClick = {
@@ -190,6 +179,15 @@ fun AppUpdateDialog(
                     onClick = onDismiss
                 ) {
                     Text("稍后")
+                }
+                if (state == UpdateDownloadState.INSTALLER_OPENED) {
+                    Button(onClick = {
+                        scope.launch {
+                            AppUpdateManager.downloadAndOpenInstaller(context, info)
+                        }
+                    }) {
+                        Text("重新打开安装器")
+                    }
                 }
             }
         }
