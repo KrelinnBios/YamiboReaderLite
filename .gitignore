@@ -5,10 +5,6 @@
 .vscode/
 *.iml
 
-# Local agent instructions
-AGENTS.md
-agents.md
-
 # Gradle
 .gradle/
 build/
