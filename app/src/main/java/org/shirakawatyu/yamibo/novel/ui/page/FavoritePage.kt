@@ -109,10 +109,13 @@ import org.shirakawatyu.yamibo.novel.ui.theme.YellowLightLight
 import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.AutoCheckSection
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
@@ -161,6 +164,25 @@ fun FavoritePage(
             favoriteVM.isFavoritePageVisible = false
         }
     }
+
+    OnboardingOverlay(
+        page = OnboardingUtil.Page.FAVORITE,
+        enabled = GlobalData.currentUid.isNotBlank(),
+        steps = listOf(
+            OnboardingStep(
+                title = "收藏管理小提示",
+                description = "长按收藏项可拖动调整顺序，支持分类、搜索、置顶和隐藏。"
+            ),
+            OnboardingStep(
+                title = "收藏管理小提示",
+                description = "可对小说/漫画/其他帖子分别设置手动或自动更新检查，及时知道有没有新章节。"
+            ),
+            OnboardingStep(
+                title = "收藏管理小提示",
+                description = "每本收藏都能单独清理本地缓存，不影响其他收藏的已缓存内容。"
+            )
+        )
+    )
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var itemActionTarget by remember { mutableStateOf<Favorite?>(null) }
     var singleDeleteTarget by remember { mutableStateOf<Favorite?>(null) }
