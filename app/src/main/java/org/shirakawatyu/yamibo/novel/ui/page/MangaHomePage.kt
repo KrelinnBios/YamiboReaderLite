@@ -72,7 +72,10 @@ import org.shirakawatyu.yamibo.novel.bean.MangaHomeItem
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.ui.vm.MangaHomeVM
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.util.DarkThemeColors
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import java.net.URLEncoder
 
@@ -91,6 +94,22 @@ fun MangaHomePage(
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scope = rememberCoroutineScope()
     var openingTid by remember { mutableStateOf<String?>(null) }
+
+    OnboardingOverlay(
+        page = OnboardingUtil.Page.MANGA_HOME,
+        enabled = GlobalData.currentUid.isNotBlank(),
+        steps = listOf(
+            OnboardingStep(
+                title = "漫画发现小提示",
+                description = "可在顶部分区切换中文漫画区和漫画图源区，点击搜索图标按书名/作者搜索。"
+            ),
+            OnboardingStep(
+                title = "漫画发现小提示",
+                description = "点开一部作品后会自动生成本地漫画目录，之后可以在目录里更新、整理章节顺序。"
+            )
+        )
+    )
+
     val classicDarkColors = DarkThemeColors.CLASSIC
     val headerContainerColor =
         if (isDarkMode) classicDarkColors.statusBar else MaterialTheme.colorScheme.primary
