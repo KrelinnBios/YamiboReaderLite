@@ -1626,7 +1626,7 @@ fun MinePage(
                                     start = 24.dp,
                                     top = 24.dp,
                                     end = 24.dp,
-                                    bottom = 8.dp
+                                    bottom = 16.dp
                                 )
                             ) {
                                 Text(
@@ -1803,6 +1803,7 @@ fun MinePage(
                                     }
                                     Text("清理缓存（${formatFileSize(cacheSizeBytes)}）")
                                 }
+                                Spacer(Modifier.height(12.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
