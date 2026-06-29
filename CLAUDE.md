@@ -20,7 +20,7 @@
 - 漫画发现：浏览和搜索中文漫画区、漫画图源区，生成、更新和管理本地漫画目录。
 - 漫画阅读：原生阅读器支持章节切换、进度记录、缓存、亮度调节和纵向/从左到右/从右到左三种阅读方向；识别失败时使用 WebView 兜底。
 - 小说阅读：原生阅读器支持字号、行距、页边距、横向/纵向翻页、正文图片、简繁转换、章节跳转、进度记录和页面缓存。
-- 收藏管理：同步论坛收藏，支持分类、搜索、拖动排序、隐藏、删除、置顶、缓存清理，以及小说/漫画/其他帖子的手动和自动更新检查。
+- 收藏管理：同步论坛收藏，支持分类、搜索、拖动排序、隐藏、删除、置顶、缓存清理，以及小说/漫画/其他帖子的手动更新检查。
 - 浏览历史：记录帖子浏览历史，支持日期筛选、批量删除，并通过独立 WebView 打开历史帖子。
 - 缓存维护：维护小说页面缓存、漫画图片缓存、缓存统计、单项清理、全量清理和定期自动清理。
 - 应用更新：启动或手动检查 GitHub Release，支持下载、校验 APK、调起系统安装器，失败时提供 Releases 页面。
@@ -68,7 +68,8 @@
 
 - 新手引导：`OnboardingUtil` 按页面（`OnboardingUtil.Page`）记录是否已展示，存入 DataStore；`OnboardingOverlay` 是复用的 Compose 组件，登录态（`GlobalData.currentUid` 非空）下首次进入对应原生页面才查询展示。只覆盖原生页面（漫画发现/漫画阅读器/收藏/小说阅读器）和底栏，不覆盖 WebView 页面（论坛/我的），因为浮层引导在 WebView 上容易遮挡或对不齐。
 - 收藏主状态在 `FavoriteVM`；本地数据、删除同步和墓碑队列分别由 `FavoriteUtil`、`FavoriteDeleteUtil`、`TombstoneQueueUtil` 管理。
-- 收藏更新检查统一经过 `UpdateCheckEngine`，自动调度由 `AutoUpdateCheckScheduler` 负责；小说、漫画和其他帖子各有独立 profile/util。
+- 收藏手动更新检查统一经过 `UpdateCheckEngine`；小说、漫画和其他帖子各有独立 profile/util。
+- 收藏页支持的漫画版块固定为 fid 30「中文百合漫画区」和 fid 37「百合漫画图源区」；小说版块固定为 fid 49「文學區」、fid 55「轻小说/译文区」、fid 60「TXT小说区」。未识别收藏需允许用户手动选择小说、漫画或其他；选择其他后应从收藏页移出。
 - 浏览历史由 `HistoryUtil` 管理；漫画目录由 `DirectoryRepository` 管理。
 - 设置使用 DataStore（`SettingsUtil` / `DataStoreUtil`）；不要另建 SharedPreferences 保存同类全局设置。阅读器自身已有兼容存储除外。
 - 应用更新统一走 `AppUpdateManager`；自动签到统一走 `AutoSignManager` / `AccountSyncManager`；缓存清理由 `CacheMaintenance` 统一协调。
