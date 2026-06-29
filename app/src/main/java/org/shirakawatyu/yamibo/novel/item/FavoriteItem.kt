@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.clip
@@ -108,7 +110,8 @@ fun FavoriteItem(
     mangaCacheBytes: Long = 0,
     hasUpdate: Boolean = false,
     isCheckingUpdate: Boolean = false,
-    isPinned: Boolean = false
+    isPinned: Boolean = false,
+    onRefreshUpdate: (() -> Unit)? = null
 ) {
     val tagColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
 
@@ -293,7 +296,8 @@ fun FavoriteItem(
                 // 右侧固定状态槽（余量不大）：刷新转圈 / 更新胶囊，垂直居中，不压文字。
                 UpdateStatusHandle(
                     isCheckingUpdate = isCheckingUpdate,
-                    hasUpdate = hasUpdate
+                    hasUpdate = hasUpdate,
+                    onRefreshUpdate = onRefreshUpdate
                 )
             }
 
@@ -340,6 +344,7 @@ private enum class HandleStatus {
 private fun UpdateStatusHandle(
     isCheckingUpdate: Boolean,
     hasUpdate: Boolean,
+    onRefreshUpdate: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val primary = darkThemeColor(YamiboColors.primary) { primary }
@@ -350,7 +355,6 @@ private fun UpdateStatusHandle(
             .size(40.dp),
         contentAlignment = Alignment.Center
     ) {
-        // 检查更新：卡片右侧上下居中的主题色普通刷新转圈（替代原来顶部的「查」胶囊）。
         androidx.compose.animation.AnimatedVisibility(
             visible = isCheckingUpdate,
             enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
@@ -363,19 +367,34 @@ private fun UpdateStatusHandle(
             )
         }
 
-        // 有更新 胶囊（顶部）
-        androidx.compose.animation.AnimatedVisibility(
-            visible = hasUpdate && !isCheckingUpdate,
-            enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
-            exit = fadeOut(animationSpec = tween(120)),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-12).dp)
-        ) {
-            HandleStatusCapsule(
-                status = HandleStatus.UPDATED,
-                accent = updateAccent
-            )
+        if (hasUpdate && !isCheckingUpdate) {
+            if (onRefreshUpdate != null) {
+                IconButton(
+                    onClick = onRefreshUpdate,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "刷新检查更新",
+                        tint = updateAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
+                    exit = fadeOut(animationSpec = tween(120)),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-12).dp)
+                ) {
+                    HandleStatusCapsule(
+                        status = HandleStatus.UPDATED,
+                        accent = updateAccent
+                    )
+                }
+            }
         }
     }
 }
