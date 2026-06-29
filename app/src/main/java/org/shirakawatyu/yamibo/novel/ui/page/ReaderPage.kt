@@ -141,11 +141,15 @@ import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
 import org.shirakawatyu.yamibo.novel.ui.state.GlobalChapter
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
 import org.shirakawatyu.yamibo.novel.ui.theme.ReaderTheme
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ReaderVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.ContentViewer
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.CustomStatusBar
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.util.reader.rememberScreenCorner
@@ -215,6 +219,25 @@ fun ReaderPage(
     val readerIdentityUrl = remember(url) {
         FavoriteUtil.normalizeUrl(url)
     }
+
+    OnboardingOverlay(
+        page = OnboardingUtil.Page.NOVEL_READER,
+        enabled = GlobalData.currentUid.isNotBlank(),
+        steps = listOf(
+            OnboardingStep(
+                title = "小说阅读小提示",
+                description = "点击正文可呼出菜单，菜单里能调节字号、行距、页边距和横向/纵向翻页方式。"
+            ),
+            OnboardingStep(
+                title = "小说阅读小提示",
+                description = "菜单里的目录支持跨论坛页聚合全书章节，可按序号或章节号搜索、正倒序排列。"
+            ),
+            OnboardingStep(
+                title = "小说阅读小提示",
+                description = "阅读进度会自动记录，下次打开同一本书会跳回上次的位置。"
+            )
+        )
+    )
 
     val bookTitle by remember(readerIdentityUrl, favoritesState.value) {
         derivedStateOf {
