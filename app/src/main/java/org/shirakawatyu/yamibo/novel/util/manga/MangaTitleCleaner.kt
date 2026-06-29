@@ -398,6 +398,47 @@ class MangaTitleCleaner {
             return Math.round((baseNum + subModifier) * 1000) / 1000f
         }
 
+        private fun formatLabelNum(numStr: String): String {
+            val value = parseNumber(numStr)
+            return if (value % 1f == 0f) value.toInt().toString() else value.toString()
+        }
+
+        /**
+         * 提取"X-Y"形式的章节显示文案（如"第7-2话"→"7-2"），用于列表直接展示原始分段，
+         * 避免 extractChapterNum 为排序需要把 Y 编码进小数位（7.02）后直接拿来显示。
+         * 仅当标题确实是 X-Y / 其之 这类分段形式时返回；其余情况返回 null，由调用方按
+         * chapterNum 数值格式化（如单纯的"7"或前后篇的"7.1"）。
+         */
+        fun extractChapterLabel(rawTitle: String): String? {
+            val cleanTitle = rawTitle
+                .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
+                .replace(Regex("\\d+\\s*[xX×]\\s*\\d+"), "")
+                .replace(Regex("(?i)\\bc\\d+\\b"), "")
+
+            if (Regex(
+                    "番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画|最终话|最終話|最终回|最終回|大结局",
+                    RegexOption.IGNORE_CASE
+                ).containsMatchIn(rawTitle)
+            ) {
+                return null
+            }
+
+            Regex("(?:第)?\\s*$NUM\\s*[话話织回章节幕折更].*?其[之の]?\\s*$NUM").find(cleanTitle)?.let {
+                return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
+            }
+            Regex("(?:第)?\\s*$NUM\\s*[^\\d零一二两三四五六七八九十百千]{0,5}?其[之の]?\\s*$NUM").find(cleanTitle)
+                ?.let {
+                    return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
+                }
+            Regex("第\\s*$NUM\\s*[-—]\\s*$NUM").find(cleanTitle)?.let {
+                return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
+            }
+            Regex("(?<![\\d.])$ARABIC\\s*[-—]\\s*$ARABIC(?!\\d)").find(cleanTitle)?.let {
+                return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
+            }
+            return null
+        }
+
         /**
          * 暴力提取标题中出现的所有数字
          */
