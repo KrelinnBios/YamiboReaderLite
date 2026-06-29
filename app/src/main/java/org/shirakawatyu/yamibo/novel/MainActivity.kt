@@ -117,6 +117,8 @@ import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.BbsSkeletonScreen
 import org.shirakawatyu.yamibo.novel.ui.widget.BottomNavBar
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToastHost
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
@@ -125,6 +127,7 @@ import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AutoSignManager
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
 import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.SignTrigger
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
@@ -710,6 +713,25 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                                         currentRoute?.startsWith("NativeMangaPage") == true
                             bottomNavBarVM.setBottomNavBarVisibility(!isReaderRoute)
                         }
+
+                        OnboardingOverlay(
+                            page = OnboardingUtil.Page.BOTTOM_NAV,
+                            enabled = GlobalData.currentUid.isNotBlank() && bottomNavBarVM.showBottomNavBar,
+                            steps = listOf(
+                                OnboardingStep(
+                                    title = "底栏操作小提示",
+                                    description = "单击底栏图标：切换到对应板块；已在该板块时单击不会重新加载。"
+                                ),
+                                OnboardingStep(
+                                    title = "底栏操作小提示",
+                                    description = "长按底栏图标：直接回到该板块主页（论坛首页/个人资料/漫画首页/收藏首页）。"
+                                ),
+                                OnboardingStep(
+                                    title = "底栏操作小提示",
+                                    description = "下拉页面：刷新当前内容，长按已不再用于刷新。"
+                                )
+                            )
+                        )
 
                         // 初始加载 / 网络恢复后，如果 BBSPage 还没成功加载且没有正在恢复，
                         // 则委托 BBSPageState 启动自动恢复，统一走 BBSPage 的 startLoading + 超时状态机。
