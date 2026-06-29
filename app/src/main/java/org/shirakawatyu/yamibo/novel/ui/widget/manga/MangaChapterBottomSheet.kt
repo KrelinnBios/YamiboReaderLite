@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.bean.MangaSettings
+import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 
 data class MangaChapter(
     val index: Float,
@@ -299,7 +300,11 @@ fun MangaChapterPanel(
                                 if (ascending) listIndex + 1 else sorted.size - listIndex
                             MangaChapterDrawerItem(
                                 chapter = chapter,
-                                chapterNumber = formatChapterNumber(chapter.index, fallbackNumber),
+                                chapterNumber = formatChapterNumber(
+                                    chapter.index,
+                                    chapter.title,
+                                    fallbackNumber
+                                ),
                                 onClick = { onChapterClick(chapter) }
                             )
                         }
@@ -367,8 +372,10 @@ private fun MangaChapterDrawerItem(
     )
 }
 
-private fun formatChapterNumber(index: Float, fallbackNumber: Int): String {
+private fun formatChapterNumber(index: Float, title: String, fallbackNumber: Int): String {
     if (!index.isFinite() || index <= 0f) return fallbackNumber.toString()
+    // "第7-2话"这类分段标题直接显示"7-2"，不展示为排序用的小数编码(7.02)
+    MangaTitleCleaner.extractChapterLabel(title)?.let { return it }
     val value = if (index % 1f == 0f) {
         index.toInt().toString()
     } else {
