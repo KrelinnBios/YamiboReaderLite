@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -53,6 +54,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -83,6 +85,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
@@ -1611,195 +1614,204 @@ fun MinePage(
                         }
                     }
 
-                    AlertDialog(
-                        onDismissRequest = { mineDialog = MineDialogState.None },
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        textContentColor = MaterialTheme.colorScheme.onSurface,
-                        title = { Text("设置", fontSize = 18.sp) },
-                        text = {
+                    Dialog(onDismissRequest = { mineDialog = MineDialogState.None }) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
                             Column(
-                                modifier = Modifier.verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                modifier = Modifier.padding(
+                                    start = 24.dp,
+                                    top = 24.dp,
+                                    end = 24.dp,
+                                    bottom = 8.dp
+                                )
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Text(
+                                    "设置",
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.height(18.dp))
+                                Column(
+                                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("暗黑模式", fontSize = 15.sp)
-                                        Text(
-                                            "使用经典黑蓝界面",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Switch(
-                                        checked = isDarkMode,
-                                        onCheckedChange = { enabled ->
-                                            GlobalData.isDarkMode.value = enabled
-                                            SettingsUtil.saveDarkMode(enabled)
-                                            mineWebView.evaluateJavascript(
-                                                PageJsScripts.getThemeSetJs(
-                                                    enabled,
-                                                    GlobalData.darkModeTheme.value,
-                                                    GlobalData.lightModeTheme.value
-                                                ),
-                                                null
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("暗黑模式", fontSize = 15.sp)
+                                            Text(
+                                                "使用经典黑蓝界面",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
-                                        },
-                                        colors = yamiboSwitchColors()
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("网络优化", fontSize = 15.sp)
-                                        Text(
-                                            "使用优化后的 DNS 连接论坛",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                        Switch(
+                                            checked = isDarkMode,
+                                            onCheckedChange = { enabled ->
+                                                GlobalData.isDarkMode.value = enabled
+                                                SettingsUtil.saveDarkMode(enabled)
+                                                mineWebView.evaluateJavascript(
+                                                    PageJsScripts.getThemeSetJs(
+                                                        enabled,
+                                                        GlobalData.darkModeTheme.value,
+                                                        GlobalData.lightModeTheme.value,
+                                                    ),
+                                                    null,
+                                                )
+                                            },
+                                            colors = yamiboSwitchColors(),
                                         )
                                     }
-                                    Switch(
-                                        checked = isDnsOptimizationEnabled,
-                                        onCheckedChange = { enabled ->
-                                            GlobalData.isDnsOptimizationEnabled.value = enabled
-                                            SettingsUtil.saveDnsOptimizationEnabled(enabled)
-                                        },
-                                        colors = yamiboSwitchColors()
-                                    )
-                                }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("屏蔽帖子", fontSize = 15.sp)
-                                        Text(
-                                            "在论坛列表和帖子页显示屏蔽按钮",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("网络优化", fontSize = 15.sp)
+                                            Text(
+                                                "使用优化后的 DNS 连接论坛",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isDnsOptimizationEnabled,
+                                            onCheckedChange = { enabled ->
+                                                GlobalData.isDnsOptimizationEnabled.value = enabled
+                                                SettingsUtil.saveDnsOptimizationEnabled(enabled)
+                                            },
+                                            colors = yamiboSwitchColors(),
                                         )
                                     }
-                                    Switch(
-                                        checked = isForumBlocklistEnabled,
-                                        onCheckedChange = ForumBlocklistManager::setEnabled,
-                                        colors = yamiboSwitchColors()
-                                    )
-                                }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("自动签到", fontSize = 15.sp)
-                                        Text(
-                                            "启动或返回应用时自动签到",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("屏蔽帖子", fontSize = 15.sp)
+                                            Text(
+                                                "在论坛列表和帖子页显示屏蔽按钮",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isForumBlocklistEnabled,
+                                            onCheckedChange = ForumBlocklistManager::setEnabled,
+                                            colors = yamiboSwitchColors(),
                                         )
                                     }
-                                    Switch(
-                                        checked = isAutoSignInEnabled,
-                                        onCheckedChange = { enabled ->
-                                            GlobalData.isAutoSignInEnabled.value = enabled
-                                            SettingsUtil.saveAutoSignInMode(enabled)
-                                            if (enabled) {
-                                                scope.launch(Dispatchers.IO) {
-                                                    AutoSignManager.resetQuota()
-                                                    AutoSignManager.checkAndSignIfNeeded(
-                                                        context,
-                                                        force = true
-                                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("自动签到", fontSize = 15.sp)
+                                            Text(
+                                                "启动或返回应用时自动签到",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isAutoSignInEnabled,
+                                            onCheckedChange = { enabled ->
+                                                GlobalData.isAutoSignInEnabled.value = enabled
+                                                SettingsUtil.saveAutoSignInMode(enabled)
+                                                if (enabled) {
+                                                    scope.launch(Dispatchers.IO) {
+                                                        AutoSignManager.resetQuota()
+                                                        AutoSignManager.checkAndSignIfNeeded(
+                                                            context,
+                                                            force = true,
+                                                        )
+                                                    }
                                                 }
-                                            }
-                                        },
-                                        colors = yamiboSwitchColors()
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("自动版本更新", fontSize = 15.sp)
-                                        Text(
-                                            "软件启动时自动检查新版本",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            colors = yamiboSwitchColors(),
                                         )
                                     }
-                                    Switch(
-                                        checked = isAutoVersionUpdateEnabled,
-                                        onCheckedChange = { enabled ->
-                                            GlobalData.isAutoVersionUpdateEnabled.value = enabled
-                                            SettingsUtil.saveAutoVersionUpdateMode(enabled)
-                                        },
-                                        colors = yamiboSwitchColors()
-                                    )
-                                }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("自动清理缓存", fontSize = 15.sp)
-                                        Text(
-                                            "每 ${CacheMaintenance.RETENTION_DAYS} 天清理一次",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("自动版本更新", fontSize = 15.sp)
+                                            Text(
+                                                "软件启动时自动检查新版本",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isAutoVersionUpdateEnabled,
+                                            onCheckedChange = { enabled ->
+                                                GlobalData.isAutoVersionUpdateEnabled.value = enabled
+                                                SettingsUtil.saveAutoVersionUpdateMode(enabled)
+                                            },
+                                            colors = yamiboSwitchColors(),
                                         )
                                     }
-                                    Switch(
-                                        checked = isAutoClearCacheEnabled,
-                                        onCheckedChange = { enabled ->
-                                            GlobalData.isAutoClearCacheEnabled.value = enabled
-                                            SettingsUtil.saveAutoClearCacheMode(enabled)
-                                            CacheMaintenance.onAutoClearChanged(context, enabled)
-                                        },
-                                        colors = yamiboSwitchColors()
-                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("自动清理缓存", fontSize = 15.sp)
+                                            Text(
+                                                "每 ${CacheMaintenance.RETENTION_DAYS} 天清理一次",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isAutoClearCacheEnabled,
+                                            onCheckedChange = { enabled ->
+                                                GlobalData.isAutoClearCacheEnabled.value = enabled
+                                                SettingsUtil.saveAutoClearCacheMode(enabled)
+                                                CacheMaintenance.onAutoClearChanged(context, enabled)
+                                            },
+                                            colors = yamiboSwitchColors(),
+                                        )
+                                    }
                                 }
 
-                            }
-                        },
-                        confirmButton = {
-                            Column(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                                Spacer(Modifier.height(16.dp))
                                 Button(
                                     onClick = { showClearCacheDialog = true },
                                     enabled = !isClearingCache,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     if (isClearingCache) {
                                         CircularProgressIndicator(
                                             modifier = Modifier.size(18.dp),
                                             strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.onPrimary
+                                            color = MaterialTheme.colorScheme.onPrimary,
                                         )
                                         Spacer(Modifier.width(8.dp))
                                     }
                                     Text("清理缓存（${formatFileSize(cacheSizeBytes)}）")
                                 }
-                                Spacer(Modifier.height(2.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     TextButton(
                                         onClick = { mineDialog = MineDialogState.Blocklist },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
                                         Text("黑名单")
                                     }
@@ -1811,7 +1823,7 @@ fun MinePage(
                                             )
                                         },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
                                         Text("反馈")
                                     }
@@ -1835,22 +1847,21 @@ fun MinePage(
                                             }
                                         },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
                                         Text("检查更新")
                                     }
                                     TextButton(
                                         onClick = { mineDialog = MineDialogState.None },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
                                         Text("关闭")
                                     }
                                 }
                             }
-                        },
-                        dismissButton = {}
-                    )
+                        }
+                    }
 
                     if (showClearCacheDialog) {
                         AlertDialog(
