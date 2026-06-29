@@ -1133,6 +1133,22 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             }
         }
     }
+    fun checkAllFavoritesForUpdates() {
+        val items = allFavorites.filter { it.type in 1..3 }
+        UpdateCheckEngine.ensureInit(applicationContext)
+        viewModelScope.launch(Dispatchers.IO) {
+            items.forEach { favorite ->
+                if (!isActive) return@launch
+                delay(600)
+                when (favorite.type) {
+                    1 -> UpdateCheckEngine.checkNovel(favorite, notify = false)
+                    2 -> UpdateCheckEngine.checkManga(favorite, notify = false)
+                    3 -> UpdateCheckEngine.checkOther(favorite, notify = false)
+                }
+            }
+        }
+    }
+
     fun checkNovelUpdate(favorite: Favorite) {
         UpdateCheckEngine.ensureInit(applicationContext)
         UpdateCheckEngine.checkNovel(favorite)
