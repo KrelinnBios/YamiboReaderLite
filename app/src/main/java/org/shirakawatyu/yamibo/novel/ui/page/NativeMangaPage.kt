@@ -128,11 +128,14 @@ import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
 import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
 import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaChapter
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaChapterPanel
 import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaSettingsPanel
 import org.shirakawatyu.yamibo.novel.util.HapticUtil
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
@@ -182,6 +185,25 @@ fun NativeMangaPage(
     val globalOffsetY = remember { Animatable(0f) }
     var probingUrl by remember { mutableStateOf<String?>(null) }
     var probingJob by remember { mutableStateOf<Job?>(null) }
+
+    OnboardingOverlay(
+        page = OnboardingUtil.Page.MANGA_READER,
+        enabled = GlobalData.currentUid.isNotBlank(),
+        steps = listOf(
+            OnboardingStep(
+                title = "漫画阅读小提示",
+                description = "点击画面中间可呼出/收起菜单，菜单里能切换章节、调节亮度和阅读方向。"
+            ),
+            OnboardingStep(
+                title = "漫画阅读小提示",
+                description = "支持纵向、从左到右、从右到左三种阅读方向，可在设置面板里切换。"
+            ),
+            OnboardingStep(
+                title = "漫画阅读小提示",
+                description = "阅读进度会自动记录，图片也会缓存到本地，下次打开同一章节能更快加载。"
+            )
+        )
+    )
 
     val configuration = LocalConfiguration.current
     val screenWidthDp = configuration.screenWidthDp.dp
