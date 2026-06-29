@@ -96,15 +96,15 @@ object UpdateCheckEngine {
     // =========================================================================
 
     /** 手动检查小说（来自滑动卡片）。 */
-    fun checkNovel(favorite: Favorite) {
+    fun checkNovel(favorite: Favorite, notify: Boolean = true) {
         if (favorite.type != 1) return
-        scope.launch { performNovel(favorite.url, favorite.title, favorite.authorId, notify = true) }
+        scope.launch { performNovel(favorite.url, favorite.title, favorite.authorId, notify) }
     }
 
     /** 手动检查"其他"帖子（来自滑动卡片）。不需要 authorId。 */
-    fun checkOther(favorite: Favorite) {
+    fun checkOther(favorite: Favorite, notify: Boolean = true) {
         if (favorite.type != 3) return
-        scope.launch { performOther(favorite.url, favorite.title, notify = true) }
+        scope.launch { performOther(favorite.url, favorite.title, notify) }
     }
 
     /** 手动检查漫画（来自滑动卡片 / 配置弹窗）。 */
@@ -112,14 +112,15 @@ object UpdateCheckEngine {
         favorite: Favorite,
         overrideStrategy: MangaUpdateCheckStrategy? = null,
         overrideSearchKeyword: String? = null,
-        overrideCleanBookName: String? = null
+        overrideCleanBookName: String? = null,
+        notify: Boolean = true
     ) {
         if (favorite.type != 2) return
         scope.launch {
             performManga(
                 favorite.url, favorite.title,
                 overrideStrategy, overrideSearchKeyword, overrideCleanBookName,
-                notify = true
+                notify
             )
         }
     }
