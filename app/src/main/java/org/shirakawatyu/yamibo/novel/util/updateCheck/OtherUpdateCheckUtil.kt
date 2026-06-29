@@ -38,12 +38,7 @@ class OtherUpdateCheckUtil {
         suspend fun saveProfileSuspend(profile: OtherUpdateCheckProfile) {
             writeMutex.withLock {
                 val map = getMapSuspend()
-                map[profile.url] = map[profile.url]?.let { old ->
-                    profile.copy(
-                        autoCheckEnabled = old.autoCheckEnabled,
-                        autoCheckIntervalHours = old.autoCheckIntervalHours
-                    )
-                } ?: profile
+                map[profile.url] = profile
                 saveMapSuspend(map)
             }
         }
@@ -80,23 +75,6 @@ class OtherUpdateCheckUtil {
                 val map = getMapSuspend()
                 map[url]?.let {
                     map[url] = it.copy(lastCheckTime = lastCheckTime)
-                    saveMapSuspend(map)
-                }
-            }
-        }
-
-        suspend fun updateAutoCheckSuspend(
-            url: String,
-            enabled: Boolean,
-            intervalHours: Int
-        ) {
-            writeMutex.withLock {
-                val map = getMapSuspend()
-                map[url]?.let {
-                    map[url] = it.copy(
-                        autoCheckEnabled = enabled,
-                        autoCheckIntervalHours = intervalHours
-                    )
                     saveMapSuspend(map)
                 }
             }
@@ -144,10 +122,7 @@ class OtherUpdateCheckUtil {
                     url = obj.getString("url") ?: "",
                     savedReplies = obj.getIntValue("savedReplies"),
                     hasUpdate = obj.getBooleanValue("hasUpdate"),
-                    lastCheckTime = obj.getLongValue("lastCheckTime"),
-                    autoCheckEnabled = obj.getBooleanValue("autoCheckEnabled"),
-                    autoCheckIntervalHours = obj.getIntValue("autoCheckIntervalHours")
-                        .takeIf { it > 0 } ?: 12
+                    lastCheckTime = obj.getLongValue("lastCheckTime")
                 )
                 map[profile.url] = profile
             }
