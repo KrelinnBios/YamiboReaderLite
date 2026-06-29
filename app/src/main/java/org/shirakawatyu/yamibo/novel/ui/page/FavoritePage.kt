@@ -179,11 +179,11 @@ fun FavoritePage(
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
-                description = "可对小说/漫画/其他帖子分别设置手动或自动更新检查，及时知道有没有新章节。"
+                description = "可对小说/漫画帖子分别设置手动或自动更新检查，及时知道有没有新章节。"
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
-                description = "每本收藏都能单独清理本地缓存，不影响其他收藏的已缓存内容。"
+                description = "每个收藏都能单独清理本地缓存，不影响其他收藏的已缓存内容。"
             )
         )
     )
