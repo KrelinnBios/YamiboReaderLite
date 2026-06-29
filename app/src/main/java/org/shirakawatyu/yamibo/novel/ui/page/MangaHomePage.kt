@@ -30,7 +30,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -60,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -304,16 +307,41 @@ fun MangaHomePage(
                 state.error != null && state.items.isEmpty() -> {
                     Column(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(28.dp),
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 32.dp),
+                        verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = state.error.orEmpty(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = "加载失败",
+                            modifier = Modifier.size(48.dp),
+                            tint = Color.Gray
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Button(onClick = mangaHomeVM::refresh) { Text("重试") }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "漫画首页无法打开",
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "页面加载失败，请检查网络后刷新",
+                            fontSize = 14.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(onClick = mangaHomeVM::refresh) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "刷新",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("刷新页面")
+                        }
                     }
                 }
                 state.items.isEmpty() -> {
