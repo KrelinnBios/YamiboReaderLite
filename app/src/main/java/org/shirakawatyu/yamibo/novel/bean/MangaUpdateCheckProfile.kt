@@ -17,7 +17,5 @@ data class MangaUpdateCheckProfile(
     val savedChapterCount: Int,
     val savedLatestTid: String,
     val hasUpdate: Boolean = false,
-    val lastCheckTime: Long = 0L,
-    val autoCheckEnabled: Boolean = false,
-    val autoCheckIntervalHours: Int = 12
+    val lastCheckTime: Long = 0L
 )
