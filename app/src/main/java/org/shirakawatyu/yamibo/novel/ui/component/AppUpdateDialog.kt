@@ -1,12 +1,14 @@
 package org.shirakawatyu.yamibo.novel.ui.component
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -130,10 +132,12 @@ fun AppUpdateDialog(
         confirmButton = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     onClick = {
                         AppUpdateManager.openReleasesPage(context)
                         onDismiss()
@@ -141,16 +145,18 @@ fun AppUpdateDialog(
                 ) {
                     Text("手动下载", maxLines = 1, softWrap = false)
                 }
-                Spacer(Modifier.width(8.dp))
                 TextButton(
                     enabled = state != UpdateDownloadState.DOWNLOADING,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     onClick = onDismiss
                 ) {
                     Text("稍后", maxLines = 1, softWrap = false)
                 }
                 Spacer(Modifier.weight(1f))
                 Button(
+                    modifier = Modifier.widthIn(min = 150.dp),
                     enabled = state != UpdateDownloadState.DOWNLOADING,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                     onClick = {
                         scope.launch {
                             state = UpdateDownloadState.DOWNLOADING
