@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,14 +28,14 @@ import org.shirakawatyu.yamibo.novel.repository.DirectoryRepository
 /**
  * 应用级（进程生命周期）更新检查引擎。
  *
- * - 手动检查（滑动卡片）与后台自动检查共用同一套执行逻辑与节流锁，避免重复实现与互相打架。
- * - 通过 [inFlight] 暴露"正在检查"的 url 集合；UI 据此显示转圈，对手动/后台都生效。
- * - 所有结果都写入 DataStore；UI 通过各自的 Flow 自动刷新角标。
- * - notify=true 时弹 Toast（手动场景）；notify=false 时全程静默（后台场景）。
+ * - 手动检查共用同一套执行逻辑与节流锁，避免重复实现。
+ * - 通过 [inFlight] 暴露"正在检查"的 url 集合；UI 据此显示转圈。
+ * - 所有结果都写入 DataStore；UI 通过各自的 Flow 刷新角标。
+ * - notify=true 时弹 Toast；notify=false 时全程静默。
  */
 object UpdateCheckEngine {
 
-    // 进程级作用域：不随任何 ViewModel / Composition 销毁而取消 —— 这是"后台不被打断"的根基。
+    // 进程级作用域：不随任何 ViewModel / Composition 销毁而取消，避免页面切换打断检查。
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -49,7 +48,7 @@ object UpdateCheckEngine {
     private fun requireContext(): Context =
         appContext ?: error("UpdateCheckEngine 未初始化，请先调用 ensureInit(context)")
 
-    // ---- 正在检查的 url 集合（手动 + 后台共用）----
+    // ---- 正在检查的 url 集合 ----
     private val _inFlight = MutableStateFlow<Set<String>>(emptySet())
     val inFlight: StateFlow<Set<String>> = _inFlight.asStateFlow()
 
@@ -123,44 +122,6 @@ object UpdateCheckEngine {
                 notify = true
             )
         }
-    }
-
-    /**
-     * 手动检查漫画（挂起版本，调用方可按需串行后续操作）。
-     * tryEnter 保证原子去重；同一 url 已在检查时直接返回，不弹 Toast。
-     */
-    suspend fun checkMangaSuspend(
-        favorite: Favorite,
-        overrideStrategy: MangaUpdateCheckStrategy? = null,
-        overrideSearchKeyword: String? = null,
-        overrideCleanBookName: String? = null
-    ) {
-        if (favorite.type != 2) return
-        performManga(favorite.url, favorite.title, overrideStrategy, overrideSearchKeyword, overrideCleanBookName, notify = true)
-    }
-
-    /** 类型探测后静默建立"追踪更新"基线：不弹 Toast，不改变自动检查开关。 */
-    fun trackNovelSilently(url: String, title: String, authorId: String?) {
-        scope.launch { performNovel(url, title, authorId, notify = false) }
-    }
-
-    /** 类型探测后静默建立"追踪更新"基线：不弹 Toast，不改变自动检查开关。 */
-    fun trackMangaSilently(url: String, title: String) {
-        scope.launch { performManga(url, title, null, null, null, notify = false) }
-    }
-
-    /** 后台自动检查（由调度器串行调用，已在引擎作用域内，需挂起等待完成以便错峰）。 */
-    suspend fun runAutoNovel(profile: NovelUpdateCheckProfile) {
-        performNovel(profile.url, profile.title, profile.authorId, notify = false)
-    }
-
-    suspend fun runAutoManga(profile: MangaUpdateCheckProfile) {
-        // 自动检查复用 profile 里已保存的策略/关键词：全部传 null，让内部回退到 oldProfile。
-        performManga(profile.url, profile.title, null, null, null, notify = false)
-    }
-
-    suspend fun runAutoOther(profile: OtherUpdateCheckProfile) {
-        performOther(profile.url, profile.title, notify = false)
     }
 
     // =========================================================================
@@ -267,7 +228,7 @@ object UpdateCheckEngine {
                             savedReplies = currentReplies, hasUpdate = false, lastCheckTime = checkedAt
                         )
                     )
-                    if (notify) toast("已开始追踪更新")
+                    if (notify) toast("已记录当前更新状态")
                     return@withLock
                 }
                 val detectedUpdate = currentReplies > profile.savedReplies
@@ -279,7 +240,7 @@ object UpdateCheckEngine {
                 if (notify) toast(if (detectedUpdate) "检测到小说更新" else "没有检测到小说更新")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                // 失败也要更新 lastCheckTime，避免错峰窗口反复立刻重试
+                // 失败也记录 lastCheckTime，保留最近一次检查时间。
                 profile?.let { NovelUpdateCheckUtil.updateCheckTimeSuspend(url, System.currentTimeMillis()) }
                 if (notify) toast("查询小说更新失败")
             }
@@ -308,7 +269,7 @@ object UpdateCheckEngine {
                             savedReplies = currentReplies, hasUpdate = false, lastCheckTime = checkedAt
                         )
                     )
-                    if (notify) toast("已开始追踪更新")
+                    if (notify) toast("已记录当前更新状态")
                     return@withLock
                 }
                 val detectedUpdate = currentReplies > profile.savedReplies
@@ -438,7 +399,7 @@ object UpdateCheckEngine {
                 )
                 if (notify) toast(
                     when {
-                        isFirstCheck -> "已开始追踪更新"
+                        isFirstCheck -> "已记录当前更新状态"
                         detectedUpdate -> "检测到漫画更新"
                         else -> "没有检测到漫画更新"
                     }
