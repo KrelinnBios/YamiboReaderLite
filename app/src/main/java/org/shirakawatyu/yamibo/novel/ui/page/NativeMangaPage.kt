@@ -196,7 +196,7 @@ fun NativeMangaPage(
             ),
             OnboardingStep(
                 title = "漫画阅读小提示",
-                description = "支持纵向、从左到右、从右到左三种阅读方向，可在设置面板里切换。"
+                description = "支持从上到下、从左到右、从右到左三种阅读方向，可在设置面板里切换。"
             ),
             OnboardingStep(
                 title = "漫画阅读小提示",
