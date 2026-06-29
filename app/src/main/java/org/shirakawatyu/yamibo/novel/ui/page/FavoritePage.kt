@@ -113,7 +113,6 @@ import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
-import org.shirakawatyu.yamibo.novel.ui.widget.favorite.AutoCheckSection
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
@@ -121,7 +120,6 @@ import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
-import org.shirakawatyu.yamibo.novel.util.updateCheck.AutoUpdateCheckScheduler
 
 
 // 非搜索场景下，确认"暂无收藏"前的等待时间。
@@ -151,11 +149,6 @@ fun FavoritePage(
     val novelCheckMap = remember(updateCheckNovels) { updateCheckNovels.associateBy { it.url } }
     val mangaCheckMap = remember(updateCheckMangas) { updateCheckMangas.associateBy { it.url } }
     val otherCheckMap = remember(updateCheckOthers) { updateCheckOthers.associateBy { it.url } }
-    val autoEnabledCount = remember(updateCheckNovels, updateCheckMangas, updateCheckOthers) {
-        updateCheckNovels.count { it.autoCheckEnabled } +
-                updateCheckMangas.count { it.autoCheckEnabled } +
-                updateCheckOthers.count { it.autoCheckEnabled }
-    }
     var cacheInfoMap = uiState.cacheInfoMap
     LaunchedEffect(Unit) { favoriteVM.refreshCacheInfo() }
     DisposableEffect(Unit) {
@@ -179,7 +172,7 @@ fun FavoritePage(
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
-                description = "可对小说/漫画帖子分别设置手动或自动更新检查，及时知道有没有新章节。"
+                description = "长按小说、漫画或其他帖子收藏项可手动检查更新，检查后有新内容会显示提示。"
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
@@ -196,14 +189,6 @@ fun FavoritePage(
     var mangaConfigPresetKeyword by remember { mutableStateOf("") }
     var mangaConfigPresetBookName by remember { mutableStateOf("") }
     var mangaConfigTagAvailable by remember { mutableStateOf(false) }
-    var novelUpdateCheckTarget by remember { mutableStateOf<Favorite?>(null) }
-    var showNovelConfigDialog by remember { mutableStateOf(false) }
-    var novelConfigAutoCheck by remember { mutableStateOf(false) }
-    var novelConfigInterval by remember { mutableIntStateOf(12) }
-    var otherUpdateCheckTarget by remember { mutableStateOf<Favorite?>(null) }
-    var showOtherConfigDialog by remember { mutableStateOf(false) }
-    var otherConfigAutoCheck by remember { mutableStateOf(false) }
-    var otherConfigInterval by remember { mutableIntStateOf(12) }
     val openMangaConfig: (Favorite) -> Unit = { fav ->
         mangaUpdateCheckTarget = fav
         favoriteVM.getDirectoryList { dirs ->
@@ -337,8 +322,6 @@ fun FavoritePage(
             } else if (event == Lifecycle.Event.ON_RESUME) {
                 val isQuickReturn = favoriteVM.lastPauseTime != 0L &&
                         (System.currentTimeMillis() - favoriteVM.lastPauseTime < 2400L)
-                // 进入前台：尝试跑一轮自动更新检查（调度器自带最小间隔 + 错峰 + 登录守卫）
-                AutoUpdateCheckScheduler.onAppForeground(context.applicationContext)
 
                 coroutineScope.launch {
                     delay(350)
@@ -842,9 +825,6 @@ fun FavoritePage(
                             mangaCheckMap[item.url]?.hasUpdate == true ||
                             otherCheckMap[item.url]?.hasUpdate == true
                     val isCheckingUpdate = uiState.checkingUpdateUrls.contains(item.url)
-                    val autoCheckEnabled = novelCheckMap[item.url]?.autoCheckEnabled == true ||
-                            mangaCheckMap[item.url]?.autoCheckEnabled == true ||
-                            otherCheckMap[item.url]?.autoCheckEnabled == true
                     FavoriteItem(
                         item.title,
                         item.lastView,
@@ -865,7 +845,6 @@ fun FavoritePage(
                         mangaCacheBytes = item.mangaCacheBytes,
                         hasUpdate = hasUpdate,
                         isCheckingUpdate = isCheckingUpdate,
-                        autoCheckEnabled = autoCheckEnabled,
                         isPinned = item.pinAnchorUrl != null
                     )
                 }
@@ -1094,10 +1073,90 @@ fun FavoritePage(
                                 Text(if (isPinned) "取消置顶" else "置顶")
                             }
                         }
+                        if (target.type == 0) {
+                            Text(
+                                "选择类型",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                            TextButton(
+                                onClick = {
+                                    favoriteVM.setFavoriteTypeManually(target, 1) { message ->
+                                        YamiboToast.show(context = context, message = message)
+                                    }
+                                    itemActionTarget = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Checklist,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("设为小说")
+                                }
+                            }
+                            TextButton(
+                                onClick = {
+                                    favoriteVM.setFavoriteTypeManually(target, 2) { message ->
+                                        YamiboToast.show(context = context, message = message)
+                                    }
+                                    itemActionTarget = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Checklist,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("设为漫画")
+                                }
+                            }
+                            TextButton(
+                                onClick = {
+                                    favoriteVM.setFavoriteTypeManually(target, 3) { message ->
+                                        YamiboToast.show(context = context, message = message)
+                                    }
+                                    itemActionTarget = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.List,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text("设为其他（移出）")
+                                }
+                            }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
                         TextButton(
                             onClick = {
                                 when (target.type) {
-                                    0 -> favoriteVM.probeFavoriteTypeInBackground(target)
+                                    0 -> favoriteVM.checkUpdateAfterTypeProbe(target)
                                     1 -> favoriteVM.checkNovelUpdate(target)
                                     2 -> {
                                         if (mangaCheckMap[target.url] != null) {
@@ -1267,11 +1326,6 @@ fun FavoritePage(
             var keyword1 by remember(fav.url, initKeyword) { mutableStateOf(initKeyword) }
             var keyword2 by remember(fav.url) { mutableStateOf("") }
             var showKeyword2 by remember(fav.url) { mutableStateOf(false) }
-            val existingManga = mangaCheckMap[fav.url]
-            var mangaConfigAutoCheck by remember(fav.url, existingManga) { mutableStateOf(existingManga?.autoCheckEnabled ?: false) }
-            var mangaConfigInterval by remember(fav.url, existingManga) {
-                mutableIntStateOf(existingManga?.autoCheckIntervalHours ?: 12)
-            }
             var searchCooldownSec by remember { mutableIntStateOf(0) }
 
             LaunchedEffect(selectedStrategy, showMangaConfigDialog) {
@@ -1372,21 +1426,6 @@ fun FavoritePage(
                                 fontSize = 12.sp
                             )
                         }
-
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        AutoCheckSection(
-                            enabled = mangaConfigAutoCheck,
-                            intervalHours = mangaConfigInterval,
-                            onEnabledChange = { mangaConfigAutoCheck = it },
-                            onIntervalChange = { mangaConfigInterval = it },
-                            enabledCount = autoEnabledCount + when {
-                                mangaConfigAutoCheck && existingManga?.autoCheckEnabled != true -> 1
-                                !mangaConfigAutoCheck && (existingManga?.autoCheckEnabled == true) -> -1
-                                else -> 0
-                            },
-                            maxCount = FavoriteVM.MAX_AUTO_CHECK,
-                            isCurrentlyEnabled = existingManga?.autoCheckEnabled == true
-                        )
                     }
                 },
                 confirmButton = {
@@ -1400,13 +1439,11 @@ fun FavoritePage(
                                         .filter { it.isNotEmpty() }
                                         .joinToString(" ")
                                 } else ""
-                                favoriteVM.checkMangaUpdateAndSaveAutoCheck(
+                                favoriteVM.checkMangaUpdate(
                                     target,
                                     overrideStrategy = selectedStrategy,
                                     overrideSearchKeyword = combinedKeyword.ifBlank { null },
-                                    overrideCleanBookName = if (isSearch) bookName.ifBlank { null } else null,
-                                    autoEnabled = mangaConfigAutoCheck,
-                                    intervalHours = mangaConfigInterval
+                                    overrideCleanBookName = if (isSearch) bookName.ifBlank { null } else null
                                 )
                             }
                             mangaUpdateCheckTarget = null
@@ -1417,89 +1454,6 @@ fun FavoritePage(
                 dismissButton = {
                     TextButton(onClick = {
                         showMangaConfigDialog = false; mangaUpdateCheckTarget = null
-                    }) { Text("取消") }
-                }
-            )
-        }
-        // 小说自动检查配置对话框
-        if (showNovelConfigDialog && novelUpdateCheckTarget != null) {
-            val fav = novelUpdateCheckTarget!!
-            AlertDialog(
-                onDismissRequest = { showNovelConfigDialog = false; novelUpdateCheckTarget = null },
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.primary,
-                textContentColor = MaterialTheme.colorScheme.onSurface,
-                title = { Text("小说更新检查") },
-                text = {
-                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        AutoCheckSection(
-                            enabled = novelConfigAutoCheck,
-                            intervalHours = novelConfigInterval,
-                            onEnabledChange = { novelConfigAutoCheck = it },
-                            onIntervalChange = { novelConfigInterval = it },
-                            enabledCount = autoEnabledCount + when {
-                                novelConfigAutoCheck && novelCheckMap[fav.url]?.autoCheckEnabled != true -> 1
-                                !novelConfigAutoCheck && (novelCheckMap[fav.url]?.autoCheckEnabled == true) -> -1
-                                else -> 0
-                            },
-                            maxCount = FavoriteVM.MAX_AUTO_CHECK,
-                            isCurrentlyEnabled = novelCheckMap[fav.url]?.autoCheckEnabled == true
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showNovelConfigDialog = false
-                        novelUpdateCheckTarget?.let { target ->
-                            favoriteVM.saveNovelAutoCheck(target.url, novelConfigAutoCheck, novelConfigInterval)
-                        }
-                        novelUpdateCheckTarget = null
-                    }) { Text("保存") }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showNovelConfigDialog = false; novelUpdateCheckTarget = null
-                    }) { Text("取消") }
-                }
-            )
-        }
-        if (showOtherConfigDialog && otherUpdateCheckTarget != null) {
-            val fav = otherUpdateCheckTarget!!
-            AlertDialog(
-                onDismissRequest = { showOtherConfigDialog = false; otherUpdateCheckTarget = null },
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.primary,
-                textContentColor = MaterialTheme.colorScheme.onSurface,
-                title = { Text("帖子更新检查") },
-                text = {
-                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        AutoCheckSection(
-                            enabled = otherConfigAutoCheck,
-                            intervalHours = otherConfigInterval,
-                            onEnabledChange = { otherConfigAutoCheck = it },
-                            onIntervalChange = { otherConfigInterval = it },
-                            enabledCount = autoEnabledCount + when {
-                                otherConfigAutoCheck && otherCheckMap[fav.url]?.autoCheckEnabled != true -> 1
-                                !otherConfigAutoCheck && (otherCheckMap[fav.url]?.autoCheckEnabled == true) -> -1
-                                else -> 0
-                            },
-                            maxCount = FavoriteVM.MAX_AUTO_CHECK,
-                            isCurrentlyEnabled = otherCheckMap[fav.url]?.autoCheckEnabled == true
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showOtherConfigDialog = false
-                        otherUpdateCheckTarget?.let { target ->
-                            favoriteVM.saveOtherAutoCheck(target.url, otherConfigAutoCheck, otherConfigInterval)
-                        }
-                        otherUpdateCheckTarget = null
-                    }) { Text("保存") }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showOtherConfigDialog = false; otherUpdateCheckTarget = null
                     }) { Text("取消") }
                 }
             )
