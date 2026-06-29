@@ -150,7 +150,14 @@ fun FavoritePage(
     val mangaCheckMap = remember(updateCheckMangas) { updateCheckMangas.associateBy { it.url } }
     val otherCheckMap = remember(updateCheckOthers) { updateCheckOthers.associateBy { it.url } }
     var cacheInfoMap = uiState.cacheInfoMap
+    var pendingBatchCheck by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { favoriteVM.refreshCacheInfo() }
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing && pendingBatchCheck) {
+            pendingBatchCheck = false
+            favoriteVM.checkAllFavoritesForUpdates()
+        }
+    }
     DisposableEffect(Unit) {
         favoriteVM.isFavoritePageVisible = true
         onDispose {
@@ -751,7 +758,10 @@ fun FavoritePage(
         val pullState = rememberPullToRefreshState()
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = { favoriteVM.refreshList(showLoading = true, isSmartSync = false) },
+            onRefresh = {
+                favoriteVM.refreshList(showLoading = true, isSmartSync = false)
+                pendingBatchCheck = true
+            },
             state = pullState,
             modifier = Modifier.weight(1f),
             indicator = {
@@ -845,7 +855,12 @@ fun FavoritePage(
                         mangaCacheBytes = item.mangaCacheBytes,
                         hasUpdate = hasUpdate,
                         isCheckingUpdate = isCheckingUpdate,
-                        isPinned = item.pinAnchorUrl != null
+                        isPinned = item.pinAnchorUrl != null,
+                        onRefreshUpdate = if (hasUpdate) {
+                            {
+                                favoriteVM.checkUpdateAfterTypeProbe(item)
+                            }
+                        } else null
                     )
                 }
             }
