@@ -188,7 +188,7 @@ fun MangaSettingsPanel(
                     fontWeight = FontWeight.SemiBold
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    val modes = listOf("下滑", "左滑", "右滑")
+                    val modes = listOf("从上到下", "从左到右", "从右到左")
                     modes.forEachIndexed { index, title ->
                         val isSelected = currentMode == index
                         Box(
