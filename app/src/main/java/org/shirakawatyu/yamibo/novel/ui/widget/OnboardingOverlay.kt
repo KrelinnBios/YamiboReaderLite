@@ -97,8 +97,15 @@ fun OnboardingOverlay(
             }
         },
         confirmButton = {
-            TextButton(onClick = { if (isLastStep) finish() else stepIndex++ }) {
-                Text(if (isLastStep) "我知道了" else "下一步")
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                if (steps.size > 1 && stepIndex > 0) {
+                    TextButton(onClick = { stepIndex-- }) {
+                        Text("上一步")
+                    }
+                }
+                TextButton(onClick = { if (isLastStep) finish() else stepIndex++ }) {
+                    Text(if (isLastStep) "我知道了" else "下一步")
+                }
             }
         },
         dismissButton = if (steps.size > 1 && !isLastStep) {
