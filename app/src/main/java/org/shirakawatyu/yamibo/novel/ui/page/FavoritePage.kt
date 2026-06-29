@@ -171,7 +171,11 @@ fun FavoritePage(
         steps = listOf(
             OnboardingStep(
                 title = "收藏管理小提示",
-                description = "长按收藏项可拖动调整顺序，支持分类、搜索、置顶和隐藏。"
+                description = "长按收藏项弹出菜单：置顶、检查更新、清理缓存、删除都在这里。"
+            ),
+            OnboardingStep(
+                title = "收藏管理小提示",
+                description = "点击右上角「管理」图标进入批量管理模式，可以全选、隐藏或删除多项收藏；顶部还支持分类切换和搜索。"
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
