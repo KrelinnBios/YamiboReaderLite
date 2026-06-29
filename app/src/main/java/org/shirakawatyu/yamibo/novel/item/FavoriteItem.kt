@@ -108,7 +108,6 @@ fun FavoriteItem(
     mangaCacheBytes: Long = 0,
     hasUpdate: Boolean = false,
     isCheckingUpdate: Boolean = false,
-    autoCheckEnabled: Boolean = false,
     isPinned: Boolean = false
 ) {
     val tagColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
@@ -294,8 +293,7 @@ fun FavoriteItem(
                 // 右侧固定状态槽（余量不大）：刷新转圈 / 更新胶囊，垂直居中，不压文字。
                 UpdateStatusHandle(
                     isCheckingUpdate = isCheckingUpdate,
-                    hasUpdate = hasUpdate,
-                    autoCheckEnabled = autoCheckEnabled
+                    hasUpdate = hasUpdate
                 )
             }
 
@@ -333,7 +331,7 @@ private enum class HandleStatus {
  * 卡片右侧状态把手：状态胶囊作为浮层坐在最右侧 40dp 图标区域上。
  *
  * 状态贴在右侧把手上，不占标题宽度，也不改变卡片高度。
- * 优先级：检查中 > 有更新 > 自动检查已开启。
+ * 优先级：检查中 > 有更新。
  *
  * 退出动画期间冻结 lastVisibleStatus，防止 AnimatedVisibility fade-out 时
  * isCheckingUpdate 已变 false 但内容切到 else 分支，闪现"新"胶囊。
@@ -342,7 +340,6 @@ private enum class HandleStatus {
 private fun UpdateStatusHandle(
     isCheckingUpdate: Boolean,
     hasUpdate: Boolean,
-    autoCheckEnabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     val primary = darkThemeColor(YamiboColors.primary) { primary }
@@ -379,18 +376,6 @@ private fun UpdateStatusHandle(
                 status = HandleStatus.UPDATED,
                 accent = updateAccent
             )
-        }
-
-        // 自动检查已开启 胶囊（仅在无查/新时展示）
-        androidx.compose.animation.AnimatedVisibility(
-            visible = autoCheckEnabled && !isCheckingUpdate && !hasUpdate,
-            enter = fadeIn(animationSpec = tween(200, easing = FastOutSlowInEasing)),
-            exit = fadeOut(animationSpec = tween(120)),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-12).dp)
-        ) {
-            AutoCheckCapsule()
         }
     }
 }
@@ -445,35 +430,6 @@ private fun HandleStatusCapsule(
                 modifier = Modifier.graphicsLayer { translationY = textOffsetPx }
             )
         }
-    }
-}
-
-/** 自动检查已开启的胶囊：比”查”/”新”更低调，表明该项已纳入后台自动巡检。 */
-@Composable
-private fun AutoCheckCapsule() {
-    val primary = darkThemeColor(YamiboColors.primary) { primary }
-    val shape = RoundedCornerShape(50)
-    val textOffsetPx = with(androidx.compose.ui.platform.LocalDensity.current) { (-3).dp.toPx() }
-
-    Row(
-        modifier = Modifier
-            .width(38.dp)
-            .height(18.dp)
-            .clip(shape)
-            .background(primary.copy(alpha = 0.08f))
-            .border(1.dp, primary.copy(alpha = 0.28f), shape)
-            .padding(horizontal = 5.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "自动",
-            color = primary.copy(alpha = 0.7f),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            modifier = Modifier.graphicsLayer { translationY = textOffsetPx }
-        )
     }
 }
 
