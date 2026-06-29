@@ -5,7 +5,5 @@ data class OtherUpdateCheckProfile(
     val url: String,
     val savedReplies: Int,
     val hasUpdate: Boolean = false,
-    val lastCheckTime: Long = 0L,
-    val autoCheckEnabled: Boolean = false,
-    val autoCheckIntervalHours: Int = 12
+    val lastCheckTime: Long = 0L
 )
