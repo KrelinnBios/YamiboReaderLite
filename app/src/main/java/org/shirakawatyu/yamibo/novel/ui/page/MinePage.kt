@@ -29,10 +29,12 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1782,27 +1784,28 @@ fun MinePage(
                                     }
                                     Text("清理缓存（${formatFileSize(cacheSizeBytes)}）")
                                 }
-                            }
-                        },
-                        confirmButton = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                TextButton(
-                                    onClick = { mineDialog = MineDialogState.Blocklist }
+                                Spacer(Modifier.height(2.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("黑名单")
-                                }
-                                Row {
+                                    TextButton(
+                                        onClick = { mineDialog = MineDialogState.Blocklist },
+                                        modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                    ) {
+                                        Text("黑名单")
+                                    }
                                     TextButton(
                                         onClick = {
                                             mineDialog = MineDialogState.None
                                             context.startActivity(
                                                 Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/KrelinnBios/YamiboReaderLite/issues/new"))
                                             )
-                                        }
+                                        },
+                                        modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                                     ) {
                                         Text("反馈")
                                     }
@@ -1824,16 +1827,23 @@ fun MinePage(
                                                         manualUpdateFailure = result.reason
                                                 }
                                             }
-                                        }
+                                        },
+                                        modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                                     ) {
                                         Text("检查更新")
                                     }
-                                    TextButton(onClick = { mineDialog = MineDialogState.None }) {
+                                    TextButton(
+                                        onClick = { mineDialog = MineDialogState.None },
+                                        modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                    ) {
                                         Text("关闭")
                                     }
                                 }
                             }
                         },
+                        confirmButton = {},
                         dismissButton = {}
                     )
 
