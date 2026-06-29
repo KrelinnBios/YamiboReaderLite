@@ -36,7 +36,6 @@ import org.shirakawatyu.yamibo.novel.util.favorite.TombstoneQueueUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.reader.LocalCacheUtil
-import org.shirakawatyu.yamibo.novel.util.updateCheck.AutoUpdateCheckScheduler
 import org.shirakawatyu.yamibo.novel.bean.OtherUpdateCheckProfile
 import org.shirakawatyu.yamibo.novel.util.updateCheck.MangaUpdateCheckUtil
 import org.shirakawatyu.yamibo.novel.util.updateCheck.NovelUpdateCheckUtil
@@ -49,20 +48,23 @@ enum class FetchState { IDLE, BACKGROUND, MANUAL }
 
 class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     companion object {
-        /** 自动检查同时启用的总上限（小说 + 漫画合计）。 */
-        const val MAX_AUTO_CHECK = 16
-
-        /** 自动检查允许的间隔：避免过长间隔导致错过更新。 */
-        val AUTO_CHECK_INTERVALS = listOf(3, 6, 12, 24, 72)
-
         /** 手动检查小说很快结束时，至少让加载圈稳定可见一小段时间，避免闪烁。 */
         private const val MIN_UPDATE_CHECK_VISIBLE_MS = 650L
         private const val MANGA_CACHE_URL_LIMIT = 500
 
-        private val MANGA_SECTIONS = listOf("中文百合漫画区", "百合漫画图源区")
-        private val NOVEL_SECTIONS = listOf("文學區", "文学区", "轻小说/译文区", "TXT小说区")
-        private val MANGA_FIDS = setOf("30", "37")
-        private val NOVEL_FIDS = setOf("49", "55", "60")
+        private val MANGA_SECTIONS_BY_FID = linkedMapOf(
+            "30" to "中文百合漫画区",
+            "37" to "百合漫画图源区"
+        )
+        private val NOVEL_SECTIONS_BY_FID = linkedMapOf(
+            "49" to "文學區",
+            "55" to "轻小说/译文区",
+            "60" to "TXT小说区"
+        )
+        private val MANGA_FIDS = MANGA_SECTIONS_BY_FID.keys
+        private val NOVEL_FIDS = NOVEL_SECTIONS_BY_FID.keys
+        private val MANGA_SECTIONS = MANGA_SECTIONS_BY_FID.values
+        private val NOVEL_SECTIONS = NOVEL_SECTIONS_BY_FID.values
     }
 
     private val _uiState = MutableStateFlow(FavoriteState())
@@ -220,7 +222,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
      * 因此左滑探测不会把用户从收藏页带走。
      */
     fun probeFavoriteTypeInBackground(favorite: Favorite) {
-        if (favorite.type != 0 && !favorite.sourceFid.isNullOrBlank()) return
+        if (favorite.type != 0) return
         val alreadyProbing = synchronized(typeProbeJobsLock) {
             typeProbeJobs[favorite.url]?.isActive == true
         }
@@ -233,7 +235,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 if (result == null) return@launch
 
                 applyTypeProbeResult(favorite, result)
-                startUpdateTrackingAfterTypeProbe(favorite, result)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(logTag, "后台探测收藏类型失败: ${favorite.url}", e)
@@ -256,7 +257,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             val result = runCatching { probeFavoriteTypeSuspend(favorite) }.getOrNull()
                 ?: return@withContext 3
             applyTypeProbeResult(favorite, result)
-            startUpdateTrackingAfterTypeProbe(favorite, result)
             result.type
         }
     }
@@ -289,25 +289,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
 
         return TypeProbeResult(type = type, title = title, authorId = authorId, sourceFid = fid)
-    }
-
-    private fun startUpdateTrackingAfterTypeProbe(favorite: Favorite, result: TypeProbeResult) {
-        when (result.type) {
-            1 -> {
-                val cleanTitle = cleanNovelProbeTitle(result.title)
-                UpdateCheckEngine.trackNovelSilently(
-                    url = favorite.url,
-                    title = cleanTitle.ifBlank { favorite.title },
-                    authorId = result.authorId
-                )
-            }
-
-            2 -> UpdateCheckEngine.trackMangaSilently(
-                url = favorite.url,
-                title = result.title.ifBlank { favorite.title }
-            )
-
-        }
     }
 
     private suspend fun applyTypeProbeResult(favorite: Favorite, result: TypeProbeResult): Boolean {
@@ -343,7 +324,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
     private fun cleanNovelProbeTitle(rawTitle: String): String =
         rawTitle.replace(
-            Regex("\\s+[-—–_]+\\s+.*?(文學區|文学区|小说区|译文区|百合会|论坛).*$"),
+            Regex("\\s+[-—–_]+\\s+.*?(文學區|轻小说/译文区|TXT小说区|百合会|论坛).*$"),
             ""
         ).trim().ifBlank { rawTitle }
 
@@ -399,8 +380,9 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
         val supportedOnly = pendingFiltered.filter { favorite ->
             when (favorite.type) {
-                1 -> favorite.sourceFid in NOVEL_FIDS
-                2 -> favorite.sourceFid in MANGA_FIDS
+                0 -> true
+                1 -> favorite.sourceFid.isNullOrBlank() || favorite.sourceFid in NOVEL_FIDS
+                2 -> favorite.sourceFid.isNullOrBlank() || favorite.sourceFid in MANGA_FIDS
                 else -> false
             }
         }
@@ -1086,12 +1068,71 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
-    private suspend fun showShortToast(message: String) {
-        withContext(Dispatchers.Main) {
-            YamiboToast.show(context = applicationContext, message = message)
+    fun setFavoriteTypeManually(
+        favorite: Favorite,
+        type: Int,
+        onToast: (String) -> Unit = {}
+    ) {
+        if (type !in 1..3) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val updatedFavorite = favorite.copy(
+                type = type,
+                sourceFid = null
+            )
+
+            stateMutex.withLock {
+                allFavorites = allFavorites.map {
+                    if (it.url == updatedFavorite.url) updatedFavorite else it
+                }
+            }
+            FavoriteUtil.updateFavoriteSuspend(updatedFavorite)
+            NovelUpdateCheckUtil.removeProfileSuspend(updatedFavorite.url)
+            MangaUpdateCheckUtil.removeProfileSuspend(updatedFavorite.url)
+            OtherUpdateCheckUtil.removeProfileSuspend(updatedFavorite.url)
+
+            withContext(Dispatchers.Main) {
+                updateUiList()
+                onToast(
+                    when (type) {
+                        1 -> "已设为小说"
+                        2 -> "已设为漫画"
+                        else -> "已设为其他，已移出收藏页"
+                    }
+                )
+            }
         }
     }
 
+    fun checkUpdateAfterTypeProbe(favorite: Favorite) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = runCatching { probeFavoriteTypeSuspend(favorite) }.getOrNull()
+            val checkedFavorite = if (result != null) {
+                applyTypeProbeResult(favorite, result)
+                when (result.type) {
+                    1 -> {
+                        val cleanTitle = cleanNovelProbeTitle(result.title).ifBlank { favorite.title }
+                        favorite.copy(
+                            type = 1,
+                            title = cleanTitle,
+                            authorId = result.authorId.takeIf { it.isNotBlank() },
+                            sourceFid = result.sourceFid
+                        )
+                    }
+
+                    2 -> favorite.copy(type = 2, sourceFid = result.sourceFid)
+                    else -> favorite.copy(type = 3, sourceFid = result.sourceFid)
+                }
+            } else {
+                favorite.copy(type = 3)
+            }
+
+            when (checkedFavorite.type) {
+                1 -> checkNovelUpdate(checkedFavorite)
+                2 -> checkMangaUpdate(checkedFavorite)
+                else -> checkOtherUpdate(checkedFavorite)
+            }
+        }
+    }
     fun checkNovelUpdate(favorite: Favorite) {
         UpdateCheckEngine.ensureInit(applicationContext)
         UpdateCheckEngine.checkNovel(favorite)
@@ -1108,24 +1149,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         UpdateCheckEngine.checkOther(favorite)
     }
 
-    fun saveOtherAutoCheck(url: String, enabled: Boolean, intervalHours: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (enabled) {
-                val already = OtherUpdateCheckUtil.getMapSuspend()[url]?.autoCheckEnabled == true
-                if (!already && autoCheckEnabledCountSuspend() >= MAX_AUTO_CHECK) {
-                    showShortToast("自动检查已达上限")
-                    return@launch
-                }
-            }
-            OtherUpdateCheckUtil.updateAutoCheckSuspend(
-                url,
-                enabled,
-                intervalHours
-            )
-            if (enabled) AutoUpdateCheckScheduler.triggerNow(applicationContext)
-        }
-    }
-
     fun checkMangaUpdate(
         favorite: Favorite,
         overrideStrategy: MangaUpdateCheckStrategy? = null,
@@ -1136,38 +1159,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         UpdateCheckEngine.checkManga(favorite, overrideStrategy, overrideSearchKeyword, overrideCleanBookName)
     }
 
-    fun checkMangaUpdateAndSaveAutoCheck(
-        favorite: Favorite,
-        overrideStrategy: MangaUpdateCheckStrategy?,
-        overrideSearchKeyword: String?,
-        overrideCleanBookName: String?,
-        autoEnabled: Boolean,
-        intervalHours: Int
-    ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            UpdateCheckEngine.ensureInit(applicationContext)
-            UpdateCheckEngine.checkMangaSuspend(
-                favorite,
-                overrideStrategy,
-                overrideSearchKeyword,
-                overrideCleanBookName
-            )
-            if (autoEnabled) {
-                val already = MangaUpdateCheckUtil.getMapSuspend()[favorite.url]?.autoCheckEnabled == true
-                if (!already && autoCheckEnabledCountSuspend() >= MAX_AUTO_CHECK) {
-                    showShortToast("自动检查已达上限")
-                    return@launch
-                }
-            }
-            MangaUpdateCheckUtil.updateAutoCheckSuspend(
-                favorite.url,
-                autoEnabled,
-                intervalHours
-            )
-            if (autoEnabled) AutoUpdateCheckScheduler.triggerNow(applicationContext)
-        }
-    }
-
     fun clearMangaUpdateCheckFlag(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             MangaUpdateCheckUtil.clearUpdateFlagSuspend(url)
@@ -1176,32 +1167,6 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
     fun getSearchCooldownRemainingMs(): Long {
         return 0L
-    }
-
-    /** 当前已启用自动检查的总数（小说 + 漫画 + 其他），用于配额校验。 */
-    private suspend fun autoCheckEnabledCountSuspend(): Int {
-        val n = NovelUpdateCheckUtil.getMapSuspend().values.count { it.autoCheckEnabled }
-        val m = MangaUpdateCheckUtil.getMapSuspend().values.count { it.autoCheckEnabled }
-        val o = OtherUpdateCheckUtil.getMapSuspend().values.count { it.autoCheckEnabled }
-        return n + m + o
-    }
-
-    fun saveNovelAutoCheck(url: String, enabled: Boolean, intervalHours: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (enabled) {
-                val already = NovelUpdateCheckUtil.getMapSuspend()[url]?.autoCheckEnabled == true
-                if (!already && autoCheckEnabledCountSuspend() >= MAX_AUTO_CHECK) {
-                    showShortToast("自动检查已达上限")
-                    return@launch
-                }
-            }
-            NovelUpdateCheckUtil.updateAutoCheckSuspend(
-                url,
-                enabled,
-                intervalHours
-            )
-            if (enabled) AutoUpdateCheckScheduler.triggerNow(applicationContext)
-        }
     }
 
 }
