@@ -1769,6 +1769,12 @@ fun MinePage(
                                     )
                                 }
 
+                            }
+                        },
+                        confirmButton = {
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Button(
                                     onClick = { showClearCacheDialog = true },
                                     enabled = !isClearingCache,
@@ -1843,7 +1849,6 @@ fun MinePage(
                                 }
                             }
                         },
-                        confirmButton = {},
                         dismissButton = {}
                     )
 
