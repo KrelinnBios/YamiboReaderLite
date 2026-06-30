@@ -179,6 +179,7 @@ fun ReaderPage(
     navController: NavController
 ) {
     val uiState by readerVM.uiState.collectAsState()
+    val languageMode by GlobalData.languageMode.collectAsState()
     val currentPercentage by readerVM.currentPercentage.collectAsState()
     val favoriteVM: FavoriteVM = viewModel(
         viewModelStoreOwner = LocalContext.current as ComponentActivity,
@@ -270,6 +271,10 @@ fun ReaderPage(
             }
         }
     }
+    LaunchedEffect(languageMode) {
+        readerVM.syncGlobalTranslationMode(languageMode, currentPageIndex)
+    }
+
     val onSetPageAction = remember(lazyListState, pagerState, scope, readerVM) {
         { pageIndex: Int ->
             scope.launch {
@@ -974,9 +979,6 @@ fun ReaderPage(
                         onSetPadding = onSetPaddingAction,
                         onShowChapters = onShowChaptersAction,
                         onSetReadingMode = onSetReadingModeAction,
-                        onSetTranslationMode = { mode ->
-                            readerVM.setTranslationMode(mode, currentPageIndex)
-                        },
                         onSetLoadImages = { enabled ->
                             if (enabled && !uiState.loadImages) {
                                 showImageWarning = true
@@ -1019,7 +1021,6 @@ fun ReaderSettingsBar(
     onSetPadding: (padding: Dp) -> Unit,
     onShowChapters: () -> Unit,
     onSetReadingMode: (isVertical: Boolean) -> Unit,
-    onSetTranslationMode: (Int) -> Unit,
     onSetLoadImages: (Boolean) -> Unit
 ) {
     var showSpacingMenu by remember { mutableStateOf(false) }
@@ -1078,7 +1079,6 @@ fun ReaderSettingsBar(
                         onSetPadding = onSetPadding,
                         onBack = { showSpacingMenu = false },
                         onSetReadingMode = onSetReadingMode,
-                        onSetTranslationMode = onSetTranslationMode,
                         onSetLoadImages = onSetLoadImages
                     )
                 } else {
@@ -1501,7 +1501,6 @@ private fun SpacingSettingsMenu(
     onSetPadding: (padding: Dp) -> Unit,
     onBack: () -> Unit,
     onSetReadingMode: (isVertical: Boolean) -> Unit,
-    onSetTranslationMode: (Int) -> Unit,
     onSetLoadImages: (Boolean) -> Unit
 ) {
     Column(
@@ -1571,13 +1570,6 @@ private fun SpacingSettingsMenu(
                     valueRange = 4f..40f,
                     steps = 8,
                     onValueChange = { onSetPadding(it.dp) }
-                )
-
-                CompactOptionRow(
-                    label = "文字转换",
-                    options = listOf("原文", "简体", "繁體"),
-                    selectedIndex = uiState.translationMode,
-                    onSelect = onSetTranslationMode
                 )
                 CompactOptionRow(
                     label = "正文图片",
