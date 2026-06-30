@@ -1171,6 +1171,46 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
+    fun retryFailedUpdateChecks() {
+        val failedUrls = _uiState.value.failedUpdateUrls
+        val items = allFavorites.filter { favorite ->
+            favorite.url in failedUrls && favorite.type in 1..2
+        }
+        val retryUrls = items.map { it.url }.toSet()
+        UpdateCheckEngine.ensureInit(applicationContext)
+        batchUpdateCheckJob?.cancel()
+        if (items.isEmpty()) {
+            _uiState.update { it.copy(failedUpdateUrls = emptySet()) }
+            YamiboToast.show(context = applicationContext, message = "没有需要重试的收藏")
+            return
+        }
+
+        _uiState.update { it.copy(failedUpdateUrls = it.failedUpdateUrls - retryUrls) }
+        batchUpdateCheckJob = viewModelScope.launch(Dispatchers.IO) {
+            val stillFailedUrls = linkedSetOf<String>()
+            items.forEachIndexed { index, favorite ->
+                if (!isActive) return@launch
+                if (index > 0) delay(600)
+                val result = runUpdateCheckForFavorite(favorite, notify = false)
+                if (result == UpdateCheckResult.FAILURE) {
+                    stillFailedUrls += favorite.url
+                }
+            }
+            _uiState.update {
+                it.copy(failedUpdateUrls = (it.failedUpdateUrls - retryUrls) + stillFailedUrls)
+            }
+            withContext(Dispatchers.Main) {
+                if (stillFailedUrls.isEmpty()) {
+                    YamiboToast.show(context = applicationContext, message = "失败项已重试完成")
+                } else {
+                    YamiboToast.show(
+                        context = applicationContext,
+                        message = "仍有 ${stillFailedUrls.size} 个收藏更新失败"
+                    )
+                }
+            }
+        }
+    }
     private suspend fun runUpdateCheckForFavorite(
         favorite: Favorite,
         notify: Boolean,
