@@ -1582,25 +1582,21 @@ private fun CompactOptionRow(
             modifier = Modifier.width(82.dp)
         )
         Row(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(7.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             options.forEachIndexed { index, option ->
                 val selected = selectedIndex == index
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(5.dp))
+                        .clip(RoundedCornerShape(7.dp))
                         .background(
                             if (selected) MaterialTheme.colorScheme.primary
-                            else Color.Transparent
+                            else MaterialTheme.colorScheme.secondaryContainer
                         )
                         .clickable { onSelect(index) }
-                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -1609,7 +1605,7 @@ private fun CompactOptionRow(
                         color = if (selected) {
                             MaterialTheme.colorScheme.onPrimary
                         } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                            MaterialTheme.colorScheme.onSecondaryContainer
                         },
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1
