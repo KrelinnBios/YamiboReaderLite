@@ -219,7 +219,7 @@ class MainActivity : ComponentActivity() {
         GlobalData.darkModeTheme.value = 0
         GlobalData.lightModeTheme.value = 0
         super.onCreate(savedInstanceState)
-        LanguageModeUtil.applyLocale(this, SettingsUtil.getLanguageMode())
+        LanguageModeUtil.applyLocale(this, runCatching { kotlinx.coroutines.runBlocking { SettingsUtil.getLanguageMode() } }.getOrDefault(LanguageModeUtil.SIMPLIFIED))
 
         val isRestoring = savedInstanceState != null
 
