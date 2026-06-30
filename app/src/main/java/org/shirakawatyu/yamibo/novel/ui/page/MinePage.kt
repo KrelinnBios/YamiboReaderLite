@@ -1694,36 +1694,16 @@ fun MinePage(
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            val normalizedLanguageMode = LanguageModeUtil.normalize(languageMode)
-                                            val simplifiedSelected = normalizedLanguageMode == LanguageModeUtil.SIMPLIFIED
-                                            val traditionalSelected = normalizedLanguageMode == LanguageModeUtil.TRADITIONAL
-                                            TextButton(
-                                                onClick = { setLanguageMode(LanguageModeUtil.SIMPLIFIED) },
-                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                colors = ButtonDefaults.textButtonColors(
-                                                    containerColor = if (simplifiedSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                    contentColor = if (simplifiedSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                                ),
-                                            ) {
-                                                Text("简体", fontSize = 14.sp)
-                                            }
-                                            TextButton(
-                                                onClick = { setLanguageMode(LanguageModeUtil.TRADITIONAL) },
-                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                colors = ButtonDefaults.textButtonColors(
-                                                    containerColor = if (traditionalSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                    contentColor = if (traditionalSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                                ),
-                                            ) {
-                                                Text("繁體", fontSize = 14.sp)
-                                            }
-                                        }
+                                        Switch(
+                                            checked = LanguageModeUtil.normalize(languageMode) == LanguageModeUtil.SIMPLIFIED,
+                                            onCheckedChange = { simplified ->
+                                                setLanguageMode(
+                                                    if (simplified) LanguageModeUtil.SIMPLIFIED
+                                                    else LanguageModeUtil.TRADITIONAL
+                                                )
+                                            },
+                                            colors = yamiboSwitchColors(),
+                                        )
                                     }
 
                                     Row(
