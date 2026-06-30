@@ -86,7 +86,7 @@ fun MangaSettingsPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 32.dp),
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -113,7 +113,7 @@ fun MangaSettingsPanel(
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(20.dp))
 
             // 阅读方向设置行
             Row(
