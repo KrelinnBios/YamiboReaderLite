@@ -785,7 +785,7 @@ object PageJsScripts {
     val MANGA_WEB_HIDE_COMMAND = """
         javascript:(function() {
             var style = document.createElement('style');
-            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search, #nav-more-menu .btn-to-pc { display: none !important; }';
+            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search { display: none !important; }';
             if (document.head) document.head.appendChild(style);
         })()
     """.trimIndent()
@@ -869,7 +869,7 @@ object PageJsScripts {
     val OTHER_WEB_HIDE_COMMAND = """
         (function() {
             var style = document.createElement('style');
-            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search, #nav-more-menu .btn-to-pc { display: none !important; }';
+            style.innerHTML = '.mz { visibility: hidden !important; pointer-events: none !important; } .nav-search { display: none !important; }';
             if (document.head) document.head.appendChild(style);
         })()
     """.trimIndent()
