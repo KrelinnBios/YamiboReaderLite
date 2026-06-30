@@ -18,4 +18,19 @@ class LanguageModeUtilTest {
         assertTrue(LanguageModeUtil.acceptLanguageHeader(LanguageModeUtil.SIMPLIFIED).startsWith("zh-CN"))
         assertTrue(LanguageModeUtil.acceptLanguageHeader(LanguageModeUtil.TRADITIONAL).startsWith("zh-TW"))
     }
+
+    @Test
+    fun mapsReaderTranslationModeFromGlobalLanguage() {
+        assertEquals(1, LanguageModeUtil.readerTranslationMode(LanguageModeUtil.SIMPLIFIED))
+        assertEquals(2, LanguageModeUtil.readerTranslationMode(LanguageModeUtil.TRADITIONAL))
+    }
+
+    @Test
+    fun languageJsCanForceForumSwitchWithoutDroppingHash() {
+        val js = PageJsScripts.getLanguageSetJs(LanguageModeUtil.SIMPLIFIED, forceForumSwitch = true)
+
+        assertTrue(js.contains("var forceForumSwitch = true;"))
+        assertTrue(js.contains("baseUrl + oldHash"))
+        assertTrue(js.contains("history.replaceState(null, document.title, restoreUrl);"))
+    }
 }
