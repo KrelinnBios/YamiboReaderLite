@@ -1,11 +1,8 @@
 package org.shirakawatyu.yamibo.novel.util
 
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.alibaba.fastjson2.JSON
 import com.alibaba.fastjson2.JSONException
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import org.shirakawatyu.yamibo.novel.bean.ReaderSettings
 import org.shirakawatyu.yamibo.novel.global.GlobalData
@@ -146,13 +143,6 @@ class SettingsUtil {
         }
         fun saveLanguageMode(mode: String) {
             DataStoreUtil.addData(LanguageModeUtil.normalize(mode), languageModeKey)
-        }
-        fun getLanguageMode(callback: (String) -> Unit) {
-            DataStoreUtil.getData(languageModeKey, callback = {
-                callback(LanguageModeUtil.normalize(it))
-            }, onNull = {
-                callback(LanguageModeUtil.SIMPLIFIED)
-            })
         }
 
         suspend fun getLanguageMode(): String {

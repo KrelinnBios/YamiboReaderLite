@@ -1,6 +1,5 @@
 package org.shirakawatyu.yamibo.novel.util
 
-import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
 import android.webkit.CookieManager
@@ -15,14 +14,6 @@ object LanguageModeUtil {
             TRADITIONAL, "zh-tw", "zh-hk", "traditional", "繁體中文", "繁体中文" -> TRADITIONAL
             else -> SIMPLIFIED
         }
-    }
-
-    fun label(mode: String?): String {
-        return if (normalize(mode) == TRADITIONAL) "繁體中文" else "简体中文"
-    }
-
-    fun readerTranslationMode(mode: String?): Int {
-        return if (normalize(mode) == TRADITIONAL) 2 else 1
     }
 
     fun acceptLanguageHeader(mode: String?): String {
@@ -58,7 +49,7 @@ object LanguageModeUtil {
     }
 
     fun applyLocale(context: Context, mode: String?) {
-        val locale = if (normalize(mode) == TRADITIONAL) Locale("zh", "HK") else Locale("zh", "CN")
+        val locale = if (normalize(mode) == TRADITIONAL) Locale("zh", "TW") else Locale("zh", "CN")
         Locale.setDefault(locale)
         val config = Configuration(context.resources.configuration)
         config.setLocale(locale)

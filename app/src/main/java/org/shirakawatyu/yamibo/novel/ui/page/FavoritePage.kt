@@ -510,7 +510,7 @@ fun FavoritePage(
         favoriteVM.refreshCacheInfo()
     }
 
-    fun favoriteTypeDescription(favorite: Favorite): String {
+    fun favoriteTypeDescriptionLines(favorite: Favorite): List<String> {
         val sourceName = when (favorite.sourceFid) {
             "30" -> "中文百合漫画区"
             "37" -> "百合漫画图源区"
@@ -521,11 +521,11 @@ fun FavoritePage(
             else -> "fid=${favorite.sourceFid}"
         }
         return when (favorite.type) {
-            0 -> "类型：未识别，可手动选择小说、漫画或其他"
-            1 -> if (sourceName == null) "类型：小说（手动设置）" else "类型：小说（自动识别：$sourceName）"
-            2 -> if (sourceName == null) "类型：漫画（手动设置）" else "类型：漫画（自动识别：$sourceName）"
-            3 -> "类型：其他（仅从收藏页过滤，不删除论坛收藏）"
-            else -> "类型：未知"
+            0 -> listOf("类型：未识别，可手动选择小说、漫画或其他")
+            1 -> if (sourceName == null) listOf("类型：小说（手动设置）") else listOf("类型：小说", "分区：$sourceName")
+            2 -> if (sourceName == null) listOf("类型：漫画（手动设置）") else listOf("类型：漫画", "分区：$sourceName")
+            3 -> listOf("类型：其他（仅从收藏页过滤，不删除论坛收藏）")
+            else -> listOf("类型：未知")
         }
     }
     @Composable
@@ -1096,7 +1096,7 @@ fun FavoritePage(
 
         if (itemActionTarget != null) {
             val target = itemActionTarget!!
-            val typeDescription = favoriteTypeDescription(target)
+            val typeDescriptionLines = favoriteTypeDescriptionLines(target)
             Dialog(
                 onDismissRequest = { itemActionTarget = null },
             ) {
@@ -1122,12 +1122,14 @@ fun FavoritePage(
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
-                        Text(
-                            typeDescription,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
-                        )
+                        typeDescriptionLines.forEach { line ->
+                            Text(
+                                line,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
+                            )
+                        }
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )

@@ -50,7 +50,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1698,11 +1697,11 @@ fun MinePage(
                                             )
                                         }
                                         Switch(
-                                            checked = LanguageModeUtil.normalize(languageMode) == LanguageModeUtil.SIMPLIFIED,
-                                            onCheckedChange = { simplified ->
+                                            checked = LanguageModeUtil.normalize(languageMode) == LanguageModeUtil.TRADITIONAL,
+                                            onCheckedChange = { useTraditional ->
                                                 setLanguageMode(
-                                                    if (simplified) LanguageModeUtil.SIMPLIFIED
-                                                    else LanguageModeUtil.TRADITIONAL
+                                                    if (useTraditional) LanguageModeUtil.TRADITIONAL
+                                                    else LanguageModeUtil.SIMPLIFIED
                                                 )
                                             },
                                             colors = yamiboSwitchColors(),
