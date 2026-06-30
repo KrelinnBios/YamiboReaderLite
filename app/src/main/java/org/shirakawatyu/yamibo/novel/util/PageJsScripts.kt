@@ -1182,6 +1182,7 @@ $styleString
                 var forceForumSwitch = $forceForumSwitch;
                 var target = mode === 'zh-hant' ? 'traditional' : 'simplified';
                 var targetFlag = mode === 'zh-hant' ? 'hant' : 'hans';
+                var desktopPluginLang = mode === 'zh-hant' ? '3' : '0';
                 var previousMode = '';
 
                 function safeSetStorage(storage, key, value) {
@@ -1200,10 +1201,10 @@ $styleString
 
                 function normalizeMode(value) {
                     value = String(value || '').toLowerCase();
-                    if (value === 'zh-hant' || value === 'zh-tw' || value === 'zh-hk' || value === 'traditional' || value === 'hant') {
+                    if (value === 'zh-hant' || value === 'zh-tw' || value === 'zh-hk' || value === 'traditional' || value === 'hant' || value === '1' || value === '2' || value === '3') {
                         return 'zh-hant';
                     }
-                    if (value === 'zh-hans' || value === 'zh-cn' || value === 'simplified' || value === 'hans') {
+                    if (value === 'zh-hans' || value === 'zh-cn' || value === 'simplified' || value === 'hans' || value === '0' || value === '4' || value === 'none') {
                         return 'zh-hans';
                     }
                     return '';
@@ -1212,6 +1213,7 @@ $styleString
                 function readPreviousPreference() {
                     var fromStorage = safeGetStorage(localStorage, 'yamibo-language-mode') ||
                         safeGetStorage(localStorage, 'yamibo_language_mode') ||
+                        safeGetStorage(localStorage, 'yami_opencc_lang') ||
                         safeGetStorage(localStorage, 'yamiOpenCCMode') ||
                         safeGetStorage(localStorage, 'yamiOpenCC');
                     var fromDocument = document.documentElement
@@ -1223,10 +1225,12 @@ $styleString
                 function persistPreference() {
                     safeSetStorage(localStorage, 'yamibo-language-mode', mode);
                     safeSetStorage(localStorage, 'yamibo_language_mode', mode);
+                    safeSetStorage(localStorage, 'yami_opencc_lang', desktopPluginLang);
                     safeSetStorage(localStorage, 'yamiOpenCCMode', target);
                     safeSetStorage(localStorage, 'yamiOpenCC', targetFlag);
                     safeSetCookie('yamibo_language', mode);
                     safeSetCookie('yamibo_language_mode', mode);
+                    safeSetCookie('yami_opencc_lang', desktopPluginLang);
                     safeSetCookie('yamiOpenCCMode', target);
                     safeSetCookie('yamiOpenCC', targetFlag);
                     if (document.documentElement) {
@@ -1235,7 +1239,20 @@ $styleString
                     }
                 }
 
+                function callDesktopOpenCcPlugin() {
+                    try {
+                        if (typeof window.yamiOpenCCSetBtnText === 'function') {
+                            window.yamiOpenCCSetBtnText(parseInt(desktopPluginLang, 10));
+                        }
+                        if (typeof window.yamiOpenCCConvert === 'function') {
+                            window.yamiOpenCCConvert();
+                            return true;
+                        }
+                    } catch (e) {}
+                    return false;
+                }
                 function callKnownOpenCcApi() {
+                    if (callDesktopOpenCcPlugin()) return true;
                     try {
                         if (window.yamiOpenCC && typeof window.yamiOpenCC.setMode === 'function') {
                             window.yamiOpenCC.setMode(target);
