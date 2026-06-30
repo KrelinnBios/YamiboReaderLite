@@ -25,9 +25,6 @@ data class ReaderSettings @JSONCreator constructor(
     @JSONField(name = "isVerticalMode", alternateNames = ["verticalMode"])
     var isVerticalMode: Boolean? = null,
 
-    @JSONField(name = "translationMode")
-    var translationMode: Int? = null,
-
     @JSONField(name = "fontFamily")
     var fontFamily: Int? = null
 )
