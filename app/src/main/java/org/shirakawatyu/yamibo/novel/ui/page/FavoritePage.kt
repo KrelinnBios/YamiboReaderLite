@@ -510,26 +510,89 @@ fun FavoritePage(
         favoriteVM.refreshCacheInfo()
     }
 
+    fun favoriteTypeDescription(favorite: Favorite): String {
+        val sourceName = when (favorite.sourceFid) {
+            "30" -> "中文百合漫画区"
+            "37" -> "百合漫画图源区"
+            "49" -> "文學區"
+            "55" -> "轻小说/译文区"
+            "60" -> "TXT小说区"
+            null, "" -> null
+            else -> "fid=${favorite.sourceFid}"
+        }
+        return when (favorite.type) {
+            0 -> "类型：未识别，可手动选择小说、漫画或其他"
+            1 -> if (sourceName == null) "类型：小说（手动设置）" else "类型：小说（自动识别：$sourceName）"
+            2 -> if (sourceName == null) "类型：漫画（手动设置）" else "类型：漫画（自动识别：$sourceName）"
+            3 -> "类型：其他（仅从收藏页过滤，不删除论坛收藏）"
+            else -> "类型：未知"
+        }
+    }
     @Composable
     fun MoreOptionsButton() {
         val enabled = favoriteList.isNotEmpty()
-        IconButton(
-            onClick = { if (enabled) favoriteVM.toggleManageMode() },
-            enabled = enabled,
-            modifier = Modifier
-                .size(44.dp)
-                .padding(end = 4.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Checklist,
-                contentDescription = "管理收藏",
-                modifier = Modifier.size(23.dp),
-                tint = if (enabled) topBarContentColor
-                else topBarContentColor.copy(alpha = 0.38f)
-            )
+        val hasFailedUpdates = failedUpdateUrls.isNotEmpty()
+        var menuExpanded by remember { mutableStateOf(false) }
+        Box {
+            IconButton(
+                onClick = {
+                    if (hasFailedUpdates) menuExpanded = true
+                    else if (enabled) favoriteVM.toggleManageMode()
+                },
+                enabled = enabled || hasFailedUpdates,
+                modifier = Modifier
+                    .size(44.dp)
+                    .padding(end = 4.dp)
+            ) {
+                Icon(
+                    imageVector = if (hasFailedUpdates) Icons.Default.Menu else Icons.Default.Checklist,
+                    contentDescription = if (hasFailedUpdates) "收藏操作" else "管理收藏",
+                    modifier = Modifier.size(if (hasFailedUpdates) 24.dp else 23.dp),
+                    tint = if (enabled || hasFailedUpdates) topBarContentColor
+                    else topBarContentColor.copy(alpha = 0.38f)
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+                modifier = Modifier
+                    .width(180.dp)
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("管理收藏") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    enabled = enabled,
+                    onClick = {
+                        menuExpanded = false
+                        favoriteVM.toggleManageMode()
+                    }
+                )
+                if (hasFailedUpdates) {
+                    DropdownMenuItem(
+                        text = { Text("重试失败项 (${failedUpdateUrls.size})") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            favoriteVM.retryFailedUpdateChecks()
+                        }
+                    )
+                }
+            }
         }
     }
-
     // 管理模式「完成」用 ✔ 图标，与旁边的放大镜图标风格统一。
     @Composable
     fun ManageDoneButton() {
@@ -1033,6 +1096,7 @@ fun FavoritePage(
 
         if (itemActionTarget != null) {
             val target = itemActionTarget!!
+            val typeDescription = favoriteTypeDescription(target)
             Dialog(
                 onDismissRequest = { itemActionTarget = null },
             ) {
@@ -1057,6 +1121,12 @@ fun FavoritePage(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                        Text(
+                            typeDescription,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
