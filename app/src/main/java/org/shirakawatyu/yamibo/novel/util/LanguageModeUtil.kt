@@ -1,6 +1,10 @@
 package org.shirakawatyu.yamibo.novel.util
 
+import android.app.Activity
+import android.content.Context
+import android.content.res.Configuration
 import android.webkit.CookieManager
+import java.util.Locale
 
 object LanguageModeUtil {
     const val SIMPLIFIED = "zh-hans"
@@ -51,5 +55,13 @@ object LanguageModeUtil {
             }
             cookieManager.flush()
         } catch (_: Exception) {}
+    }
+
+    fun applyLocale(context: Context, mode: String?) {
+        val locale = if (normalize(mode) == TRADITIONAL) Locale("zh", "HK") else Locale("zh", "CN")
+        Locale.setDefault(locale)
+        val config = Configuration(context.resources.configuration)
+        config.setLocale(locale)
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
     }
 }
