@@ -192,22 +192,31 @@ open class YamiboWebViewClient : WebViewClient() {
         view?.alpha = 0f
     }
 
-    private fun injectCurrentTheme(view: WebView?, currentUrl: String?) {
-        if (!GlobalData.isDarkMode.value && GlobalData.lightModeTheme.value <= 0) return
+    private fun injectCurrentTheme(view: WebView?, currentUrl: String?, onComplete: (() -> Unit)? = null) {
+        if (!GlobalData.isDarkMode.value && GlobalData.lightModeTheme.value <= 0) {
+            onComplete?.invoke()
+            return
+        }
         val themeUrl = currentUrl ?: try {
             view?.url
         } catch (_: Throwable) {
             null
         }
-        if (!isYamiboForumUrl(themeUrl)) return
-        view?.evaluateJavascript(
+        if (!isYamiboForumUrl(themeUrl)) {
+            onComplete?.invoke()
+            return
+        }
+        if (view == null) {
+            onComplete?.invoke()
+            return
+        }
+        view.evaluateJavascript(
             PageJsScripts.getThemeSetJs(
                 GlobalData.isDarkMode.value,
                 GlobalData.darkModeTheme.value,
                 GlobalData.lightModeTheme.value
-            ),
-            null
-        )
+            )
+        ) { onComplete?.invoke() }
     }
 
     private fun injectCurrentLanguage(view: WebView?, currentUrl: String?) {
@@ -310,9 +319,10 @@ open class YamiboWebViewClient : WebViewClient() {
 
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         applyHideCss(view, url)
-        injectCurrentTheme(view, url)
-        injectCurrentLanguage(view, url)
-        revealThemeFlashSuppression(view)
+        injectCurrentTheme(view, url) {
+            injectCurrentLanguage(view, url)
+            revealThemeFlashSuppression(view)
+        }
         super.onPageCommitVisible(view, url)
     }
 
@@ -330,9 +340,10 @@ open class YamiboWebViewClient : WebViewClient() {
             }
         }
         super.onPageFinished(view, url)
-        injectCurrentTheme(view, url)
-        injectCurrentLanguage(view, url)
-        revealThemeFlashSuppression(view)
+        injectCurrentTheme(view, url) {
+            injectCurrentLanguage(view, url)
+            revealThemeFlashSuppression(view)
+        }
 
         view?.evaluateJavascript(
             """
