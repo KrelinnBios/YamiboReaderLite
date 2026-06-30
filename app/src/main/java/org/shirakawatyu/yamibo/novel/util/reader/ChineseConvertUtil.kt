@@ -9,7 +9,7 @@ import com.zqc.opencc.android.lib.ConversionType
  * 中文简繁转换工具。
  *
  * 简体模式仍然保持原来的语义：先 S2TWP，再 TW2SP。
- * 新增转换结果缓存，避免同一页在"原文 / 繁体 / 简体"之间来回切换时反复跑 OpenCC。
+ * 新增转换结果缓存，避免同一页在简体 / 繁体之间来回切换时反复跑 OpenCC。
  */
 object ChineseConvertUtil {
 
