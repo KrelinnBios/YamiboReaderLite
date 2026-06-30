@@ -41,6 +41,7 @@ import org.shirakawatyu.yamibo.novel.util.updateCheck.MangaUpdateCheckUtil
 import org.shirakawatyu.yamibo.novel.util.updateCheck.NovelUpdateCheckUtil
 import org.shirakawatyu.yamibo.novel.util.updateCheck.OtherUpdateCheckUtil
 import org.shirakawatyu.yamibo.novel.util.updateCheck.UpdateCheckEngine
+import org.shirakawatyu.yamibo.novel.util.updateCheck.UpdateCheckResult
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -94,6 +95,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     // 等待队列：保存正在倒计时的那个任务
     private var pendingSyncJob: Job? = null
     private var fetchJob: Job? = null
+    private var batchUpdateCheckJob: Job? = null
     private val updateCheckVisibleSince = mutableMapOf<String, Long>()
     private val updateCheckHideJobs = mutableMapOf<String, Job>()
     private val typeProbeJobs = mutableMapOf<String, Job>()
@@ -1096,7 +1098,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     when (type) {
                         1 -> "已设为小说"
                         2 -> "已设为漫画"
-                        else -> "已设为其他，已移出收藏页"
+                        else -> "已设为其他，仅从收藏页过滤"
                     }
                 )
             }
@@ -1134,26 +1136,80 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
     fun checkAllFavoritesForUpdates() {
-        val items = allFavorites.filter { it.type in 1..3 }
+        val items = allFavorites.filter { it.type in 1..2 }
+        val checkedUrls = items.map { it.url }.toSet()
         UpdateCheckEngine.ensureInit(applicationContext)
-        viewModelScope.launch(Dispatchers.IO) {
-            items.forEach { favorite ->
+        batchUpdateCheckJob?.cancel()
+        if (items.isEmpty()) {
+            _uiState.update { it.copy(failedUpdateUrls = emptySet()) }
+            YamiboToast.show(context = applicationContext, message = "收藏刷新完成")
+            return
+        }
+
+        _uiState.update { it.copy(failedUpdateUrls = it.failedUpdateUrls - checkedUrls) }
+        batchUpdateCheckJob = viewModelScope.launch(Dispatchers.IO) {
+            val failedUrls = linkedSetOf<String>()
+            items.forEachIndexed { index, favorite ->
                 if (!isActive) return@launch
-                delay(600)
-                when (favorite.type) {
-                    1 -> UpdateCheckEngine.checkNovel(favorite, notify = false)
-                    2 -> UpdateCheckEngine.checkManga(favorite, notify = false)
-                    3 -> UpdateCheckEngine.checkOther(favorite, notify = false)
+                if (index > 0) delay(600)
+                val result = runUpdateCheckForFavorite(favorite, notify = false)
+                if (result == UpdateCheckResult.FAILURE) {
+                    failedUrls += favorite.url
+                }
+            }
+            _uiState.update { it.copy(failedUpdateUrls = failedUrls) }
+            withContext(Dispatchers.Main) {
+                if (failedUrls.isEmpty()) {
+                    YamiboToast.show(context = applicationContext, message = "全部收藏更新完成")
+                } else {
+                    YamiboToast.show(
+                        context = applicationContext,
+                        message = "${failedUrls.size} 个收藏更新失败，请点刷新图标重试"
+                    )
                 }
             }
         }
     }
 
-    fun checkNovelUpdate(favorite: Favorite) {
-        UpdateCheckEngine.ensureInit(applicationContext)
-        UpdateCheckEngine.checkNovel(favorite)
+    private suspend fun runUpdateCheckForFavorite(
+        favorite: Favorite,
+        notify: Boolean,
+        overrideStrategy: MangaUpdateCheckStrategy? = null,
+        overrideSearchKeyword: String? = null,
+        overrideCleanBookName: String? = null
+    ): UpdateCheckResult {
+        return when (favorite.type) {
+            1 -> UpdateCheckEngine.checkNovelAwait(favorite, notify)
+            2 -> UpdateCheckEngine.checkMangaAwait(
+                favorite,
+                overrideStrategy,
+                overrideSearchKeyword,
+                overrideCleanBookName,
+                notify
+            )
+            3 -> UpdateCheckEngine.checkOtherAwait(favorite, notify)
+            else -> UpdateCheckResult.SKIPPED
+        }
     }
 
+    private fun markUpdateCheckStarted(url: String) {
+        _uiState.update { it.copy(failedUpdateUrls = it.failedUpdateUrls - url) }
+    }
+
+    private fun markUpdateCheckFinished(url: String, result: UpdateCheckResult) {
+        if (result == UpdateCheckResult.FAILURE) {
+            _uiState.update { it.copy(failedUpdateUrls = it.failedUpdateUrls + url) }
+        }
+    }
+
+    fun checkNovelUpdate(favorite: Favorite) {
+        UpdateCheckEngine.ensureInit(applicationContext)
+        viewModelScope.launch(Dispatchers.IO) {
+            markUpdateCheckStarted(favorite.url)
+            val result = runUpdateCheckForFavorite(favorite, notify = true)
+            markUpdateCheckFinished(favorite.url, result)
+        }
+    }
     fun clearNovelUpdateCheckFlag(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             NovelUpdateCheckUtil.clearUpdateFlagSuspend(url)
@@ -1162,7 +1218,11 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
     fun checkOtherUpdate(favorite: Favorite) {
         UpdateCheckEngine.ensureInit(applicationContext)
-        UpdateCheckEngine.checkOther(favorite)
+        viewModelScope.launch(Dispatchers.IO) {
+            markUpdateCheckStarted(favorite.url)
+            val result = runUpdateCheckForFavorite(favorite, notify = true)
+            markUpdateCheckFinished(favorite.url, result)
+        }
     }
 
     fun checkMangaUpdate(
@@ -1172,9 +1232,18 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         overrideCleanBookName: String? = null
     ) {
         UpdateCheckEngine.ensureInit(applicationContext)
-        UpdateCheckEngine.checkManga(favorite, overrideStrategy, overrideSearchKeyword, overrideCleanBookName)
+        viewModelScope.launch(Dispatchers.IO) {
+            markUpdateCheckStarted(favorite.url)
+            val result = runUpdateCheckForFavorite(
+                favorite,
+                notify = true,
+                overrideStrategy = overrideStrategy,
+                overrideSearchKeyword = overrideSearchKeyword,
+                overrideCleanBookName = overrideCleanBookName
+            )
+            markUpdateCheckFinished(favorite.url, result)
+        }
     }
-
     fun clearMangaUpdateCheckFlag(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             MangaUpdateCheckUtil.clearUpdateFlagSuspend(url)
