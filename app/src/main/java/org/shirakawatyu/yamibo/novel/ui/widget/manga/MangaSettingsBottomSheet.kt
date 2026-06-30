@@ -1,12 +1,9 @@
 package org.shirakawatyu.yamibo.novel.ui.widget.manga
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,26 +16,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.ui.component.ReaderSettingSlider
 
@@ -53,7 +44,6 @@ fun MangaSettingsPanel(
 ) {
     val offsetY = remember { Animatable(1000f) }
     val scope = rememberCoroutineScope()
-    var dragJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) {
         launch { offsetY.animateTo(0f, animationSpec = tween(250)) }
@@ -85,74 +75,26 @@ fun MangaSettingsPanel(
                 .offset(y = offsetY.value.dp)
                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .background(MaterialTheme.colorScheme.surface)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                )
                 .navigationBarsPadding()
                 .padding(bottom = 20.dp)
         ) {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    if (offsetY.value > 120f) dismiss()
-                                    else {
-                                        offsetY.animateTo(
-                                            0f, spring(
-                                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                                stiffness = Spring.StiffnessMediumLow
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onDragCancel = {
-                                scope.launch {
-                                    offsetY.animateTo(
-                                        0f, spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        )
-                                    )
-                                }
-                            },
-                            onVerticalDrag = { _, dragAmount ->
-                                dragJob?.cancel()
-                                dragJob = scope.launch {
-                                    val next = (offsetY.value + dragAmount).coerceAtLeast(0f)
-                                    offsetY.snapTo(next)
-                                }
-                            }
-                        )
-                    },
-                contentAlignment = Alignment.Center
+                    .padding(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 32.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Spacer(Modifier.height(10.dp))
-                    Box(
-                        Modifier
-                            .width(36.dp)
-                            .height(3.dp)
-                            .align(Alignment.CenterHorizontally)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
-                    Spacer(Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "设置",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
+                Text(
+                    text = "设置",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
 
             // 设置项

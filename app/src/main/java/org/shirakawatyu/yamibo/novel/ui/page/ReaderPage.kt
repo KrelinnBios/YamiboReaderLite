@@ -1077,7 +1077,6 @@ fun ReaderSettingsBar(
                         onSetFontSize = onSetFontSize,
                         onSetLineHeight = onSetLineHeight,
                         onSetPadding = onSetPadding,
-                        onBack = { showSpacingMenu = false },
                         onSetReadingMode = onSetReadingMode,
                         onSetLoadImages = onSetLoadImages
                     )
@@ -1499,7 +1498,6 @@ private fun SpacingSettingsMenu(
     onSetFontSize: (fontSize: TextUnit) -> Unit,
     onSetLineHeight: (lineHeight: TextUnit) -> Unit,
     onSetPadding: (padding: Dp) -> Unit,
-    onBack: () -> Unit,
     onSetReadingMode: (isVertical: Boolean) -> Unit,
     onSetLoadImages: (Boolean) -> Unit
 ) {
@@ -1509,75 +1507,58 @@ private fun SpacingSettingsMenu(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .width(42.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.45f))
-        )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-            }
             Text(
                 text = "设置",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 2.dp)
+                modifier = Modifier.padding(start = 2.dp, top = 4.dp)
             )
         }
 
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                CompactOptionRow(
-                    label = "翻页方式",
-                    options = listOf("左右", "上下"),
-                    selectedIndex = if (uiState.isVerticalMode) 1 else 0,
-                    onSelect = { onSetReadingMode(it == 1) }
-                )
+            CompactOptionRow(
+                label = "翻页方式",
+                options = listOf("←→", "↑↓"),
+                selectedIndex = if (uiState.isVerticalMode) 1 else 0,
+                onSelect = { onSetReadingMode(it == 1) }
+            )
 
-                ReaderSettingSlider(
-                    label = "正文字号",
-                    value = uiState.fontSize.value,
-                    valueRange = 14f..34f,
-                    steps = 9,
-                    onValueChange = { onSetFontSize(it.sp) }
-                )
-                val minLineHeight = (uiState.fontSize.value * 1.2f).coerceAtLeast(17f)
-                val maxLineHeight = (uiState.fontSize.value * 2f).coerceAtMost(68f)
-                ReaderSettingSlider(
-                    label = "行距",
-                    value = uiState.lineHeight.value,
-                    valueRange = minLineHeight..maxLineHeight,
-                    steps = 7,
-                    onValueChange = { onSetLineHeight(it.sp) }
-                )
-                ReaderSettingSlider(
-                    label = "页边距",
-                    value = uiState.padding.value,
-                    valueRange = 4f..40f,
-                    steps = 8,
-                    onValueChange = { onSetPadding(it.dp) }
-                )
-                CompactOptionRow(
-                    label = "正文图片",
-                    options = listOf("关闭", "显示"),
-                    selectedIndex = if (uiState.loadImages) 1 else 0,
-                    onSelect = { onSetLoadImages(it == 1) }
-                )
-            }
+            ReaderSettingSlider(
+                label = "正文字号",
+                value = uiState.fontSize.value,
+                valueRange = 14f..34f,
+                steps = 9,
+                onValueChange = { onSetFontSize(it.sp) }
+            )
+            val minLineHeight = (uiState.fontSize.value * 1.2f).coerceAtLeast(17f)
+            val maxLineHeight = (uiState.fontSize.value * 2f).coerceAtMost(68f)
+            ReaderSettingSlider(
+                label = "行距",
+                value = uiState.lineHeight.value,
+                valueRange = minLineHeight..maxLineHeight,
+                steps = 7,
+                onValueChange = { onSetLineHeight(it.sp) }
+            )
+            ReaderSettingSlider(
+                label = "页边距",
+                value = uiState.padding.value,
+                valueRange = 4f..40f,
+                steps = 8,
+                onValueChange = { onSetPadding(it.dp) }
+            )
+            CompactOptionRow(
+                label = "正文图片",
+                options = listOf("关闭", "显示"),
+                selectedIndex = if (uiState.loadImages) 1 else 0,
+                onSelect = { onSetLoadImages(it == 1) }
+            )
         }
     }
 }
