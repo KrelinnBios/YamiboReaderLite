@@ -1173,23 +1173,51 @@ $styleString
         }
     }
 
-    fun getLanguageSetJs(mode: String): String {
+    fun getLanguageSetJs(mode: String, forceForumSwitch: Boolean = false): String {
         val normalizedMode = LanguageModeUtil.normalize(mode)
         val modeLiteral = jsStringLiteral(normalizedMode)
         return """
             (function() {
                 var mode = $modeLiteral;
+                var forceForumSwitch = $forceForumSwitch;
                 var target = mode === 'zh-hant' ? 'traditional' : 'simplified';
                 var targetFlag = mode === 'zh-hant' ? 'hant' : 'hans';
+                var previousMode = '';
 
                 function safeSetStorage(storage, key, value) {
                     try { storage.setItem(key, value); } catch (e) {}
+                }
+
+                function safeGetStorage(storage, key) {
+                    try { return storage.getItem(key) || ''; } catch (e) { return ''; }
                 }
 
                 function safeSetCookie(name, value) {
                     try {
                         document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;max-age=31536000;SameSite=Lax';
                     } catch (e) {}
+                }
+
+                function normalizeMode(value) {
+                    value = String(value || '').toLowerCase();
+                    if (value === 'zh-hant' || value === 'zh-tw' || value === 'zh-hk' || value === 'traditional' || value === 'hant') {
+                        return 'zh-hant';
+                    }
+                    if (value === 'zh-hans' || value === 'zh-cn' || value === 'simplified' || value === 'hans') {
+                        return 'zh-hans';
+                    }
+                    return '';
+                }
+
+                function readPreviousPreference() {
+                    var fromStorage = safeGetStorage(localStorage, 'yamibo-language-mode') ||
+                        safeGetStorage(localStorage, 'yamibo_language_mode') ||
+                        safeGetStorage(localStorage, 'yamiOpenCCMode') ||
+                        safeGetStorage(localStorage, 'yamiOpenCC');
+                    var fromDocument = document.documentElement
+                        ? document.documentElement.getAttribute('data-yamibo-language-mode')
+                        : '';
+                    return normalizeMode(fromStorage) || normalizeMode(fromDocument);
                 }
 
                 function persistPreference() {
@@ -1229,40 +1257,77 @@ $styleString
                     return false;
                 }
 
+                function countHits(text, chars) {
+                    var score = 0;
+                    for (var i = 0; i < chars.length; i++) {
+                        var ch = chars.charAt(i);
+                        var index = text.indexOf(ch);
+                        while (index >= 0) {
+                            score++;
+                            index = text.indexOf(ch, index + 1);
+                        }
+                    }
+                    return score;
+                }
+
                 function currentModeFromPageText() {
                     var body = document.body;
                     if (!body) return '';
-                    var text = (body.innerText || body.textContent || '').slice(0, 5000);
-                    var looksTraditional = /[頁個後這發現閱讀讀設關閉檢查積戶間簡體轉換臺灣]/.test(text);
-                    var looksSimplified = /[页个后这发现阅读读设关闭检查积户间简体转换台湾]/.test(text);
-                    if (looksTraditional && !looksSimplified) return 'zh-hant';
-                    if (looksSimplified && !looksTraditional) return 'zh-hans';
+                    var text = (body.innerText || body.textContent || '').slice(0, 8000);
+                    var tradScore = countHits(text, '頁個後這發現閱讀讀設關閉檢查積戶間簡體轉換臺灣與為應過網歡請們會區舊開體寫獎貼樓軟體預設');
+                    var simpScore = countHits(text, '页个后这发现阅读读设关闭检查积户间简体转换台湾与为应过网欢请们会区旧开体写奖贴楼软件预设');
+                    if (tradScore >= simpScore + 2) return 'zh-hant';
+                    if (simpScore >= tradScore + 2) return 'zh-hans';
                     return '';
+                }
+
+                function triggerForumSwitch(baseUrl) {
+                    var link = document.querySelector('a[href*="#yamiOpenCCSW"], a[href*="yamiOpenCCSW"], #mn_N520f a');
+                    if (link && typeof link.click === 'function') {
+                        link.click();
+                        return true;
+                    }
+                    try {
+                        var oldHash = location.hash;
+                        location.hash = 'yamiOpenCCSW';
+                        if (typeof HashChangeEvent === 'function') {
+                            window.dispatchEvent(new HashChangeEvent('hashchange'));
+                        } else {
+                            window.dispatchEvent(new Event('hashchange'));
+                        }
+                        setTimeout(function() {
+                            var restoreUrl = oldHash && oldHash !== '#yamiOpenCCSW' ? baseUrl + oldHash : baseUrl;
+                            history.replaceState(null, document.title, restoreUrl);
+                        }, 80);
+                        return true;
+                    } catch (e) {}
+                    return false;
                 }
 
                 function switchByForumEntryIfNeeded() {
                     var current = currentModeFromPageText();
-                    if (!current || current === mode) return;
+                    if (current === mode) return;
+                    var shouldForce = forceForumSwitch && previousMode && previousMode !== mode;
+                    if (!current && !shouldForce) return;
                     var baseUrl = String(location.href || '').split('#')[0];
                     var sessionKey = '__yamiboLanguageSwitch:' + baseUrl;
                     try {
                         if (sessionStorage.getItem(sessionKey) === mode) return;
-                        sessionStorage.setItem(sessionKey, mode);
                     } catch (e) {}
-                    var link = document.querySelector('a[href*="#yamiOpenCCSW"], a[href*="yamiOpenCCSW"], #mn_N520f a');
-                    if (link && typeof link.click === 'function') {
-                        link.click();
+                    if (triggerForumSwitch(baseUrl)) {
+                        try { sessionStorage.setItem(sessionKey, mode); } catch (e) {}
                     }
                 }
-
+                previousMode = readPreviousPreference();
                 persistPreference();
                 if (!callKnownOpenCcApi()) {
-                    setTimeout(switchByForumEntryIfNeeded, 120);
-                    setTimeout(switchByForumEntryIfNeeded, 700);
+                    setTimeout(switchByForumEntryIfNeeded, forceForumSwitch ? 40 : 120);
+                    setTimeout(switchByForumEntryIfNeeded, forceForumSwitch ? 360 : 700);
                 }
             })();
         """.trimIndent()
     }
+
     fun getThemeSetJs(isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
         val darkJs = getDarkModeSetJs(isDark, darkThemeId)
         val lightJs = getLightModeSetJs(!isDark, lightThemeId)
