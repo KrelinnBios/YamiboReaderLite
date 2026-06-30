@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -126,6 +127,7 @@ import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.AutoSignManager
 import org.shirakawatyu.yamibo.novel.util.CacheMaintenance
 import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
@@ -586,6 +588,7 @@ fun MinePage(
     }
 
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
+    val languageMode by GlobalData.languageMode.collectAsState()
     val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
     val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
 
@@ -1598,6 +1601,16 @@ fun MinePage(
                     var isClearingCache by remember { mutableStateOf(false) }
                     var showClearCacheDialog by remember { mutableStateOf(false) }
 
+                    fun setLanguageMode(mode: String) {
+                        val normalized = LanguageModeUtil.normalize(mode)
+                        if (LanguageModeUtil.normalize(languageMode) == normalized) return
+                        GlobalData.languageMode.value = normalized
+                        SettingsUtil.saveLanguageMode(normalized)
+                        LanguageModeUtil.applyForumCookies(normalized, mineWebView.url)
+                        mineWebView.evaluateJavascript(PageJsScripts.getLanguageSetJs(normalized), null)
+                        YamiboToast.show(message = "已切换为${LanguageModeUtil.label(normalized)}")
+                    }
+
                     fun formatFileSize(bytes: Long): String = when {
                         bytes < 1024L -> "$bytes B"
                         bytes < 1024L * 1024L -> "${bytes / 1024L} KB"
@@ -1667,6 +1680,50 @@ fun MinePage(
                                             },
                                             colors = yamiboSwitchColors(),
                                         )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("语言", fontSize = 15.sp)
+                                            Text(
+                                                "影响阅读默认简繁和论坛 BBS 默认语言",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            val normalizedLanguageMode = LanguageModeUtil.normalize(languageMode)
+                                            val simplifiedSelected = normalizedLanguageMode == LanguageModeUtil.SIMPLIFIED
+                                            val traditionalSelected = normalizedLanguageMode == LanguageModeUtil.TRADITIONAL
+                                            TextButton(
+                                                onClick = { setLanguageMode(LanguageModeUtil.SIMPLIFIED) },
+                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.textButtonColors(
+                                                    containerColor = if (simplifiedSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                    contentColor = if (simplifiedSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                ),
+                                            ) {
+                                                Text("简体", fontSize = 14.sp)
+                                            }
+                                            TextButton(
+                                                onClick = { setLanguageMode(LanguageModeUtil.TRADITIONAL) },
+                                                modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.textButtonColors(
+                                                    containerColor = if (traditionalSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                    contentColor = if (traditionalSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                                ),
+                                            ) {
+                                                Text("繁體", fontSize = 14.sp)
+                                            }
+                                        }
                                     }
 
                                     Row(

@@ -129,6 +129,7 @@ import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColo
 import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.SignTrigger
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
@@ -538,6 +539,9 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                 SettingsUtil.getDnsOptimizationMode { GlobalData.dnsOptimizationMode.value = it }
                 SettingsUtil.getCustomDnsUrl { GlobalData.customDnsUrl.value = it }
                 SettingsUtil.getDarkMode { GlobalData.isDarkMode.value = it }
+                val savedLanguageMode = SettingsUtil.getLanguageMode()
+                GlobalData.languageMode.value = savedLanguageMode
+                LanguageModeUtil.applyForumCookies(savedLanguageMode)
                 CurrentUserUtil.load()
                 GlobalData.darkModeTheme.value = 0
                 GlobalData.lightModeTheme.value = 0

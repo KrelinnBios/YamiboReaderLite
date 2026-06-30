@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 
 open class YamiboWebViewClient : WebViewClient() {
@@ -209,6 +210,19 @@ open class YamiboWebViewClient : WebViewClient() {
         )
     }
 
+    private fun injectCurrentLanguage(view: WebView?, currentUrl: String?) {
+        val languageUrl = currentUrl ?: try {
+            view?.url
+        } catch (_: Throwable) {
+            null
+        }
+        if (!isYamiboForumUrl(languageUrl)) return
+        view?.evaluateJavascript(
+            PageJsScripts.getLanguageSetJs(GlobalData.languageMode.value),
+            null
+        )
+    }
+
     private fun revealThemeFlashSuppression(view: WebView?, delayMs: Long = 96L) {
         if (!isSuppressingThemeFlash) return
         themeFlashRevealRunnable?.let { themeFlashHandler.removeCallbacks(it) }
@@ -283,6 +297,9 @@ open class YamiboWebViewClient : WebViewClient() {
             CookieManager.getInstance().setCookie(url, targetCookie)
             CookieManager.getInstance().flush()
         }
+        if (isYamiboForumUrl(url)) {
+            LanguageModeUtil.applyForumCookies(GlobalData.languageMode.value, url)
+        }
 
         if (url?.startsWith(RequestConfig.BASE_URL) == true) {
             applyHideCss(view, url)
@@ -294,6 +311,7 @@ open class YamiboWebViewClient : WebViewClient() {
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         applyHideCss(view, url)
         injectCurrentTheme(view, url)
+        injectCurrentLanguage(view, url)
         revealThemeFlashSuppression(view)
         super.onPageCommitVisible(view, url)
     }
@@ -313,6 +331,7 @@ open class YamiboWebViewClient : WebViewClient() {
         }
         super.onPageFinished(view, url)
         injectCurrentTheme(view, url)
+        injectCurrentLanguage(view, url)
         revealThemeFlashSuppression(view)
 
         view?.evaluateJavascript(

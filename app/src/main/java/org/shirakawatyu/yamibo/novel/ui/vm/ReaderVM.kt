@@ -39,6 +39,7 @@ import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
 import org.shirakawatyu.yamibo.novel.ui.state.GlobalChapter
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderMemoryPrewarmManager
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
@@ -542,7 +543,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     backgroundColor = null,
                     loadImages = settings?.loadImages ?: false,
                     isVerticalMode = settings?.isVerticalMode ?: false,
-                    translationMode = settings?.translationMode ?: 0,
+                    translationMode = settings?.translationMode ?: LanguageModeUtil.readerTranslationMode(GlobalData.languageMode.value),
                     fontFamily = 0
                 )
                 updateFontRatios()

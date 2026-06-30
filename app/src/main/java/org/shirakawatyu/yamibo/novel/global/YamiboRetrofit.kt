@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.dnsoverhttps.DnsOverHttps
 import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.TtlDnsCache
@@ -19,7 +20,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.IOException
 import java.net.InetAddress
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.Executors
@@ -130,9 +130,8 @@ class YamiboRetrofit {
         private val staticResourceRegex =
             Regex("\\.(jpg|jpeg|png|webp|gif|js|css|woff2?|ttf|eot|svg|ico)(\\?.*)?\$", RegexOption.IGNORE_CASE)
 
-        private val acceptLanguage by lazy {
-            val locale = Locale.getDefault()
-            "${locale.language}-${locale.country},${locale.language};q=0.9,en-US;q=0.8,en;q=0.7"
+        private fun acceptLanguage(): String {
+            return LanguageModeUtil.acceptLanguageHeader(GlobalData.languageMode.value)
         }
 
         // keepalive 必须短于论坛服务器的空闲超时（nginx 通常 60~75 秒），
@@ -230,7 +229,7 @@ class YamiboRetrofit {
                 val requestBuilder = original.newBuilder()
                     .header("User-Agent", finalUa)
                     .header("Accept", RequestConfig.ACCEPT)
-                    .header("Accept-Language", acceptLanguage)
+                    .header("Accept-Language", acceptLanguage())
                     .header("Cookie", cookie)
 
                 if (

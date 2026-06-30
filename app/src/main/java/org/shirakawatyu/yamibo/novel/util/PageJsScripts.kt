@@ -1173,6 +1173,96 @@ $styleString
         }
     }
 
+    fun getLanguageSetJs(mode: String): String {
+        val normalizedMode = LanguageModeUtil.normalize(mode)
+        val modeLiteral = jsStringLiteral(normalizedMode)
+        return """
+            (function() {
+                var mode = $modeLiteral;
+                var target = mode === 'zh-hant' ? 'traditional' : 'simplified';
+                var targetFlag = mode === 'zh-hant' ? 'hant' : 'hans';
+
+                function safeSetStorage(storage, key, value) {
+                    try { storage.setItem(key, value); } catch (e) {}
+                }
+
+                function safeSetCookie(name, value) {
+                    try {
+                        document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;max-age=31536000;SameSite=Lax';
+                    } catch (e) {}
+                }
+
+                function persistPreference() {
+                    safeSetStorage(localStorage, 'yamibo-language-mode', mode);
+                    safeSetStorage(localStorage, 'yamibo_language_mode', mode);
+                    safeSetStorage(localStorage, 'yamiOpenCCMode', target);
+                    safeSetStorage(localStorage, 'yamiOpenCC', targetFlag);
+                    safeSetCookie('yamibo_language', mode);
+                    safeSetCookie('yamibo_language_mode', mode);
+                    safeSetCookie('yamiOpenCCMode', target);
+                    safeSetCookie('yamiOpenCC', targetFlag);
+                    if (document.documentElement) {
+                        document.documentElement.setAttribute('lang', mode === 'zh-hant' ? 'zh-Hant' : 'zh-Hans');
+                        document.documentElement.setAttribute('data-yamibo-language-mode', mode);
+                    }
+                }
+
+                function callKnownOpenCcApi() {
+                    try {
+                        if (window.yamiOpenCC && typeof window.yamiOpenCC.setMode === 'function') {
+                            window.yamiOpenCC.setMode(target);
+                            return true;
+                        }
+                        if (window.yamiOpenCC && typeof window.yamiOpenCC.set === 'function') {
+                            window.yamiOpenCC.set(target);
+                            return true;
+                        }
+                        if (window.yamiOpenCC && typeof window.yamiOpenCC.convert === 'function') {
+                            window.yamiOpenCC.convert(target);
+                            return true;
+                        }
+                        if (window.OpenCC && typeof window.OpenCC === 'function' && window.__yamiboOpenCCTarget !== mode) {
+                            window.__yamiboOpenCCTarget = mode;
+                            return false;
+                        }
+                    } catch (e) {}
+                    return false;
+                }
+
+                function currentModeFromPageText() {
+                    var body = document.body;
+                    if (!body) return '';
+                    var text = (body.innerText || body.textContent || '').slice(0, 5000);
+                    var looksTraditional = /[頁個後這發現閱讀讀設關閉檢查積戶間簡體轉換臺灣]/.test(text);
+                    var looksSimplified = /[页个后这发现阅读读设关闭检查积户间简体转换台湾]/.test(text);
+                    if (looksTraditional && !looksSimplified) return 'zh-hant';
+                    if (looksSimplified && !looksTraditional) return 'zh-hans';
+                    return '';
+                }
+
+                function switchByForumEntryIfNeeded() {
+                    var current = currentModeFromPageText();
+                    if (!current || current === mode) return;
+                    var baseUrl = String(location.href || '').split('#')[0];
+                    var sessionKey = '__yamiboLanguageSwitch:' + baseUrl;
+                    try {
+                        if (sessionStorage.getItem(sessionKey) === mode) return;
+                        sessionStorage.setItem(sessionKey, mode);
+                    } catch (e) {}
+                    var link = document.querySelector('a[href*="#yamiOpenCCSW"], a[href*="yamiOpenCCSW"], #mn_N520f a');
+                    if (link && typeof link.click === 'function') {
+                        link.click();
+                    }
+                }
+
+                persistPreference();
+                if (!callKnownOpenCcApi()) {
+                    setTimeout(switchByForumEntryIfNeeded, 120);
+                    setTimeout(switchByForumEntryIfNeeded, 700);
+                }
+            })();
+        """.trimIndent()
+    }
     fun getThemeSetJs(isDark: Boolean, darkThemeId: Int, lightThemeId: Int): String {
         val darkJs = getDarkModeSetJs(isDark, darkThemeId)
         val lightJs = getLightModeSetJs(!isDark, lightThemeId)

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.shirakawatyu.yamibo.novel.module.YamiboWebViewClient
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 
 class GlobalData {
 
@@ -45,6 +46,7 @@ class GlobalData {
         val isDnsOptimizationEnabled = MutableStateFlow(true)
         val dnsOptimizationMode = MutableStateFlow("auto")
         val customDnsUrl = MutableStateFlow("")
+        val languageMode = MutableStateFlow(LanguageModeUtil.SIMPLIFIED)
 
         val pendingClipboardUrl = MutableStateFlow<String?>(null)
         var lastClipboardUrl: String? = null

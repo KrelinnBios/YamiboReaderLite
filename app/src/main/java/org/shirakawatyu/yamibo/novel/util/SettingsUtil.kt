@@ -27,6 +27,7 @@ class SettingsUtil {
         private val dnsModeKey = stringPreferencesKey("dns_optimization_mode")
         private val darkModeKey = stringPreferencesKey("dark_mode")
         private val customDnsUrlKey = stringPreferencesKey("custom_dns_url")
+        private val languageModeKey = stringPreferencesKey("language_mode")
         fun saveSettings(settings: ReaderSettings) {
             DataStoreUtil.addData(JSON.toJSONString(settings), key)
         }
@@ -142,6 +143,21 @@ class SettingsUtil {
             }, onNull = {
                 callback(false)
             })
+        }
+        fun saveLanguageMode(mode: String) {
+            DataStoreUtil.addData(LanguageModeUtil.normalize(mode), languageModeKey)
+        }
+        fun getLanguageMode(callback: (String) -> Unit) {
+            DataStoreUtil.getData(languageModeKey, callback = {
+                callback(LanguageModeUtil.normalize(it))
+            }, onNull = {
+                callback(LanguageModeUtil.SIMPLIFIED)
+            })
+        }
+
+        suspend fun getLanguageMode(): String {
+            val preferences = GlobalData.dataStore?.data?.first() ?: return LanguageModeUtil.SIMPLIFIED
+            return LanguageModeUtil.normalize(preferences[languageModeKey])
         }
     }
 }
