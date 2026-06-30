@@ -38,6 +38,7 @@ import org.shirakawatyu.yamibo.novel.ui.page.typefaceFromMode
 import org.shirakawatyu.yamibo.novel.ui.state.ChapterInfo
 import org.shirakawatyu.yamibo.novel.ui.state.GlobalChapter
 import org.shirakawatyu.yamibo.novel.ui.state.ReaderState
+import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderMemoryPrewarmManager
@@ -233,7 +234,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
     /**
      * 缓存 HTML -> Content 的解析结果。
-     * 这层缓存能跳过 Jsoup、HTMLUtil 和 OpenCC，尤其对“原文/繁体/简体”来回切换很有用。
+     * 这层缓存能跳过 Jsoup、HTMLUtil 和 OpenCC，尤其对简体/繁体来回切换很有用。
      */
     private val parsedContentCache = LruCache<ParsedContentCacheKey, List<Content>>(12)
 
@@ -542,7 +543,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     backgroundColor = null,
                     loadImages = settings?.loadImages ?: false,
                     isVerticalMode = settings?.isVerticalMode ?: false,
-                    translationMode = settings?.translationMode ?: 0,
+                    translationMode = LanguageModeUtil.readerTranslationMode(GlobalData.languageMode.value),
                     fontFamily = 0
                 )
                 updateFontRatios()
@@ -2033,15 +2034,14 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
     private fun saveCurrentSettings() {
         val state = _uiState.value
         val settings = ReaderSettings(
-            ValueUtil.spToPx(state.fontSize),
-            ValueUtil.spToPx(state.lineHeight),
-            state.padding.value,
-            false,
-            null,
-            state.loadImages,
-            state.isVerticalMode,
-            state.translationMode,
-            0
+            fontSizePx = ValueUtil.spToPx(state.fontSize),
+            lineHeightPx = ValueUtil.spToPx(state.lineHeight),
+            paddingDp = state.padding.value,
+            nightMode = false,
+            backgroundColor = null,
+            loadImages = state.loadImages,
+            isVerticalMode = state.isVerticalMode,
+            fontFamily = 0
         )
         SettingsUtil.saveSettings(settings)
     }
@@ -2137,12 +2137,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         super.onCleared()
     }
 
-    fun setTranslationMode(mode: Int, currentPage: Int) {
-        if (_uiState.value.translationMode == mode) return
+    fun syncGlobalTranslationMode(mode: String, currentPage: Int) {
+        val translationMode = LanguageModeUtil.readerTranslationMode(mode)
+        if (_uiState.value.translationMode == translationMode) return
 
         val anchor = capturePageAnchor(currentPage)
-        _uiState.value = _uiState.value.copy(translationMode = mode)
-        saveCurrentSettings()
+        _uiState.value = _uiState.value.copy(translationMode = translationMode)
 
         val html = currentRawHtml
         if (html != null) {
@@ -2158,8 +2158,8 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 val pageToScrollTo = resolvePageAnchor(anchor, newPages, newChapters, preferChapterProgress = true)
                 applyRepaginatedContent(newPages, newChapters, pageToScrollTo)
 
-                // 简繁切换后标题需跟随字体：清空并用新字体重建全书目录（当前页即时更新，
-                // 其余已缓存页按新简繁模式重新解析；indexCachedPages 读取的是最新 translationMode）。
+                // 简繁切换后标题需同步转换：清空并重建全书目录（当前页即时更新，
+                // 其余已缓存页按最新 translationMode 重新解析；indexCachedPages 读取的是最新状态）。
                 pageChapterTitles.clear()
                 recordPageChapters(_uiState.value.currentView, newChapters)
                 indexCachedPages()
