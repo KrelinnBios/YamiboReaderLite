@@ -1689,7 +1689,7 @@ fun MinePage(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text("语言", fontSize = 15.sp)
                                             Text(
-                                                "影响阅读默认简繁和论坛 BBS 默认语言",
+                                                "切换论坛和界面的显示语言",
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
