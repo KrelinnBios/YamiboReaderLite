@@ -16,5 +16,6 @@ data class FavoriteState(
     var updateCheckMangas: List<MangaUpdateCheckProfile> = listOf(),
     var updateCheckOthers: List<OtherUpdateCheckProfile> = listOf(),
     var checkingUpdateUrls: Set<String> = emptySet(),
+    var failedUpdateUrls: Set<String> = emptySet(),
     var probingTypeUrls: Set<String> = emptySet()
 )
