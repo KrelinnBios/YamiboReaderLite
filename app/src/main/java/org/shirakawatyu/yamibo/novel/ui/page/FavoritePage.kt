@@ -146,6 +146,7 @@ fun FavoritePage(
     val updateCheckNovels = uiState.updateCheckNovels
     val updateCheckMangas = uiState.updateCheckMangas
     val updateCheckOthers = uiState.updateCheckOthers
+    val failedUpdateUrls = uiState.failedUpdateUrls
     val novelCheckMap = remember(updateCheckNovels) { updateCheckNovels.associateBy { it.url } }
     val mangaCheckMap = remember(updateCheckMangas) { updateCheckMangas.associateBy { it.url } }
     val otherCheckMap = remember(updateCheckOthers) { updateCheckOthers.associateBy { it.url } }
@@ -180,6 +181,10 @@ fun FavoritePage(
             OnboardingStep(
                 title = "收藏管理小提示",
                 description = "长按小说、漫画或其他帖子收藏项可手动检查更新，检查后有新内容会显示提示。"
+            ),
+            OnboardingStep(
+                title = "收藏管理小提示",
+                description = "未识别收藏可长按选择小说、漫画或其他；选择「其他」会标记为 type=3，并立即从收藏页过滤隐藏。这只是过滤，不会删除论坛收藏。"
             ),
             OnboardingStep(
                 title = "收藏管理小提示",
@@ -835,6 +840,7 @@ fun FavoritePage(
                             mangaCheckMap[item.url]?.hasUpdate == true ||
                             otherCheckMap[item.url]?.hasUpdate == true
                     val isCheckingUpdate = uiState.checkingUpdateUrls.contains(item.url)
+                    val hasUpdateFailure = failedUpdateUrls.contains(item.url)
                     FavoriteItem(
                         item.title,
                         item.lastView,
@@ -854,9 +860,10 @@ fun FavoritePage(
                         mangaCachedPages = item.mangaCachedPages,
                         mangaCacheBytes = item.mangaCacheBytes,
                         hasUpdate = hasUpdate,
+                        hasUpdateCheckFailure = hasUpdateFailure,
                         isCheckingUpdate = isCheckingUpdate,
                         isPinned = item.pinAnchorUrl != null,
-                        onRefreshUpdate = if (hasUpdate) {
+                        onRefreshUpdate = if (hasUpdate || hasUpdateFailure) {
                             {
                                 favoriteVM.checkUpdateAfterTypeProbe(item)
                             }
@@ -1161,7 +1168,7 @@ fun FavoritePage(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(Modifier.width(12.dp))
-                                    Text("设为其他（移出）")
+                                    Text("设为其他（过滤）")
                                 }
                             }
                             HorizontalDivider(
