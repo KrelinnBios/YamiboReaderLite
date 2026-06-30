@@ -1608,7 +1608,10 @@ fun MinePage(
                         GlobalData.languageMode.value = normalized
                         SettingsUtil.saveLanguageMode(normalized)
                         LanguageModeUtil.applyForumCookies(normalized, mineWebView.url)
-                        mineWebView.evaluateJavascript(PageJsScripts.getLanguageSetJs(normalized), null)
+                        mineWebView.evaluateJavascript(
+                            PageJsScripts.getLanguageSetJs(normalized, forceForumSwitch = true),
+                            null
+                        )
                         LanguageModeUtil.applyLocale(context, normalized)
                     }
 
