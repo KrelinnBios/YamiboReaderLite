@@ -110,6 +110,7 @@ fun FavoriteItem(
     mangaCachedPages: Int = 0,
     mangaCacheBytes: Long = 0,
     hasUpdate: Boolean = false,
+    hasUpdateCheckFailure: Boolean = false,
     isCheckingUpdate: Boolean = false,
     isPinned: Boolean = false,
     onRefreshUpdate: (() -> Unit)? = null
@@ -298,6 +299,7 @@ fun FavoriteItem(
                 UpdateStatusHandle(
                     isCheckingUpdate = isCheckingUpdate,
                     hasUpdate = hasUpdate,
+                    hasUpdateCheckFailure = hasUpdateCheckFailure,
                     onRefreshUpdate = onRefreshUpdate
                 )
             }
@@ -345,6 +347,7 @@ private enum class HandleStatus {
 private fun UpdateStatusHandle(
     isCheckingUpdate: Boolean,
     hasUpdate: Boolean,
+    hasUpdateCheckFailure: Boolean,
     onRefreshUpdate: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -368,7 +371,7 @@ private fun UpdateStatusHandle(
             )
         }
 
-        if (hasUpdate && !isCheckingUpdate) {
+        if ((hasUpdate || hasUpdateCheckFailure) && !isCheckingUpdate) {
             if (onRefreshUpdate != null) {
                 IconButton(
                     onClick = onRefreshUpdate,
@@ -376,7 +379,7 @@ private fun UpdateStatusHandle(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "刷新检查更新",
+                        contentDescription = if (hasUpdateCheckFailure) "重新检查更新" else "刷新检查更新",
                         tint = updateAccent,
                         modifier = Modifier.size(20.dp)
                     )
