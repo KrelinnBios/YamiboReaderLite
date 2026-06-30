@@ -24,6 +24,10 @@ object LanguageModeUtil {
         }
     }
 
+    fun readerTranslationMode(mode: String?): Int {
+        return if (normalize(mode) == TRADITIONAL) 2 else 1
+    }
+
     fun applyForumCookies(mode: String?, currentUrl: String? = null) {
         val normalized = normalize(mode)
         val target = if (normalized == TRADITIONAL) "traditional" else "simplified"
