@@ -1610,7 +1610,6 @@ fun MinePage(
                         LanguageModeUtil.applyForumCookies(normalized, mineWebView.url)
                         mineWebView.evaluateJavascript(PageJsScripts.getLanguageSetJs(normalized), null)
                         LanguageModeUtil.applyLocale(context, normalized)
-                        (context as? ComponentActivity)?.recreate()
                     }
 
                     fun formatFileSize(bytes: Long): String = when {
