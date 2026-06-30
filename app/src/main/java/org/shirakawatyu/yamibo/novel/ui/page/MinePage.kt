@@ -120,6 +120,7 @@ import org.shirakawatyu.yamibo.novel.BuildConfig
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
 import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
+import org.shirakawatyu.yamibo.novel.util.AppStrings
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
@@ -589,6 +590,7 @@ fun MinePage(
 
     val isDarkMode by GlobalData.isDarkMode.collectAsState()
     val languageMode by GlobalData.languageMode.collectAsState()
+    val strings = remember(languageMode) { AppStrings.forMode(languageMode) }
     val isForumBlocklistEnabled by ForumBlocklistManager.enabled.collectAsState()
     val forumBlockedItems by ForumBlocklistManager.items.collectAsState()
 
@@ -1608,7 +1610,8 @@ fun MinePage(
                         SettingsUtil.saveLanguageMode(normalized)
                         LanguageModeUtil.applyForumCookies(normalized, mineWebView.url)
                         mineWebView.evaluateJavascript(PageJsScripts.getLanguageSetJs(normalized), null)
-                        YamiboToast.show(message = "已切换为${LanguageModeUtil.label(normalized)}")
+                        LanguageModeUtil.applyLocale(context, normalized)
+                        (context as? ComponentActivity)?.recreate()
                     }
 
                     fun formatFileSize(bytes: Long): String = when {
@@ -1643,7 +1646,7 @@ fun MinePage(
                                 )
                             ) {
                                 Text(
-                                    "设置",
+                                    strings.settings,
                                     fontSize = 18.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -1657,9 +1660,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("暗黑模式", fontSize = 15.sp)
+                                            Text(strings.darkMode, fontSize = 15.sp)
                                             Text(
-                                                "使用经典黑蓝界面",
+                                                strings.darkModeDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1687,9 +1690,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("语言", fontSize = 15.sp)
+                                            Text(strings.language, fontSize = 15.sp)
                                             Text(
-                                                "切换论坛和界面的显示语言",
+                                                strings.languageDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1711,9 +1714,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("网络优化", fontSize = 15.sp)
+                                            Text(strings.networkOptimization, fontSize = 15.sp)
                                             Text(
-                                                "使用优化后的 DNS 连接论坛",
+                                                strings.networkOptimizationDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1733,9 +1736,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("屏蔽帖子", fontSize = 15.sp)
+                                            Text(strings.blockPosts, fontSize = 15.sp)
                                             Text(
-                                                "在论坛列表和帖子页显示屏蔽按钮",
+                                                strings.blockPostsDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1752,9 +1755,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("自动签到", fontSize = 15.sp)
+                                            Text(strings.autoSignIn, fontSize = 15.sp)
                                             Text(
-                                                "启动或返回应用时自动签到",
+                                                strings.autoSignInDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1783,9 +1786,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("自动版本更新", fontSize = 15.sp)
+                                            Text(strings.autoVersionUpdate, fontSize = 15.sp)
                                             Text(
-                                                "软件启动时自动检查新版本",
+                                                strings.autoVersionUpdateDesc,
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1805,9 +1808,9 @@ fun MinePage(
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("自动清理缓存", fontSize = 15.sp)
+                                            Text(strings.autoClearCache, fontSize = 15.sp)
                                             Text(
-                                                "每 ${CacheMaintenance.RETENTION_DAYS} 天清理一次",
+                                                strings.autoClearCacheDesc.format(CacheMaintenance.RETENTION_DAYS),
                                                 fontSize = 12.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -1838,7 +1841,7 @@ fun MinePage(
                                         )
                                         Spacer(Modifier.width(8.dp))
                                     }
-                                    Text("清理缓存（${formatFileSize(cacheSizeBytes)}）")
+                                    Text(strings.clearCache + "（${formatFileSize(cacheSizeBytes)}）")
                                 }
                                 Spacer(Modifier.height(12.dp))
                                 Row(
@@ -1851,7 +1854,7 @@ fun MinePage(
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Text("黑名单")
+                                        Text(strings.blacklist)
                                     }
                                     TextButton(
                                         onClick = {
@@ -1863,17 +1866,17 @@ fun MinePage(
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Text("反馈")
+                                        Text(strings.feedback)
                                     }
                                     TextButton(
                                         onClick = {
                                             mineDialog = MineDialogState.None
-                                            YamiboToast.show(message = "正在检查更新…")
+                                            YamiboToast.show(message = strings.checkingUpdate)
                                             scope.launch {
                                                 when (val result = AppUpdateManager.checkForUpdate()) {
                                                     AppUpdateCheckResult.NoUpdate ->
                                                         YamiboToast.show(
-                                                            message = "未发现新版本，当前安装版本：v${BuildConfig.VERSION_NAME}"
+                                                            message = strings.noNewVersion.format(BuildConfig.VERSION_NAME)
                                                         )
 
                                                     is AppUpdateCheckResult.UpdateAvailable ->
@@ -1887,14 +1890,14 @@ fun MinePage(
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Text("检查更新")
+                                        Text(strings.checkUpdate)
                                     }
                                     TextButton(
                                         onClick = { mineDialog = MineDialogState.None },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                                     ) {
-                                        Text("关闭")
+                                        Text(strings.close)
                                     }
                                 }
                             }
@@ -1907,10 +1910,10 @@ fun MinePage(
                             containerColor = MaterialTheme.colorScheme.surface,
                             titleContentColor = MaterialTheme.colorScheme.primary,
                             textContentColor = MaterialTheme.colorScheme.onSurface,
-                            title = { Text("清理缓存", fontSize = 18.sp) },
+                            title = { Text(strings.clearCache, fontSize = 18.sp) },
                             text = {
                                 Text(
-                                    "确定要清理小说页面和漫画图片缓存吗？此操作不可撤销。",
+                                    strings.clearCacheConfirmText,
                                     fontSize = 15.sp
                                 )
                             },
@@ -1930,7 +1933,7 @@ fun MinePage(
                                     }
                                 }) {
                                     Text(
-                                        "确定",
+                                        strings.confirm,
                                         color = MaterialTheme.colorScheme.error,
                                         fontSize = 15.sp
                                     )
@@ -1938,7 +1941,7 @@ fun MinePage(
                             },
                             dismissButton = {
                                 TextButton(onClick = { showClearCacheDialog = false }) {
-                                    Text("取消", fontSize = 15.sp)
+                                    Text(strings.cancel, fontSize = 15.sp)
                                 }
                             }
                         )
