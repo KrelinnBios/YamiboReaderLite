@@ -33,4 +33,15 @@ class LanguageModeUtilTest {
         assertTrue(js.contains("baseUrl + oldHash"))
         assertTrue(js.contains("history.replaceState(null, document.title, restoreUrl);"))
     }
+
+    @Test
+    fun languageJsControlsDesktopOpenCcPluginState() {
+        val simplifiedJs = PageJsScripts.getLanguageSetJs(LanguageModeUtil.SIMPLIFIED, forceForumSwitch = true)
+        val traditionalJs = PageJsScripts.getLanguageSetJs(LanguageModeUtil.TRADITIONAL, forceForumSwitch = true)
+
+        assertTrue(simplifiedJs.contains("var desktopPluginLang = mode === 'zh-hant' ? '3' : '0';"))
+        assertTrue(simplifiedJs.contains("safeSetStorage(localStorage, 'yami_opencc_lang', desktopPluginLang);"))
+        assertTrue(simplifiedJs.contains("window.yamiOpenCCConvert();"))
+        assertTrue(traditionalJs.contains("var desktopPluginLang = mode === 'zh-hant' ? '3' : '0';"))
+    }
 }
