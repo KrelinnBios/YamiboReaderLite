@@ -509,7 +509,6 @@ class DirectoryRepository private constructor(private val context: Context) {
 
             if (cachedDir != null) {
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
-                val detectedOriginalAuthor = MangaTitleCleaner.extractAuthorPrefix(threadTitle).takeIf { it.isNotBlank() }
                 val hasPageLinks = allLinks.isNotEmpty()
                 val newStrategy =
                     if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks) {
@@ -517,7 +516,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     } else cachedDir.strategy
 
                 val existingChapterKeys = cachedDir.chapters.map { chapterUniqueKey(it) }.toSet()
-                Log.d(LOG_TAG, "cached chapters=${cachedDir.chapters.size} existingKeys=${existingChapterKeys.size} author='$detectedOriginalAuthor'")
+                Log.d(LOG_TAG, "cached chapters=${cachedDir.chapters.size} existingKeys=${existingChapterKeys.size}")
 
                 val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
                 val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
@@ -603,7 +602,6 @@ class DirectoryRepository private constructor(private val context: Context) {
 
                 // 调用核心 TID 排序初始化
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
-                val detectedOriginalAuthor = MangaTitleCleaner.extractAuthorPrefix(threadTitle).takeIf { it.isNotBlank() }
                 val initialAll = mergeAndSortChapters(emptyList(), gatheredFromPage)
                 val initialChapters = filterChaptersByDirectoryConstraints(
                     chapters = initialAll,
@@ -621,7 +619,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     chapters = initialChapters,
                     sourceFid = detectedSourceFid,
                     translationGroup = detectedGroup.takeIf { it.isNotBlank() },
-                    originalAuthor = detectedOriginalAuthor,
+                    originalAuthor = null,
                     publisherUid = detectedAuthor.uid,
                     publisherName = detectedAuthor.name
                 )
@@ -644,8 +642,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                 ?: currentDir.chapters.lastOrNull()
 
             val firstRawTitle = targetChapter?.rawTitle ?: currentDir.cleanBookName
-            val targetOriginalAuthor = currentDir.originalAuthor
-                ?: MangaTitleCleaner.extractAuthorPrefix(firstRawTitle).takeIf { it.isNotBlank() }
+            val targetOriginalAuthor: String? = null
             val targetAuthor = if (targetChapter?.authorUid.isNullOrBlank() && targetChapter?.authorName.isNullOrBlank()) {
                 resolveThreadAuthor(currentTid ?: targetChapter?.tid)
             } else {

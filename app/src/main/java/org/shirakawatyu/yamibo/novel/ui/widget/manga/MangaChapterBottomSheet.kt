@@ -76,14 +76,13 @@ data class MangaChapter(
 fun MangaChapterPanel(
     modifier: Modifier = Modifier,
     title: String,
-    initialOriginalAuthor: String,
     initialTranslationGroup: String,
     initialPublisher: String,
     chapters: List<MangaChapter>,
     isUpdating: Boolean = false,
     onDismiss: () -> Unit,
     onChapterClick: (MangaChapter) -> Unit,
-    onTitleEdit: (String, String, String, String) -> Unit
+    onTitleEdit: (String, String, String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -92,7 +91,6 @@ fun MangaChapterPanel(
     var ascending by remember { mutableStateOf(MangaSettings.getSettings(context).isAscending) }
     var showEditDialog by remember { mutableStateOf(false) }
     var editTitleText by remember(title) { mutableStateOf(title) }
-    var editOriginalAuthor by remember(initialOriginalAuthor) { mutableStateOf(initialOriginalAuthor) }
     var editTranslationGroup by remember(initialTranslationGroup) {
         mutableStateOf(initialTranslationGroup)
     }
@@ -133,18 +131,6 @@ fun MangaChapterPanel(
             title = { Text("更新漫画信息") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "留空的字段不会参与过滤，可按需要手动补充",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    OutlinedTextField(
-                        value = editOriginalAuthor,
-                        onValueChange = { editOriginalAuthor = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("原作者") },
-                        singleLine = true
-                    )
                     OutlinedTextField(
                         value = editTitleText,
                         onValueChange = { editTitleText = it },
@@ -175,7 +161,6 @@ fun MangaChapterPanel(
                         if (editTitleText.isNotBlank()) {
                             onTitleEdit(
                                 editTitleText.trim(),
-                                editOriginalAuthor.trim(),
                                 editTranslationGroup.trim(),
                                 editPublisher.trim()
                             )

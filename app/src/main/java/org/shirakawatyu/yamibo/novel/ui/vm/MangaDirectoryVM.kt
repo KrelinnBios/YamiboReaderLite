@@ -115,7 +115,6 @@ class MangaDirectoryVM(application: Application) : AndroidViewModel(application)
 
     fun updateDirectoryInfo(
         newTitle: String,
-        newOriginalAuthor: String,
         newTranslationGroup: String,
         newPublisher: String,
         currentTid: String
@@ -130,7 +129,7 @@ class MangaDirectoryVM(application: Application) : AndroidViewModel(application)
                 val mergedDir = repo.renameAndMergeDirectory(
                     dir,
                     newTitle,
-                    newOriginalAuthor,
+                    "",
                     newTranslationGroup,
                     newPublisher,
                     currentTid

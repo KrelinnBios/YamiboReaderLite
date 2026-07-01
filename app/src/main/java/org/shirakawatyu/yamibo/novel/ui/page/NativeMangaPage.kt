@@ -1518,15 +1518,6 @@ fun NativeMangaPage(
 
                 val currentDirectory = mangaDirVM.currentDirectory
                 val currentChapter = currentDirectory?.chapters?.find { it.tid == currentTid }
-                val initialOriginalAuthor = remember(currentDirectory, currentTid) {
-                    currentDirectory?.originalAuthor
-                        ?: currentChapter?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) }
-                            ?.takeIf { it.isNotBlank() }
-                        ?: currentDirectory?.chapters?.lastOrNull()
-                            ?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) }
-                            ?.takeIf { it.isNotBlank() }
-                        ?: currentDirectory?.searchKeyword.orEmpty()
-                }
                 val initialTranslationGroup = remember(currentDirectory, currentTid) {
                     currentChapter
                         ?.let { MangaTitleCleaner.extractTranslationGroup(it.rawTitle) }
@@ -1543,16 +1534,14 @@ fun NativeMangaPage(
                 MangaChapterPanel(
                     modifier = Modifier.align(Alignment.BottomCenter),
                     title = mangaDirVM.currentDirectory?.cleanBookName ?: "目录",
-                    initialOriginalAuthor = initialOriginalAuthor,
                     initialTranslationGroup = initialTranslationGroup,
                     initialPublisher = initialPublisher,
                     chapters = displayChapters,
                     isUpdating = mangaDirVM.isUpdatingDirectory,
                     onDismiss = { showChapterList = false; showUi = false },
-                    onTitleEdit = { newTitle, newOriginalAuthor, newTranslationGroup, newPublisher ->
+                    onTitleEdit = { newTitle, newTranslationGroup, newPublisher ->
                         mangaDirVM.updateDirectoryInfo(
                             newTitle.trim(),
-                            newOriginalAuthor.trim(),
                             newTranslationGroup.trim(),
                             newPublisher.trim(),
                             currentTid
