@@ -535,11 +535,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     cachedGroupStale -> null
                     else -> cachedDir.translationGroup
                 }
-                val detectedOrSavedOriginalAuthor = if (preferCurrentThreadMetadata) {
-                    detectedOriginalAuthor ?: cachedDir.originalAuthor
-                } else {
-                    cachedDir.originalAuthor ?: detectedOriginalAuthor
-                }
+                val detectedOrSavedOriginalAuthor = cachedDir.originalAuthor
                 val detectedOrSavedPublisherUid = if (preferCurrentThreadMetadata || !cachedDir.hasPublisherSetting()) {
                     detectedAuthor.uid ?: cachedDir.publisherUid
                 } else {
