@@ -814,9 +814,11 @@ fun MangaWebPage(
                     sectionName.isNotBlank() && allowedSections.none { sectionName.contains(it) }
 
                 if (!isCrossForum) {
-                    val displayNum = MangaTitleCleaner.formatDisplayChapterNum(
+                    val fallbackNumber = dir.chapters.indexOfFirst { it.tid == tid } + 1
+                    val displayNum = MangaTitleCleaner.formatChapterDisplayNumber(
                         currentChapter.rawTitle,
-                        currentChapter.chapterNum
+                        currentChapter.chapterNum,
+                        fallbackNumber
                     )
                     val shortTitle = if (currentChapter.chapterNum >= 1000f) {
                         "番外"
