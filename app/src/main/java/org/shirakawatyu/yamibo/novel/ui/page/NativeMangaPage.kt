@@ -335,6 +335,16 @@ fun NativeMangaPage(
         bottomNavBarVM.setBottomNavBarVisibility(true)
 
         if (previousRoute?.startsWith("MangaWebPage") == true || previousRoute == "BBSPage" || previousRoute == "MinePage" || previousRoute?.startsWith("MineHistoryPostPage") == true) {
+            // 保存原帖 URL 供 BBSPage 加载，原生漫画阅读器无 authorId/currentView/readerPageIndex
+            ReaderReturnBridge.context = ReaderReturnBridge.ReaderContext(
+                readerUrl = ReaderReturnBridge.stripReaderTransientParams(ReaderReturnBridge.toAbsoluteBbsUrl(url)),
+                tid = ReaderReturnBridge.extractTid(originalUrl),
+                authorId = null,
+                readerWebPage = 1,
+                readerPageIndex = 0,
+                cacheTitle = null,
+                originalPostUrl = ReaderReturnBridge.forceMobileTemplate(originalUrl)
+            )
             navController.navigateUp()
         } else {
             val encodedChapterUrl =
