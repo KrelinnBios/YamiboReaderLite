@@ -306,10 +306,6 @@ class MangaTitleCleaner {
 
         private const val ARABIC = "(\\d+(?:\\.\\d+)?|[０-９]+(?:\\.[０-９]+)?)"
 
-        private val DISPLAY_SPECIAL_CHAPTER_REGEX =
-            Regex("番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画", RegexOption.IGNORE_CASE)
-        private val DISPLAY_CHAPTER_INDEX_FORMAT = java.text.DecimalFormat("0.###")
-
         fun extractChapterNum(rawTitle: String): Float {
             val cleanTitle = rawTitle
                 .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
@@ -453,19 +449,27 @@ class MangaTitleCleaner {
         }
 
 
-        fun formatDisplayChapterNum(rawTitle: String, chapterNum: Float): String {
+        /**
+         * 章节显示编号：目录、原生阅读器、WebView 兜底阅读器共用同一套逻辑，
+         * 保证同一章在目录和标题下方的展示完全一致。
+         * - chapterNum <= 0（识别失败/番外等）时用列表位置 fallbackNumber 兜底，
+         *   不再显示"Ex"/"SP"，与目录保持一致。
+         * - 最终话（chapterNum >= 999）显示"终"。
+         * - "第7-2话"/"12-2"/"52+52.5" 等分段/合集标题按 extractChapterLabel 原样展示。
+         * - 纯小数编号（如 13.2）保留小数点，不再转成"13-2"。
+         */
+        fun formatChapterDisplayNumber(
+            rawTitle: String,
+            chapterNum: Float,
+            fallbackNumber: Int
+        ): String {
+            if (!chapterNum.isFinite() || chapterNum <= 0f) return fallbackNumber.toString()
+            if (chapterNum >= 999f) return "终"
             extractChapterLabel(rawTitle)?.let { return it }
-            return when {
-                rawTitle.contains(DISPLAY_SPECIAL_CHAPTER_REGEX) -> "SP"
-                chapterNum == 999f -> "终"
-                chapterNum < 1f && !rawTitle.contains(Regex("[0零〇]")) -> "Ex"
-                else -> {
-                    val safeStr = DISPLAY_CHAPTER_INDEX_FORMAT.format(chapterNum)
-                    if (safeStr.contains(".")) {
-                        val parts = safeStr.split(".")
-                        if (parts[1].length >= 3) "Ex" else "${parts[0]}-${parts[1].trimStart('0')}"
-                    } else safeStr
-                }
+            return if (chapterNum % 1f == 0f) {
+                chapterNum.toInt().toString()
+            } else {
+                chapterNum.toString().trimEnd('0').trimEnd('.')
             }
         }
 
