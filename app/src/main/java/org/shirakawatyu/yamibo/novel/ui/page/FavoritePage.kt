@@ -222,11 +222,7 @@ fun FavoritePage(
                 existing != null -> existing.strategy
                 else -> MangaUpdateCheckStrategy.TAG
             }
-            val derivedKeyword = matchedDir?.chapters?.find { it.tid == t }
-                ?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) }
-                ?: matchedDir?.chapters?.lastOrNull()
-                    ?.let { MangaTitleCleaner.extractAuthorPrefix(it.rawTitle) } ?: ""
-            mangaConfigPresetKeyword = existing?.searchKeyword ?: matchedDir?.searchKeyword ?: derivedKeyword
+            mangaConfigPresetKeyword = existing?.searchKeyword ?: matchedDir?.searchKeyword ?: ""
             mangaConfigPresetBookName = existing?.cleanBookName ?: matchedDir?.cleanBookName ?: ""
             showMangaConfigDialog = true
         }

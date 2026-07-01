@@ -53,23 +53,6 @@ class MangaTitleCleaner {
             return clean
         }
 
-        /**
-         * 独立提取作者名前缀
-         */
-        fun extractAuthorPrefix(rawTitle: String): String {
-            val prefixMatch = Regex("^(?:【.*?】|\\[.*?\\]|[\\s\\u00A0\\u3000])+").find(rawTitle)
-
-            if (prefixMatch != null) {
-                val bracketMatch =
-                    Regex("【(.*?)】|\\[(.*?)\\]").findAll(prefixMatch.value).lastOrNull()
-                if (bracketMatch != null) {
-                    return bracketMatch.groupValues[1].ifEmpty { bracketMatch.groupValues[2] }
-                        .trim()
-                }
-            }
-            return ""
-        }
-
         fun extractTranslationGroup(rawTitle: String): String {
             val title = getCleanThreadTitle(rawTitle)
             val bracketCandidate = Regex("""[【\[\(（「『]([^】\]\)）」』]{2,64})[】\]\)）」』]""")
