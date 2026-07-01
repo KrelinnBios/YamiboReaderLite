@@ -96,6 +96,7 @@ import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
@@ -695,6 +696,12 @@ fun MangaWebPage(
                     return true
                 }
 
+                // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(link)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
                 return super.shouldOverrideUrlLoading(view, request)
             }
 
@@ -709,6 +716,11 @@ fun MangaWebPage(
 
                 if (!BBSGlobalWebViewClient.isYamiboUrl(safeUrl)) {
                     openExternalUrl(safeUrl)
+                    return true
+                }
+
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
                     return true
                 }
 
