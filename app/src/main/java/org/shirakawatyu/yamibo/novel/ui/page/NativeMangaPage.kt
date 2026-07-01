@@ -227,10 +227,12 @@ fun NativeMangaPage(
     }
     val previousRoute = navController.previousBackStackEntry?.destination?.route
 
-    val getDisplayChapterNum = remember {
-        { rawTitle: String, chapterNum: Float ->
-            MangaTitleCleaner.formatDisplayChapterNum(rawTitle, chapterNum)
-        }
+    // 与目录使用同一套显示逻辑：识别失败时用章节在目录中的位置兜底，保证目录与标题下方一致
+    val getDisplayChapterNum = { rawTitle: String, chapterNum: Float, tid: String? ->
+        val chapters = mangaDirVM.currentDirectory?.chapters
+        val pos = chapters?.indexOfFirst { it.tid == tid } ?: -1
+        val fallbackNumber = if (pos >= 0) pos + 1 else 1
+        MangaTitleCleaner.formatChapterDisplayNumber(rawTitle, chapterNum, fallbackNumber)
     }
 
     val fallbackNavigate = { targetUrl: String ->
@@ -546,7 +548,7 @@ fun NativeMangaPage(
                 if (previousTid != null && previousTid != currentTid) {
                     val chap = mangaDirVM.currentDirectory?.chapters?.find { it.tid == currentTid }
                     if (chap != null) {
-                        val displayNum = getDisplayChapterNum(chap.rawTitle, chap.chapterNum)
+                        val displayNum = getDisplayChapterNum(chap.rawTitle, chap.chapterNum, currentTid)
                         toastChapterText = "第 $displayNum 话"
                     }
                 }
@@ -567,7 +569,7 @@ fun NativeMangaPage(
                 val tid = currentItem?.tid ?: return@LaunchedEffect
                 val chapter = mangaDirVM.currentDirectory?.chapters?.find { it.tid == tid }
                 if (chapter != null) {
-                    val displayNum = getDisplayChapterNum(chapter.rawTitle, chapter.chapterNum)
+                    val displayNum = getDisplayChapterNum(chapter.rawTitle, chapter.chapterNum, tid)
                     val shortTitle = "读至第 $displayNum 话 - ${currentItem.localIndex + 1}页"
                     favoriteVM.updateMangaProgress(
                         originalUrl,
@@ -1311,7 +1313,8 @@ fun NativeMangaPage(
                         val chap =
                             mangaDirVM.currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
                         if (chap != null) {
-                            val displayNum = getDisplayChapterNum(chap.rawTitle, chap.chapterNum)
+                            val displayNum =
+                                getDisplayChapterNum(chap.rawTitle, chap.chapterNum, currentItem?.tid)
                             Text(
                                 "第 $displayNum 话",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
