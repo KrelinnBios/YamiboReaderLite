@@ -1,7 +1,7 @@
 # YamiboReaderLite
 
 <p align="center">
-  <img src="app/src/main/res/drawable-nodpi/ic_launcher_playstore.png" width="128" alt="300 Lite logo">
+  <img src="icon/logo.svg" width="128" alt="300 Lite logo">
 </p>
 
 <p align="center">
