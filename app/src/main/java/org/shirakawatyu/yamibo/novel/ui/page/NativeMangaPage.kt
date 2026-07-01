@@ -146,9 +146,6 @@ import org.shirakawatyu.yamibo.novel.util.manga.verticalMangaZoomGesture
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import java.net.URLEncoder
 
-private val SpecialChapterRegex =
-    Regex("番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画", RegexOption.IGNORE_CASE)
-private val ChapterIndexFormat = java.text.DecimalFormat("0.###")
 private val MangaLoadingIndicatorColor = Color.White
 
 @OptIn(ExperimentalFoundationApi::class, FlowPreview::class, ExperimentalCoilApi::class)
@@ -232,18 +229,7 @@ fun NativeMangaPage(
 
     val getDisplayChapterNum = remember {
         { rawTitle: String, chapterNum: Float ->
-            when {
-                rawTitle.contains(SpecialChapterRegex) -> "SP"
-                chapterNum == 999f -> "终"
-                chapterNum < 1f && !rawTitle.contains(Regex("[0零〇]")) -> "Ex"
-                else -> {
-                    val safeStr = ChapterIndexFormat.format(chapterNum)
-                    if (safeStr.contains(".")) {
-                        val parts = safeStr.split(".")
-                        if (parts[1].length >= 3) "Ex" else "${parts[0]}-${parts[1].trimStart('0')}"
-                    } else safeStr
-                }
-            }
+            MangaTitleCleaner.formatDisplayChapterNum(rawTitle, chapterNum)
         }
     }
 
