@@ -814,10 +814,14 @@ fun MangaWebPage(
                     sectionName.isNotBlank() && allowedSections.none { sectionName.contains(it) }
 
                 if (!isCrossForum) {
-                    val shortTitle = when {
-                        currentChapter.chapterNum >= 1000f -> "番外"
-                        currentChapter.chapterNum % 1f == 0f -> "读至第 ${currentChapter.chapterNum.toInt()} 话"
-                        else -> "读至第 ${currentChapter.chapterNum} 话"
+                    val displayNum = MangaTitleCleaner.formatDisplayChapterNum(
+                        currentChapter.rawTitle,
+                        currentChapter.chapterNum
+                    )
+                    val shortTitle = if (currentChapter.chapterNum >= 1000f) {
+                        "番外"
+                    } else {
+                        "读至第 $displayNum 话"
                     }
 
                     favoriteVM.updateMangaProgress(
