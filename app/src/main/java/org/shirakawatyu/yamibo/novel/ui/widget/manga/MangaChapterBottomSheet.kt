@@ -372,14 +372,5 @@ private fun MangaChapterDrawerItem(
     )
 }
 
-private fun formatChapterNumber(index: Float, title: String, fallbackNumber: Int): String {
-    if (!index.isFinite() || index <= 0f) return fallbackNumber.toString()
-    // "第7-2话"这类分段标题直接显示"7-2"，不展示为排序用的小数编码(7.02)
-    MangaTitleCleaner.extractChapterLabel(title)?.let { return it }
-    val value = if (index % 1f == 0f) {
-        index.toInt().toString()
-    } else {
-        index.toString().trimEnd('0').trimEnd('.')
-    }
-    return value
-}
+private fun formatChapterNumber(index: Float, title: String, fallbackNumber: Int): String =
+    MangaTitleCleaner.formatChapterDisplayNumber(title, index, fallbackNumber)
