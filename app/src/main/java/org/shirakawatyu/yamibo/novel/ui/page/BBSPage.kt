@@ -291,13 +291,6 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
             return true
         }
 
-        // 论坛帖子链接强制添加 mobile=2，避免从目录等链接跳转时变成电脑版
-        val mobileUrl = ReaderReturnBridge.forceMobileTemplate(url)
-        if (mobileUrl != url) {
-            view?.loadUrl(mobileUrl)
-            return true
-        }
-
         return super.shouldOverrideUrlLoading(view, request)
     }
 
@@ -317,13 +310,6 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
 
         YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
             view?.loadUrl(rewritten)
-            return true
-        }
-
-        // 论坛帖子链接强制添加 mobile=2，避免从目录等链接跳转时变成电脑版
-        val mobileUrl = ReaderReturnBridge.forceMobileTemplate(safeUrl)
-        if (mobileUrl != safeUrl) {
-            view?.loadUrl(mobileUrl)
             return true
         }
 
@@ -751,15 +737,6 @@ fun BBSPage(
         try {
             webView.onResume()
             webView.resumeTimers()
-
-            // 检查是否有从阅读器返回的原帖 URL
-            val originalPostUrl = ReaderReturnBridge.context?.originalPostUrl
-            if (originalPostUrl != null && !ReaderReturnBridge.sameUrlIgnoringHashAndTrailingSlash(webView.url, originalPostUrl)) {
-                ReaderReturnBridge.context = null
-                startLoading(originalPostUrl)
-                return
-            }
-            ReaderReturnBridge.context = null
 
             // 从 NativeMangaPage / ReaderPage 返回时，不重新加载页面，只恢复 WebView 的定时器与点击脚本。
             webView.evaluateJavascript(PageJsScripts.REMOVE_TRANSITION_STYLE_JS, null)
