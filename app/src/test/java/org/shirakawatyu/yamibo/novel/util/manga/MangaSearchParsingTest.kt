@@ -119,6 +119,23 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun combinedChapterNumberKeepsDisplayLabel() {
+        val title =
+            "[長篇連載] 【大友同好會】 [ドスコイ]特别な中途半端(特别的半吊子) 52+52.5"
+
+        assertEquals("特别な中途半端(特别的半吊子)", MangaTitleCleaner.getCleanBookName(title))
+        assertEquals("52+52.5", MangaTitleCleaner.extractChapterLabel(title))
+        assertEquals(52f, MangaTitleCleaner.extractChapterNum(title))
+        assertEquals(
+            "52+52.5",
+            MangaTitleCleaner.formatDisplayChapterNum(
+                title,
+                MangaTitleCleaner.extractChapterNum(title)
+            )
+        )
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))
