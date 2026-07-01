@@ -28,6 +28,7 @@ class MangaTitleCleaner {
             val chapterMarkerPattern = Regex(
                 "(?i)(" +
                         "第\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+|" +
+                        "\\s*(?:第\\s*)?(?<!\\d)[\\d０-９]+(?:[\\.．][\\d０-９]+)?\\s*[+＋]\\s*[\\d０-９]+(?:[\\.．][\\d０-９]+)?\\s*(?:[话話织回章节幕折更])?\\s*(?=[：:—\\-「【\\[(（《]|\\s|$)|" +
                         "[-—\\s]*[#＃]\\s*\\d+|" +
                         "[-—\\s]*S\\d+(\\s*EP\\d+)?|" +
                         "[-—\\s]*EP\\d+|" +
@@ -305,6 +306,10 @@ class MangaTitleCleaner {
 
         private const val ARABIC = "(\\d+(?:\\.\\d+)?|[０-９]+(?:\\.[０-９]+)?)"
 
+        private val DISPLAY_SPECIAL_CHAPTER_REGEX =
+            Regex("番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画", RegexOption.IGNORE_CASE)
+        private val DISPLAY_CHAPTER_INDEX_FORMAT = java.text.DecimalFormat("0.###")
+
         fun extractChapterNum(rawTitle: String): Float {
             val cleanTitle = rawTitle
                 .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
@@ -403,10 +408,16 @@ class MangaTitleCleaner {
             return if (value % 1f == 0f) value.toInt().toString() else value.toString()
         }
 
+        private fun formatCombinedChapterLabel(value: String): String {
+            return value
+                .split(Regex("\\s*[+＋]\\s*"))
+                .joinToString("+") { formatLabelNum(it) }
+        }
+
         /**
-         * 提取"X-Y"形式的章节显示文案（如"第7-2话"→"7-2"），用于列表直接展示原始分段，
-         * 避免 extractChapterNum 为排序需要把 Y 编码进小数位（7.02）后直接拿来显示。
-         * 仅当标题确实是 X-Y / 其之 这类分段形式时返回；其余情况返回 null，由调用方按
+         * 提取章节显示文案（如"第7-2话"→"7-2"、"52+52.5"→"52+52.5"），
+         * 用于列表和阅读器顶部直接展示原始分段/合集编号，避免把排序用 chapterNum 当作显示文本。
+         * 仅当标题确实是 X-Y / X+Y / 其之 这类分段形式时返回；其余情况返回 null，由调用方按
          * chapterNum 数值格式化（如单纯的"7"或前后篇的"7.1"）。
          */
         fun extractChapterLabel(rawTitle: String): String? {
@@ -423,6 +434,8 @@ class MangaTitleCleaner {
                 return null
             }
 
+            Regex("(?:第)?\\s*($ARABIC(?:\\s*[+＋]\\s*$ARABIC)+)\\s*[话話织回章节幕折更]?").find(cleanTitle)
+                ?.let { return formatCombinedChapterLabel(it.groupValues[1]) }
             Regex("(?:第)?\\s*$NUM\\s*[话話织回章节幕折更].*?其[之の]?\\s*$NUM").find(cleanTitle)?.let {
                 return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
             }
@@ -437,6 +450,23 @@ class MangaTitleCleaner {
                 return "${formatLabelNum(it.groupValues[1])}-${formatLabelNum(it.groupValues[2])}"
             }
             return null
+        }
+
+
+        fun formatDisplayChapterNum(rawTitle: String, chapterNum: Float): String {
+            extractChapterLabel(rawTitle)?.let { return it }
+            return when {
+                rawTitle.contains(DISPLAY_SPECIAL_CHAPTER_REGEX) -> "SP"
+                chapterNum == 999f -> "终"
+                chapterNum < 1f && !rawTitle.contains(Regex("[0零〇]")) -> "Ex"
+                else -> {
+                    val safeStr = DISPLAY_CHAPTER_INDEX_FORMAT.format(chapterNum)
+                    if (safeStr.contains(".")) {
+                        val parts = safeStr.split(".")
+                        if (parts[1].length >= 3) "Ex" else "${parts[0]}-${parts[1].trimStart('0')}"
+                    } else safeStr
+                }
+            }
         }
 
         /**
