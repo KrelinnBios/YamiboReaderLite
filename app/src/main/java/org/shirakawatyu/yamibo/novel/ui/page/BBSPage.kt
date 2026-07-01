@@ -285,6 +285,12 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
             return true
         }
 
+        // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
+        YamiboPostLinkUtil.normalizePcOnlyPageUrl(url)?.let { rewritten ->
+            view?.loadUrl(rewritten)
+            return true
+        }
+
         return super.shouldOverrideUrlLoading(view, request)
     }
 
@@ -299,6 +305,11 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
 
         if (!isYamiboUrl(safeUrl)) {
             openExternalUrl(safeUrl)
+            return true
+        }
+
+        YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+            view?.loadUrl(rewritten)
             return true
         }
 

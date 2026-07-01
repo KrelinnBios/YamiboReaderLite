@@ -120,6 +120,7 @@ import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
 import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
 import org.shirakawatyu.yamibo.novel.util.AppStrings
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
@@ -1007,6 +1008,12 @@ fun MinePage(
                     return true
                 }
 
+                // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(urlStr)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
                 if (!fromHistory && isSelected && isHomepageUrl(urlStr) && view != null) {
                     scope.launch(Dispatchers.IO) {
                         delay(500L)
@@ -1033,6 +1040,11 @@ fun MinePage(
 
                 if (!BBSGlobalWebViewClient.isYamiboUrl(safeUrl)) {
                     openExternalUrl(safeUrl)
+                    return true
+                }
+
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
                     return true
                 }
 

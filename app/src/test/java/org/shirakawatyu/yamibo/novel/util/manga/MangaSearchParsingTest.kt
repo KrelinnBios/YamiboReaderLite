@@ -137,6 +137,30 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun realCombinedChapterTitleCleansWithoutResidue() {
+        // 真实标题（繁体 特別/半吊子帖）：清洗结果不得残留 "52+"
+        val title = "【大友同好會】[ドスコイ]特別な中途半端(特别的半吊子) 52+52.5"
+        assertEquals("特別な中途半端(特别的半吊子)", MangaTitleCleaner.getCleanBookName(title))
+    }
+
+    @Test
+    fun staleCleanBookNameDetectsOldCleanerResidue() {
+        // 旧版清洗器把"52+52.5"只截掉"52.5"，存量目录名残留"52+"
+        assertTrue(
+            MangaTitleCleaner.isStaleCleanBookName(
+                "特別な中途半端(特别的半吊子) 52+",
+                "特別な中途半端(特别的半吊子)"
+            )
+        )
+        assertTrue(MangaTitleCleaner.isStaleCleanBookName("作品名 第12话", "作品名"))
+        // 名字一致 / 用户自定义文字后缀 / 完全不同的名字，都不算残次品
+        assertFalse(MangaTitleCleaner.isStaleCleanBookName("作品名", "作品名"))
+        assertFalse(MangaTitleCleaner.isStaleCleanBookName("作品名 (完结)", "作品名"))
+        assertFalse(MangaTitleCleaner.isStaleCleanBookName("别的书 12", "作品名"))
+        assertFalse(MangaTitleCleaner.isStaleCleanBookName("作品名 12", ""))
+    }
+
+    @Test
     fun chapterDisplayNumberMatchesDirectoryFormat() {
         // 纯小数编号（13.2）保留小数点，不转成"13-2"
         assertEquals(

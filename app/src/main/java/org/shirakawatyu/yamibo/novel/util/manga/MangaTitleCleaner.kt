@@ -159,6 +159,19 @@ class MangaTitleCleaner {
                 ?: cleanName.take(24).trim()
         }
 
+        /**
+         * 判断已存目录名是否是旧版清洗器留下的残次品（如"作品名 52+"——旧版把"52+52.5"
+         * 只截掉了"52.5"）。条件：存量名 = 新清洗名 + 纯章节编号残渣（含数字的编号/标点片段）。
+         * 用户手动改的名字（如加"(完结)"等文字后缀）不会命中，不会被误还原。
+         */
+        fun isStaleCleanBookName(storedName: String, freshName: String): Boolean {
+            if (freshName.isBlank() || storedName == freshName) return false
+            if (!storedName.startsWith(freshName)) return false
+            val residue = storedName.removePrefix(freshName).trim()
+            if (residue.isEmpty() || residue.none(Char::isDigit)) return false
+            return residue.matches(Regex("[\\d０-９.．+＋\\-—~～\\s第话話回章节]+"))
+        }
+
         fun isAdministrativeThread(rawTitle: String): Boolean {
             val normalized = rawTitle.replace(Regex("\\s+"), "")
             return listOf(

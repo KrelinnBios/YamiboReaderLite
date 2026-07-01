@@ -174,6 +174,31 @@ class DirectoryRepository private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 把残次名目录迁移到正确的清洗名下：若目标名已有目录则合并章节，随后删除旧文件。
+     * 返回迁移后的目录；迁移失败时返回 null（调用方继续沿用旧名，不影响功能）。
+     */
+    private suspend fun migrateStaleDirectoryName(
+        oldDir: MangaDirectory,
+        newCleanName: String
+    ): MangaDirectory? = withContext(Dispatchers.IO) {
+        try {
+            val target = loadDirectory(newCleanName)
+            val migrated = if (target != null) {
+                target.copy(chapters = mergeAndSortChapters(oldDir.chapters, target.chapters))
+            } else {
+                oldDir.copy(cleanBookName = newCleanName)
+            }
+            saveDirectory(migrated)
+            deleteDirectory(oldDir.cleanBookName)
+            Log.d(LOG_TAG, "迁移残次目录名: '${oldDir.cleanBookName}' -> '$newCleanName'")
+            migrated
+        } catch (e: Exception) {
+            Log.w(LOG_TAG, "残次目录名迁移失败: ${oldDir.cleanBookName}", e)
+            null
+        }
+    }
+
     // 基于 TID 排序并重组序号
     private fun mergeAndSortChapters(
         old: List<MangaChapterItem>,
@@ -342,7 +367,17 @@ class DirectoryRepository private constructor(private val context: Context) {
         val existingDir = allDirs.find { dir -> dir.chapters.any { it.tid == tid } }
         val detectedSourceFid = existingDir?.sourceFid ?: resolveSourceFid(tid)
 
-        val cleanName = existingDir?.cleanBookName ?: MangaTitleCleaner.getCleanBookName(rawTitle)
+        // 自愈旧版清洗器留下的残次目录名（如"作品名 52+"）：重命名到当前清洗结果
+        val freshCleanName = MangaTitleCleaner.getCleanBookName(rawTitle)
+        val migratedDir = if (existingDir != null &&
+            MangaTitleCleaner.isStaleCleanBookName(existingDir.cleanBookName, freshCleanName)
+        ) {
+            migrateStaleDirectoryName(existingDir, freshCleanName)
+        } else {
+            null
+        }
+
+        val cleanName = migratedDir?.cleanBookName ?: existingDir?.cleanBookName ?: freshCleanName
 
         return getFileLock(cleanName).withLock {
             val cachedDir = loadDirectory(cleanName)
@@ -487,10 +522,19 @@ class DirectoryRepository private constructor(private val context: Context) {
                 val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
                 val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
 
-                val detectedOrSavedGroup = if (preferCurrentThreadMetadata) {
-                    detectedGroup.takeIf { it.isNotBlank() } ?: cachedDir.translationGroup
-                } else {
-                    cachedDir.translationGroup ?: detectedGroup.takeIf { it.isNotBlank() }
+                // 同名不同版本（不同汉化组/发布者）的作品会落到同一个 cleanBookName 目录。
+                // 若旧目录记录的汉化组与当前打开的帖子对不上，继承它会让面板用旧组把当前
+                // 版本的所有章节过滤成空目录，故此时必须丢弃旧组（同时可自愈已经写坏的目录）。
+                val cachedGroupStale = !cachedDir.translationGroup.isNullOrBlank() &&
+                        !MangaTitleCleaner.matchesTranslationGroup(
+                            threadTitle,
+                            cachedDir.translationGroup!!
+                        )
+
+                val detectedOrSavedGroup = when {
+                    detectedGroup.isNotBlank() -> detectedGroup
+                    cachedGroupStale -> null
+                    else -> cachedDir.translationGroup
                 }
                 val detectedOrSavedOriginalAuthor = if (preferCurrentThreadMetadata) {
                     detectedOriginalAuthor ?: cachedDir.originalAuthor
@@ -532,6 +576,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                 if (mergedChapters.size != cachedDir.chapters.size ||
                     updatedDir.strategy != cachedDir.strategy ||
                     updatedDir.sourceFid != cachedDir.sourceFid ||
+                    updatedDir.translationGroup != cachedDir.translationGroup ||
                     updatedDir.originalAuthor != cachedDir.originalAuthor ||
                     updatedDir.publisherUid != cachedDir.publisherUid ||
                     updatedDir.publisherName != cachedDir.publisherName

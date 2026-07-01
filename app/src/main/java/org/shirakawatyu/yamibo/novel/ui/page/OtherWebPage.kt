@@ -89,6 +89,7 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import kotlin.text.Charsets
@@ -414,6 +415,12 @@ fun OtherWebPage(
                     return true
                 }
 
+                // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(link)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
                 return super.shouldOverrideUrlLoading(view, request)
             }
 
@@ -436,6 +443,11 @@ fun OtherWebPage(
                         context.startActivity(Intent(Intent.ACTION_VIEW, safeUrl.toUri()))
                     } catch (_: Exception) {
                     }
+                    return true
+                }
+
+                YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
                     return true
                 }
 

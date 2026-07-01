@@ -44,4 +44,49 @@ class YamiboPostLinkUtilTest {
             )
         )
     }
+
+    @Test
+    fun rewritesTagPageLinkToDesktopTemplate() {
+        // 标签页是电脑版专属页，手机版会话下必须强制 mobile=no
+        assertEquals(
+            "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=no",
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://bbs.yamibo.com/misc.php?mod=tag&id=20563"
+            )
+        )
+        // 已带 mobile=2 的也要改成 mobile=no
+        assertEquals(
+            "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=no",
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=2"
+            )
+        )
+    }
+
+    @Test
+    fun tagPageRewriteSkipsAlreadyDesktopAndNonTagLinks() {
+        // 已经是 mobile=no 时返回 null，避免 loadUrl 重写循环
+        assertNull(
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=no"
+            )
+        )
+        // 非标签页 misc 链接与普通帖子链接不重写
+        assertNull(
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://bbs.yamibo.com/misc.php?mod=seccode"
+            )
+        )
+        assertNull(
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162"
+            )
+        )
+        // 非百合会域名不重写
+        assertNull(
+            YamiboPostLinkUtil.normalizePcOnlyPageUrl(
+                "https://example.com/misc.php?mod=tag&id=1"
+            )
+        )
+    }
 }
