@@ -128,10 +128,35 @@ class MangaSearchParsingTest {
         assertEquals(52f, MangaTitleCleaner.extractChapterNum(title))
         assertEquals(
             "52+52.5",
-            MangaTitleCleaner.formatDisplayChapterNum(
+            MangaTitleCleaner.formatChapterDisplayNumber(
                 title,
-                MangaTitleCleaner.extractChapterNum(title)
+                MangaTitleCleaner.extractChapterNum(title),
+                1
             )
+        )
+    }
+
+    @Test
+    fun chapterDisplayNumberMatchesDirectoryFormat() {
+        // 纯小数编号（13.2）保留小数点，不转成"13-2"
+        assertEquals(
+            "13.2",
+            MangaTitleCleaner.formatChapterDisplayNumber("魔法少女奈叶 EXCEEDS 13.2", 13.2f, 5)
+        )
+        // 分段标题（X-Y）原样展示为"12-2"
+        assertEquals(
+            "12-2",
+            MangaTitleCleaner.formatChapterDisplayNumber("某漫画 12-2", 12.02f, 5)
+        )
+        // 整数编号
+        assertEquals(
+            "4",
+            MangaTitleCleaner.formatChapterDisplayNumber("就像你一样 4", 4f, 9)
+        )
+        // 识别失败（chapterNum<=0）时用列表位置兜底，而非"Ex"
+        assertEquals(
+            "4",
+            MangaTitleCleaner.formatChapterDisplayNumber("【提灯喵汉化组】就像你一样", 0f, 4)
         )
     }
 
