@@ -257,6 +257,22 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun samePageLinksIgnoreUrlTextReferences() {
+        val html = """
+            <div class="message">
+                Previous: <a href="https://bbs.yamibo.com/forum.php?mod=viewthread&amp;tid=566102&amp;highlight=%E5%97%9C%E5%A5%BD%E5%93%81">https://bbs.yamibo.com/forum.php ... C%E5%A5%BD%E5%93%81</a><br>
+                <a href="https://bbs.yamibo.com/forum.php?mod=viewthread&amp;tid=573149">2</a>
+            </div>
+        """.trimIndent()
+
+        val parsed = MangaHtmlParser.extractSamePageLinks(html)
+
+        assertEquals(1, parsed.size)
+        assertEquals("573149", parsed.single().tid)
+        assertEquals("2", parsed.single().rawTitle)
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))
