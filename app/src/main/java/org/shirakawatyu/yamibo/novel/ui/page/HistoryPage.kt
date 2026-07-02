@@ -70,6 +70,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.bean.HistoryEntry
+import org.shirakawatyu.yamibo.novel.global.GlobalData
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
+import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
+import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
@@ -265,6 +269,25 @@ fun HistoryPage(navController: NavController) {
 
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val lazyListState = rememberLazyListState()
+
+    OnboardingOverlay(
+        page = OnboardingUtil.Page.HISTORY,
+        enabled = GlobalData.currentUid.isNotBlank(),
+        steps = listOf(
+            OnboardingStep(
+                title = "浏览历史小提示",
+                description = "搜索框支持组合查询：多个关键词用空格隔开，标题、作者或版块里包含全部关键词的记录才会显示。"
+            ),
+            OnboardingStep(
+                title = "浏览历史小提示",
+                description = "点击搜索框右侧的日历图标可以按日期或日期范围筛选；筛选生效后上方会出现日期标签，点击标签可以清除。"
+            ),
+            OnboardingStep(
+                title = "浏览历史小提示",
+                description = "点击右上角「管理」图标进入多选模式，可以全选并批量删除；右上角垃圾桶图标可以一键清空全部历史（有二次确认）。"
+            )
+        )
+    )
 
     // 组合式日期选择器 Dialog
     if (showDatePicker) {
