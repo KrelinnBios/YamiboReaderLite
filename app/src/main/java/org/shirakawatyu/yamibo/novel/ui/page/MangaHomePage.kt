@@ -271,8 +271,11 @@ fun MangaHomePage(
                         unfocusedTrailingIconColor = MaterialTheme.colorScheme.primary,
                         focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        focusedBorderColor = MaterialTheme.colorScheme.tertiary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.55f),
+                        // 选中才高亮：聚焦用主题高亮色，未聚焦用低调的 outline 边框色。
+                        // 之前 focused 用 tertiary（暗黑下≈面板色，选中反而看不见边框）、
+                        // unfocused 用半透明白（未选中反而亮），语义正好用反了。
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                         cursorColor = MaterialTheme.colorScheme.primary
                     )
                 )

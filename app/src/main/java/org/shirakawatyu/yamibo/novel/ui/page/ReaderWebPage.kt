@@ -351,8 +351,10 @@ fun ReaderWebPage(
                 javaScriptEnabled = true
                 useWideViewPort = true
                 loadWithOverviewMode = true
-                setSupportZoom(false)
-                builtInZoomControls = false
+                // 允许捏合缩放（与论坛主页 WebView 一致）：手机版模板自带 user-scalable=no，
+                // 行为不变；点「电脑版」切出的桌面页则可以缩放。
+                setSupportZoom(true)
+                builtInZoomControls = true
                 displayZoomControls = false
                 textZoom = 100
                 domStorageEnabled = true
