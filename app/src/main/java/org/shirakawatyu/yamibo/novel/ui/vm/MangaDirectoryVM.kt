@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.shirakawatyu.yamibo.novel.bean.DirectoryStrategy
 import org.shirakawatyu.yamibo.novel.bean.MangaDirectory
 import org.shirakawatyu.yamibo.novel.repository.DirectoryRepository
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
@@ -44,11 +45,15 @@ class MangaDirectoryVM(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val dir = repo.initDirectoryForThread(tid, url, title, html)
             currentDirectory = dir
-            updateMangaDirectory(currentTid = tid)
+            updateMangaDirectory(
+                isForced = shouldForceSearchOnOpen(dir),
+                currentTid = tid,
+                ignoreCooldown = true
+            )
         }
     }
 
-    fun loadDirectoryByUrl(currentUrl: String) {
+    fun loadDirectoryByUrl(currentUrl: String, refreshAfterLoad: Boolean = false) {
         viewModelScope.launch {
             val tid = MangaTitleCleaner.extractTidFromUrl(currentUrl) ?: return@launch
             val allDirs = repo.getAllDirectories()
@@ -56,14 +61,29 @@ class MangaDirectoryVM(application: Application) : AndroidViewModel(application)
 
             if (targetDir != null) {
                 currentDirectory = targetDir
+                if (refreshAfterLoad) {
+                    updateMangaDirectory(
+                        isForced = shouldForceSearchOnOpen(targetDir),
+                        currentTid = tid,
+                        ignoreCooldown = true
+                    )
+                }
             }
         }
     }
 
+    private fun shouldForceSearchOnOpen(dir: MangaDirectory): Boolean {
+        val smallDirectoryNeedsRetry = dir.chapters.size <= 2 &&
+                (dir.lastUpdateTime == 0L || System.currentTimeMillis() - dir.lastUpdateTime > 30 * 60 * 1000L)
+        if (smallDirectoryNeedsRetry) return true
+        if (dir.strategy == DirectoryStrategy.SEARCHED) return false
+        return dir.lastUpdateTime == 0L
+    }
+
     /** 打开漫画后在后台更新目录。 */
-    fun updateMangaDirectory(isForced: Boolean = false, currentTid: String? = null) {
+    fun updateMangaDirectory(isForced: Boolean = false, currentTid: String? = null, ignoreCooldown: Boolean = false) {
         val dir = currentDirectory ?: return
-        if (isUpdatingDirectory || directoryCooldown > 0) return
+        if (isUpdatingDirectory || (!ignoreCooldown && directoryCooldown > 0)) return
 
         viewModelScope.launch {
             isUpdatingDirectory = true
