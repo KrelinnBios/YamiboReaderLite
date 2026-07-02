@@ -1521,15 +1521,21 @@ fun NativeMangaPage(
                                             publisherName = selectedPublisherName
                                         ))
                     }
-                    ?.map {
-                    MangaChapter(
-                        it.chapterNum,
-                        it.rawTitle,
-                        it.url,
-                        isCurrent = it.tid == currentTid,
-                        isRead = false
-                    )
-                } ?: emptyList()
+                    ?.mapIndexed { chapterIndex, chapter ->
+                        val chapterKey = if (!chapter.pid.isNullOrBlank()) {
+                            "${chapter.tid}-pid-${chapter.pid}"
+                        } else {
+                            "${chapter.tid}-${chapter.url}-${chapter.rawTitle}-$chapterIndex"
+                        }
+                        MangaChapter(
+                            chapter.chapterNum,
+                            chapter.rawTitle,
+                            chapter.url,
+                            isCurrent = chapter.tid == currentTid,
+                            isRead = false,
+                            key = chapterKey
+                        )
+                    } ?: emptyList()
 
                 val currentDirectory = mangaDirVM.currentDirectory
                 val currentChapter = currentDirectory?.chapters?.find { it.tid == currentTid }
