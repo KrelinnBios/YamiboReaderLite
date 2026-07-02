@@ -182,6 +182,7 @@ fun NativeMangaPage(
     val globalOffsetY = remember { Animatable(0f) }
     var probingUrl by remember { mutableStateOf<String?>(null) }
     var probingJob by remember { mutableStateOf<Job?>(null) }
+    var currentPostUrlForOriginal by remember(url) { mutableStateOf(url) }
 
     OnboardingOverlay(
         page = OnboardingUtil.Page.MANGA_READER,
@@ -334,13 +335,25 @@ fun NativeMangaPage(
         }
         bottomNavBarVM.setBottomNavBarVisibility(true)
 
-        if (previousRoute?.startsWith("MangaWebPage") == true || previousRoute == "BBSPage" || previousRoute == "MinePage" || previousRoute?.startsWith("MineHistoryPostPage") == true) {
+        val currentPostUrl = currentPostUrlForOriginal.takeIf { it.isNotBlank() } ?: url
+        val currentTidForOriginal = MangaTitleCleaner.extractTidFromUrl(currentPostUrl)
+        val routeTid = MangaTitleCleaner.extractTidFromUrl(url)
+        val originalTid = MangaTitleCleaner.extractTidFromUrl(originalUrl)
+        val canReusePreviousPostPage = currentTidForOriginal != null &&
+                routeTid != null &&
+                currentTidForOriginal == routeTid &&
+                (originalTid == null || originalTid == routeTid)
+        val originalPostUrl = if (canReusePreviousPostPage) originalUrl else currentPostUrl
+
+        if (canReusePreviousPostPage &&
+            (previousRoute?.startsWith("MangaWebPage") == true || previousRoute == "BBSPage" || previousRoute == "MinePage" || previousRoute?.startsWith("MineHistoryPostPage") == true)
+        ) {
             navController.navigateUp()
         } else {
             val encodedChapterUrl =
-                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(url), "utf-8")
+                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(currentPostUrl), "utf-8")
             val encodedOriginalUrl =
-                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(originalUrl), "utf-8")
+                URLEncoder.encode(ReaderReturnBridge.forceMobileTemplate(originalPostUrl), "utf-8")
             navController.navigate("MangaWebPage/$encodedChapterUrl/$encodedOriginalUrl?fastForward=true&initialPage=0") {
                 navController.currentDestination?.id?.let { currentId ->
                     popUpTo(currentId) {
@@ -458,7 +471,7 @@ fun NativeMangaPage(
             if (GlobalData.tempHtml.isNotBlank()) {
                 mangaDirVM.initDirectoryFromWeb(url, GlobalData.tempHtml, GlobalData.tempTitle)
             } else {
-                if (mangaDirVM.currentDirectory == null) mangaDirVM.loadDirectoryByUrl(url)
+                if (mangaDirVM.currentDirectory == null) mangaDirVM.loadDirectoryByUrl(url, refreshAfterLoad = true)
             }
 
             val targetIndex = GlobalData.tempMangaIndex
@@ -473,7 +486,7 @@ fun NativeMangaPage(
                 }
             }
         } else {
-            if (mangaDirVM.currentDirectory == null) mangaDirVM.loadDirectoryByUrl(url)
+            if (mangaDirVM.currentDirectory == null) mangaDirVM.loadDirectoryByUrl(url, refreshAfterLoad = true)
 
             readerManager.jumpToChapter(url) { globalIdx ->
                 executeScroll(globalIdx)
@@ -538,6 +551,10 @@ fun NativeMangaPage(
             }
 
             val currentItem = pagesSnapshot.getOrNull(currentIndex)
+
+            LaunchedEffect(currentItem?.chapterUrl) {
+                currentPostUrlForOriginal = currentItem?.chapterUrl ?: url
+            }
 
             var showChapterToast by remember { mutableStateOf(false) }
             var toastChapterText by remember { mutableStateOf("") }
@@ -1490,7 +1507,8 @@ fun NativeMangaPage(
                 val selectedPublisherName = directory?.publisherName.orEmpty()
                 val displayChapters = directory?.chapters
                     ?.filter {
-                        (selectedGroup.isBlank() ||
+                        !MangaTitleCleaner.isUrlLikeChapterTitle(it.rawTitle) &&
+                                (selectedGroup.isBlank() ||
                                 MangaTitleCleaner.matchesTranslationGroup(
                                     it.rawTitle,
                                     selectedGroup
