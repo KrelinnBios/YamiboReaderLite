@@ -454,7 +454,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                                 .firstOrNull()?.text()?.trim()
                             if (title.isNullOrBlank() || title.length > 100) continue
                             val chapterNum = MangaTitleCleaner.extractChapterNum(title)
-                            val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                            val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2&pid=$pid"
                             supplementaryLinks.add(
                                 MangaChapterItem(tid, title, chapterNum, safeUrl,
                                     authorUid = detectedAuthor.uid, authorName = detectedAuthor.name,
