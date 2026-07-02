@@ -320,12 +320,25 @@ class YamiboRetrofit {
             return response.code == 444
         }
 
+        /**
+         * 建连失败：DNS 解析不到、连接超时/被拒、TLS 握手失败等。这类失败往往是当前缓存的解析结果
+         * （见 TtlDnsCache，30 分钟 TTL，与「DNS 优化」开关无关——开关只决定用哪个解析器，
+         * 解析完的 IP 一样会被这层缓存复用半小时）指向的地址暂时不可达，仅换连接（evictAll）
+         * 解决不了地址本身的问题，必须让下一次重试重新走一次 DNS 解析。
+         */
+        private fun isConnectFailure(e: IOException): Boolean {
+            return e is java.net.UnknownHostException ||
+                    e is java.net.ConnectException ||
+                    e is java.net.SocketTimeoutException ||
+                    e is javax.net.ssl.SSLException
+        }
+
         private fun proceedWithDnsRecovery(
             chain: okhttp3.Interceptor.Chain,
             request: Request
         ): okhttp3.Response {
             var lastError: IOException? = null
-            // GET 请求遇到瞬时流重置最多重试 3 次（稍弱网络下 stream was reset 偶发更频繁，
+            // GET 请求遇到瞬时流重置或建连失败最多重试 3 次（稍弱网络下 stream was reset 偶发更频繁，
             // 多给一次重试明显提升头像/表情/封面这类小图的成活率）；444 WAF 限流仍只重试 2 次，
             // 避免反复打它加剧限流。每次重试前清空空闲连接换新连接，并做递增退避。
             repeat(4) { attempt ->
@@ -341,13 +354,19 @@ class YamiboRetrofit {
                     backoff(attempt)
                 } catch (e: IOException) {
                     lastError = e
+                    val isConnectIssue = isConnectFailure(e)
                     val canRetry = attempt < 3 &&
                             request.method == "GET" &&
-                            isTransientStreamReset(e)
+                            (isTransientStreamReset(e) || isConnectIssue)
                     if (!canRetry) {
                         request.url.host.takeIf { it.contains("yamibo.com") }
                             ?.let(sharedDns::invalidate)
                         throw e
+                    }
+                    // 建连失败提前失效缓存 IP，让下一次重试换新解析；流重置不动 DNS，只换连接即可。
+                    if (isConnectIssue) {
+                        request.url.host.takeIf { it.contains("yamibo.com") }
+                            ?.let(sharedDns::invalidate)
                     }
                     sharedConnectionPool.evictAll()
                     backoff(attempt)
