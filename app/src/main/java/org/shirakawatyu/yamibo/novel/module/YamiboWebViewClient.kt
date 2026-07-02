@@ -27,6 +27,7 @@ import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
+import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 
 open class YamiboWebViewClient : WebViewClient() {
 
@@ -324,6 +325,45 @@ open class YamiboWebViewClient : WebViewClient() {
             revealThemeFlashSuppression(view)
         }
         super.onPageCommitVisible(view, url)
+    }
+
+    /**
+     * 五个论坛 WebView（论坛/我的/其他帖子/小说原帖/漫画兜底）共用的链接跳转预处理，按顺序：
+     * 1) 非 http(s) 协议与站外链接交给系统（浏览器/对应应用）打开；
+     * 2) 电脑版专属页（标签页）改写 mobile=no，避免手机版会话下落到「提示信息→首页」；
+     * 3) 帖子链接兜底补 mobile=2，防 mobile cookie 被污染后帖子渲染成电脑版
+     *    （用户主动切电脑版会话时 2、3 均不改写）。
+     * 返回非 null 表示已消费该跳转，调用方直接 return；返回 null 表示继续调用方自己的逻辑。
+     */
+    protected fun handleCommonUrlOverride(view: WebView?, url: String?): Boolean? {
+        val safeUrl = url ?: ""
+        if (safeUrl.isBlank()) return false
+        if (!safeUrl.startsWith("http://") && !safeUrl.startsWith("https://")) {
+            return openExternalUrl(view, safeUrl)
+        }
+        if (!isYamiboForumUrl(safeUrl)) {
+            openExternalUrl(view, safeUrl)
+            return true
+        }
+        YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+            view?.loadUrl(rewritten)
+            return true
+        }
+        YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
+            view?.loadUrl(rewritten)
+            return true
+        }
+        return null
+    }
+
+    private fun openExternalUrl(view: WebView?, url: String): Boolean {
+        val context = view?.context ?: return false
+        return try {
+            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)))
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**

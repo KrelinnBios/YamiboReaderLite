@@ -34,8 +34,7 @@ data class MangaDirectory @JSONCreator constructor(
     @JSONField(name = "translationGroup")
     val translationGroup: String? = null,
 
-    @JSONField(name = "originalAuthor")
-    val originalAuthor: String? = null,
+    // 原作者识别已整体移除（老是识别错误）；旧目录 JSON 里的 originalAuthor 字段会被 fastjson2 忽略。
 
     @JSONField(name = "publisherUid")
     val publisherUid: String? = null,

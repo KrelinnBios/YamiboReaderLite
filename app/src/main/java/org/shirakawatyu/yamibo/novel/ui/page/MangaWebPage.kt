@@ -96,7 +96,6 @@ import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
-import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
@@ -686,67 +685,14 @@ fun MangaWebPage(
                 view: WebView?,
                 request: WebResourceRequest?
             ): Boolean {
-                val link = request?.url?.toString() ?: ""
-                if (link.isBlank()) return false
-
-                if (!link.startsWith("http://") && !link.startsWith("https://")) {
-                    return openExternalUrl(link)
-                }
-
-                if (!BBSGlobalWebViewClient.isYamiboUrl(link)) {
-                    openExternalUrl(link)
-                    return true
-                }
-
-                // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
-                YamiboPostLinkUtil.normalizePcOnlyPageUrl(link)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                // 帖子链接兜底补 mobile=2：防 mobile cookie 被电脑版页污染后帖子渲染成电脑版
-                YamiboPostLinkUtil.forceMobilePostUrl(link)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
+                handleCommonUrlOverride(view, request?.url?.toString())?.let { return it }
                 return super.shouldOverrideUrlLoading(view, request)
             }
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, link: String?): Boolean {
-                val safeUrl = link ?: ""
-                if (safeUrl.isBlank()) return false
-
-                if (!safeUrl.startsWith("http://") && !safeUrl.startsWith("https://")) {
-                    return openExternalUrl(safeUrl)
-                }
-
-                if (!BBSGlobalWebViewClient.isYamiboUrl(safeUrl)) {
-                    openExternalUrl(safeUrl)
-                    return true
-                }
-
-                YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                return super.shouldOverrideUrlLoading(view, safeUrl)
-            }
-
-            private fun openExternalUrl(url: String): Boolean {
-                return try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                    true
-                } catch (_: Exception) {
-                    false
-                }
+                handleCommonUrlOverride(view, link)?.let { return it }
+                return super.shouldOverrideUrlLoading(view, link ?: "")
             }
 
             override fun onReceivedError(

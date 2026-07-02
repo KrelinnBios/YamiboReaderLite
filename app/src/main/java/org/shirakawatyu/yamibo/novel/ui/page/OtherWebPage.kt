@@ -89,7 +89,6 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
-import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import kotlin.text.Charsets
@@ -397,74 +396,14 @@ fun OtherWebPage(
                 view: WebView?,
                 request: WebResourceRequest?
             ): Boolean {
-                val link = request?.url?.toString() ?: ""
-                if (link.isBlank()) return false
-
-                if (!link.startsWith("http://") && !link.startsWith("https://")) {
-                    return try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()))
-                        true
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-
-                if (!BBSGlobalWebViewClient.isYamiboUrl(link)) {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, link.toUri()))
-                    } catch (_: Exception) {
-                    }
-                    return true
-                }
-
-                // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
-                YamiboPostLinkUtil.normalizePcOnlyPageUrl(link)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                // 帖子链接兜底补 mobile=2：防 mobile cookie 被电脑版页污染后帖子渲染成电脑版
-                YamiboPostLinkUtil.forceMobilePostUrl(link)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
+                handleCommonUrlOverride(view, request?.url?.toString())?.let { return it }
                 return super.shouldOverrideUrlLoading(view, request)
             }
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, link: String?): Boolean {
-                val safeUrl = link ?: ""
-                if (safeUrl.isBlank()) return false
-
-                if (!safeUrl.startsWith("http://") && !safeUrl.startsWith("https://")) {
-                    return try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, safeUrl.toUri()))
-                        true
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-
-                if (!BBSGlobalWebViewClient.isYamiboUrl(safeUrl)) {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, safeUrl.toUri()))
-                    } catch (_: Exception) {
-                    }
-                    return true
-                }
-
-                YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
-                    view?.loadUrl(rewritten)
-                    return true
-                }
-
-                return super.shouldOverrideUrlLoading(view, safeUrl)
+                handleCommonUrlOverride(view, link)?.let { return it }
+                return super.shouldOverrideUrlLoading(view, link ?: "")
             }
 
             override fun onFormResubmission(

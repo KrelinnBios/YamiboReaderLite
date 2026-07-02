@@ -3,7 +3,6 @@ package org.shirakawatyu.yamibo.novel.ui.page
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -273,67 +272,14 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
         view: WebView?,
         request: WebResourceRequest?
     ): Boolean {
-        val url = request?.url?.toString() ?: ""
-        if (url.isBlank()) return false
-
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            return openExternalUrl(url)
-        }
-
-        if (!isYamiboUrl(url)) {
-            openExternalUrl(url)
-            return true
-        }
-
-        // 电脑版专属页（标签页）：手机版会话下需强制 mobile=no，否则落到「提示信息→首页」
-        YamiboPostLinkUtil.normalizePcOnlyPageUrl(url)?.let { rewritten ->
-            view?.loadUrl(rewritten)
-            return true
-        }
-
-        // 帖子链接兜底补 mobile=2：防 mobile cookie 被电脑版页污染后帖子渲染成电脑版
-        YamiboPostLinkUtil.forceMobilePostUrl(url)?.let { rewritten ->
-            view?.loadUrl(rewritten)
-            return true
-        }
-
+        handleCommonUrlOverride(view, request?.url?.toString())?.let { return it }
         return super.shouldOverrideUrlLoading(view, request)
     }
 
     @Deprecated("Deprecated in Java")
     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-        val safeUrl = url ?: ""
-        if (safeUrl.isBlank()) return false
-
-        if (!safeUrl.startsWith("http://") && !safeUrl.startsWith("https://")) {
-            return openExternalUrl(safeUrl)
-        }
-
-        if (!isYamiboUrl(safeUrl)) {
-            openExternalUrl(safeUrl)
-            return true
-        }
-
-        YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
-            view?.loadUrl(rewritten)
-            return true
-        }
-
-        YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
-            view?.loadUrl(rewritten)
-            return true
-        }
-
-        return super.shouldOverrideUrlLoading(view, safeUrl)
-    }
-
-    private fun openExternalUrl(url: String): Boolean {
-        return try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            true
-        } catch (_: Exception) {
-            false
-        }
+        handleCommonUrlOverride(view, url)?.let { return it }
+        return super.shouldOverrideUrlLoading(view, url ?: "")
     }
 
     override fun onFormResubmission(

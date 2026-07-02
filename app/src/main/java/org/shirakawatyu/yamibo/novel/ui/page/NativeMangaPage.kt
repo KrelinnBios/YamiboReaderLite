@@ -1485,19 +1485,16 @@ fun NativeMangaPage(
             if (showChapterList) {
                 val currentTid = currentItem?.tid ?: ""
                 val directory = mangaDirVM.currentDirectory
-                val selectedOriginalAuthor = directory?.originalAuthor.orEmpty()
                 val selectedGroup = directory?.translationGroup.orEmpty()
                 val selectedPublisherUid = directory?.publisherUid.orEmpty()
                 val selectedPublisherName = directory?.publisherName.orEmpty()
                 val displayChapters = directory?.chapters
                     ?.filter {
-                        (selectedOriginalAuthor.isBlank() ||
-                                MangaTitleCleaner.matchesSearchQuery(it.rawTitle, selectedOriginalAuthor)) &&
-                                (selectedGroup.isBlank() ||
-                                        MangaTitleCleaner.matchesTranslationGroup(
-                                            it.rawTitle,
-                                            selectedGroup
-                                        )) &&
+                        (selectedGroup.isBlank() ||
+                                MangaTitleCleaner.matchesTranslationGroup(
+                                    it.rawTitle,
+                                    selectedGroup
+                                )) &&
                                 (selectedPublisherUid.isBlank() && selectedPublisherName.isBlank() ||
                                         MangaTitleCleaner.matchesPublisher(
                                             authorUid = it.authorUid,

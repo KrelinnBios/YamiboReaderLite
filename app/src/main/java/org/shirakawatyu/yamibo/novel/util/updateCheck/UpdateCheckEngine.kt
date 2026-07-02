@@ -403,7 +403,6 @@ object UpdateCheckEngine {
                     mangaDir = repo.renameAndMergeDirectory(
                         mangaDir,
                         overrideCleanBookName,
-                        mangaDir.originalAuthor.orEmpty(),
                         mangaDir.translationGroup.orEmpty(),
                         mangaDir.publisherName ?: mangaDir.publisherUid.orEmpty(),
                         tid
