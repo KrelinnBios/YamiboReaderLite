@@ -143,6 +143,22 @@ class MangaTitleCleaner {
         }
 
         /**
+         * 目录列表里的章节标题展示：去掉【汉化组】[原作者]等括号段和重复的作品名，
+         * 只留话数/副标题部分（如"13.2"、"第4话 出差"）；清理后为空则回退 fallback
+         * （通常传章节编号）。避免目录里出现整行的原始帖子标题。
+         */
+        fun getDisplayChapterTitle(rawTitle: String, bookName: String, fallback: String): String {
+            var text = getCleanThreadTitle(rawTitle)
+                .replace(Regex("【.*?】|\\[.*?\\]"), "")
+                .trim()
+            if (bookName.isNotBlank()) {
+                text = text.replace(bookName, "").trim()
+            }
+            text = text.trim(' ', '-', '—', '_', '|', '｜', ':', '：', '·')
+            return text.ifBlank { fallback }
+        }
+
+        /**
          * 判断已存目录名是否是旧版清洗器留下的残次品（如"作品名 52+"——旧版把"52+52.5"
          * 只截掉了"52.5"）。条件：存量名 = 新清洗名 + 纯章节编号残渣（含数字的编号/标点片段）。
          * 用户手动改的名字（如加"(完结)"等文字后缀）不会命中，不会被误还原。

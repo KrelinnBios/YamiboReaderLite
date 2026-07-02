@@ -1014,6 +1014,12 @@ fun MinePage(
                     return true
                 }
 
+                // 帖子链接兜底补 mobile=2：防 mobile cookie 被电脑版页污染后帖子渲染成电脑版
+                YamiboPostLinkUtil.forceMobilePostUrl(urlStr)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
                 if (!fromHistory && isSelected && isHomepageUrl(urlStr) && view != null) {
                     scope.launch(Dispatchers.IO) {
                         delay(500L)
@@ -1044,6 +1050,11 @@ fun MinePage(
                 }
 
                 YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
+                YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
                     view?.loadUrl(rewritten)
                     return true
                 }

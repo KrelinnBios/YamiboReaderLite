@@ -283,12 +283,19 @@ fun MangaChapterPanel(
                         ) { listIndex, chapter ->
                             val fallbackNumber =
                                 if (ascending) listIndex + 1 else sorted.size - listIndex
+                            val chapterNumber = formatChapterNumber(
+                                chapter.index,
+                                chapter.title,
+                                fallbackNumber
+                            )
                             MangaChapterDrawerItem(
                                 chapter = chapter,
-                                chapterNumber = formatChapterNumber(
-                                    chapter.index,
+                                chapterNumber = chapterNumber,
+                                // 标题列只显示话数/副标题，去掉汉化组、原作者和作品名前缀
+                                chapterTitle = MangaTitleCleaner.getDisplayChapterTitle(
                                     chapter.title,
-                                    fallbackNumber
+                                    title,
+                                    chapterNumber
                                 ),
                                 onClick = { onChapterClick(chapter) }
                             )
@@ -304,6 +311,7 @@ fun MangaChapterPanel(
 private fun MangaChapterDrawerItem(
     chapter: MangaChapter,
     chapterNumber: String,
+    chapterTitle: String,
     onClick: () -> Unit
 ) {
     NavigationDrawerItem(
@@ -325,7 +333,7 @@ private fun MangaChapterDrawerItem(
                     maxLines = 1
                 )
                 Text(
-                    text = chapter.title,
+                    text = chapterTitle,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = if (chapter.isRead && !chapter.isCurrent) {

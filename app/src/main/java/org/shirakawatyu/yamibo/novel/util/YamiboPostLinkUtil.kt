@@ -81,6 +81,24 @@ object YamiboPostLinkUtil {
             .toString()
     }
 
+    /**
+     * 帖子链接兜底补 mobile=2：mobile cookie 一旦被电脑版页面（如 mobile=no 的标签页）
+     * 污染成 no，之后所有不带 mobile 参数的帖子跳转（我的主题/我的回复/历史记录/原帖）
+     * 都会渲染成电脑版，表现为"没有内容或被弹回"。给帖子链接显式带上 mobile=2 后，
+     * 服务器会渲染手机版并顺带清掉污染的 mobile cookie（实测 Set-Cookie deleted）。
+     * 仅处理站内帖子链接；已带 mobile 参数时返回 null 不改写。
+     */
+    fun forceMobilePostUrl(url: String?): String? {
+        val parsed = url?.toHttpUrlOrNull() ?: return null
+        if (parsed.host.lowercase() !in validHosts) return null
+        if (!isPostUrl(parsed)) return null
+        if (!parsed.queryParameter("mobile").isNullOrBlank()) return null
+        return parsed.newBuilder()
+            .addQueryParameter("mobile", "2")
+            .build()
+            .toString()
+    }
+
     private fun isPostUrl(url: HttpUrl): Boolean {
         if (threadPathRegex.matches(url.encodedPath)) return true
         if (!url.encodedPath.equals("/forum.php", ignoreCase = true)) return false

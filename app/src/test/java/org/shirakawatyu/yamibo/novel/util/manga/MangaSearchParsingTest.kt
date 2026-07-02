@@ -144,6 +144,37 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun displayChapterTitleStripsBracketsAndBookName() {
+        // 目录标题列去掉【汉化组】[原作者]和作品名，只留话数
+        assertEquals(
+            "13.2",
+            MangaTitleCleaner.getDisplayChapterTitle(
+                "【大友同好會】[原作:都築真紀／漫画:川上修一]魔法少女奈叶 EXCEEDS 13.2",
+                "魔法少女奈叶 EXCEEDS",
+                "13.2"
+            )
+        )
+        assertEquals(
+            "4",
+            MangaTitleCleaner.getDisplayChapterTitle(
+                "【提灯喵汉化组】[ユニ/YUNI]就像你一样 4",
+                "就像你一样",
+                "4"
+            )
+        )
+        // 本身就是短话数文本的目录项保持原样
+        assertEquals(
+            "8.2",
+            MangaTitleCleaner.getDisplayChapterTitle("8.2", "魔法少女奈叶 EXCEEDS", "8.2")
+        )
+        // 全部清掉后回退章节编号
+        assertEquals(
+            "1",
+            MangaTitleCleaner.getDisplayChapterTitle("【提灯喵汉化组】就像你一样", "就像你一样", "1")
+        )
+    }
+
+    @Test
     fun staleCleanBookNameDetectsOldCleanerResidue() {
         // 旧版清洗器把"52+52.5"只截掉"52.5"，存量目录名残留"52+"
         assertTrue(

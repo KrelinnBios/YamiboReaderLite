@@ -326,7 +326,42 @@ open class YamiboWebViewClient : WebViewClient() {
         super.onPageCommitVisible(view, url)
     }
 
+    /**
+     * 电脑版专属页（标签页）用 mobile=no 打开后，服务器会写入 *_mobile=no cookie（约 1 小时），
+     * 之后所有不带 mobile 参数的站内跳转都会渲染成电脑版，表现为帖子页空白/被弹回。
+     * 该页加载完成后立即把 mobile cookie 改回 2，避免污染整个会话（含 CookieUtil 持久化）。
+     */
+    private fun restoreMobileCookieAfterPcOnlyPage(url: String?) {
+        if (url.isNullOrBlank()) return
+        if (!url.contains("mod=tag", ignoreCase = true) ||
+            !url.contains("mobile=no", ignoreCase = true)
+        ) {
+            return
+        }
+        try {
+            val cookieManager = CookieManager.getInstance()
+            val base = "https://bbs.yamibo.com"
+            val cookies = cookieManager.getCookie(base) ?: return
+            var changed = false
+            cookies.split(';').forEach { pair ->
+                val trimmed = pair.trim()
+                val name = trimmed.substringBefore('=')
+                val value = trimmed.substringAfter('=', "")
+                if (value.equals("no", ignoreCase = true) &&
+                    (name.equals("mobile", ignoreCase = true) ||
+                            name.endsWith("_mobile", ignoreCase = true))
+                ) {
+                    cookieManager.setCookie(base, "$name=2; path=/")
+                    changed = true
+                }
+            }
+            if (changed) cookieManager.flush()
+        } catch (_: Throwable) {
+        }
+    }
+
     override fun onPageFinished(view: WebView?, url: String?) {
+        restoreMobileCookieAfterPcOnlyPage(url)
         url?.let {
             if (it.contains(RequestConfig.BASE_URL)) {
                 applyHideCss(view, url)

@@ -613,6 +613,12 @@ fun ReaderWebPage(
                     return true
                 }
 
+                // 帖子链接兜底补 mobile=2：防 mobile cookie 被电脑版页污染后帖子渲染成电脑版
+                YamiboPostLinkUtil.forceMobilePostUrl(link)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
                 return super.shouldOverrideUrlLoading(view, request)
             }
 
@@ -639,6 +645,11 @@ fun ReaderWebPage(
                 }
 
                 YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
+                    view?.loadUrl(rewritten)
+                    return true
+                }
+
+                YamiboPostLinkUtil.forceMobilePostUrl(safeUrl)?.let { rewritten ->
                     view?.loadUrl(rewritten)
                     return true
                 }
