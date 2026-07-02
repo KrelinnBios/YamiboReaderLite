@@ -15,7 +15,24 @@ class MangaTitleCleaner {
         }
 
         /**
-         * 提取纯净书名 (用于后续去重和搜索)
+         * Ignore visible URL text used as cross-post references.
+         */
+        fun isUrlLikeChapterTitle(rawTitle: String): Boolean {
+            val compact = rawTitle.trim().replace(Regex("\\s+"), "")
+            if (compact.isBlank()) return false
+
+            val lower = compact.lowercase()
+            if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("www.")) {
+                return true
+            }
+            if (lower.contains("forum.php") || lower.contains("thread-")) return true
+            if (Regex("%[0-9a-fA-F]{2}").containsMatchIn(compact)) return true
+            if (compact.length > 80 && Regex("[/?=&]").containsMatchIn(compact)) return true
+            return false
+        }
+
+        /**
+         * Extract cleaned book title for directory and search matching.
          */
         fun getCleanBookName(rawTitle: String): String {
             var clean = getCleanThreadTitle(rawTitle)
