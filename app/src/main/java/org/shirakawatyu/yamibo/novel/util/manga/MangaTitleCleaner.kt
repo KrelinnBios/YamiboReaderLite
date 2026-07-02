@@ -30,7 +30,7 @@ class MangaTitleCleaner {
             // 中间没有任何分隔符）。必须在下面的章节标记截断之前先在后缀词处截住，否则要么把
             // "集"字当成普通文字被后面的规则连同单篇标题一起吞掉，要么（若单篇标题里没有可识别
             // 的章节标记）整段单篇标题会被误当成书名的一部分。
-            val collectionSuffixPattern = Regex("(短篇集|合集|选集|選集|总集|總集|精选集|精選集)")
+            val collectionSuffixPattern = Regex("(${COLLECTION_SUFFIXES.joinToString("|")})")
             collectionSuffixPattern.find(clean)?.let { suffixMatch ->
                 clean = clean.substring(0, suffixMatch.range.last + 1)
             }
@@ -188,6 +188,34 @@ class MangaTitleCleaner {
             val residue = storedName.removePrefix(freshName).trim()
             if (residue.isEmpty() || residue.none(Char::isDigit)) return false
             return residue.matches(Regex("[\\d０-９.．+＋\\-—~～\\s第话話回章节]+"))
+        }
+
+        /**
+         * 判断已存目录名是否是旧版清洗器"切太短"留下的残次品（如短篇集/合集类作品，旧版没有
+         * 集合类后缀识别，把"XX短篇集"从"短篇"处直接截断只存了"XX"）。与 [isStaleCleanBookName]
+         * 相反：那个处理的是存量名比新清洗名长，这个处理存量名比新清洗名短的情况。
+         * 条件：新清洗名 = 存量名 + 集合类后缀词，避免误还原用户手动改短的名字。
+         */
+        fun isTruncatedCleanBookName(storedName: String, freshName: String): Boolean {
+            if (storedName.isBlank() || freshName == storedName) return false
+            if (!freshName.startsWith(storedName)) return false
+            val residue = freshName.removePrefix(storedName)
+            return residue in COLLECTION_SUFFIXES
+        }
+
+        private val COLLECTION_SUFFIXES =
+            setOf("短篇集", "合集", "选集", "選集", "总集", "總集", "精选集", "精選集")
+
+        /**
+         * 判断标题是否标注为个人/非固定团队发布（个人汉化、个人翻译、合作汉化、自翻、代发、
+         * 渣翻及其常见变体如中字渣翻/个人渣翻/个人渣改翻、转载/授权转载、以及繁体写法）。
+         * 这类作品通常没有稳定的汉化组名可用于跨帖归并同一目录，只能退回按发布者（论坛账号）
+         * 区分——这也是目前唯一会自动写入目录"发布者"字段的场景，其余情况一律只依据作品名和
+         * 汉化组，不自动记发布者，避免同一汉化组内多人分工投稿被错误拆开。
+         */
+        fun isIndividualRelease(rawTitle: String): Boolean {
+            return Regex("个人汉化|個人漢化|个人翻译|個人翻譯|合作汉化|合作漢化|自翻|代发|代發|渣.{0,2}翻|转载|轉載")
+                .containsMatchIn(rawTitle)
         }
 
         fun isAdministrativeThread(rawTitle: String): Boolean {
