@@ -67,7 +67,7 @@
 
 ### 数据与后台功能
 
-- 新手引导：`OnboardingUtil` 按页面（`OnboardingUtil.Page`）记录是否已展示，存入 DataStore；`OnboardingOverlay` 是复用的 Compose 组件，登录态（`GlobalData.currentUid` 非空）下首次进入对应原生页面才查询展示。只覆盖原生页面（漫画发现/漫画阅读器/收藏/小说阅读器）和底栏，不覆盖 WebView 页面（论坛/我的），因为浮层引导在 WebView 上容易遮挡或对不齐。
+- 新手引导：`OnboardingUtil` 按页面（`OnboardingUtil.Page`）记录是否已展示，存入 DataStore；`OnboardingOverlay` 是复用的 Compose 组件，登录态（`GlobalData.currentUid` 非空）下首次进入对应原生页面才查询展示。只覆盖原生页面（漫画发现/漫画阅读器/收藏/浏览历史/小说阅读器）和底栏，不覆盖 WebView 页面（论坛/我的），因为浮层引导在 WebView 上容易遮挡或对不齐。
 - 收藏主状态在 `FavoriteVM`；本地数据、删除同步和墓碑队列分别由 `FavoriteUtil`、`FavoriteDeleteUtil`、`TombstoneQueueUtil` 管理。
 - 收藏手动更新检查统一经过 `UpdateCheckEngine`；小说、漫画和其他帖子各有独立 profile/util。
 - 收藏页支持的漫画版块固定为 fid 30「中文百合漫画区」和 fid 37「百合漫画图源区」；小说版块固定为 fid 49「文學區」、fid 55「轻小说/译文区」、fid 60「TXT小说区」。未识别收藏需允许用户手动选择小说、漫画或其他；选择其他后应从收藏页移出。
