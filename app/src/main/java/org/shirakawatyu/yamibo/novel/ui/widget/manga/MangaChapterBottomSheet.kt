@@ -69,7 +69,8 @@ data class MangaChapter(
     val url: String,
     val isRead: Boolean = false,
     val isNew: Boolean = false,
-    val isCurrent: Boolean = false
+    val isCurrent: Boolean = false,
+    val key: String = url
 )
 
 @Composable
@@ -279,7 +280,7 @@ fun MangaChapterPanel(
                     ) {
                         itemsIndexed(
                             items = sorted,
-                            key = { _, chapter -> chapter.url }
+                            key = { _, chapter -> chapter.key }
                         ) { listIndex, chapter ->
                             val fallbackNumber =
                                 if (ascending) listIndex + 1 else sorted.size - listIndex
