@@ -141,6 +141,7 @@
 - 只屏蔽**别人**的内容：自己发布的主题/楼层（含 1 楼）不显示「屏蔽」按钮。判断依据是当前登录 uid 与该主题/楼层作者 uid 比对；`view=me` 或自己 `mod=space&do=thread/reply/favorite` 的"我的空间列表页"整页跳过，不依赖行内作者链接（部分模板该页不带作者头像链接）。
 - uid 必须**登录后尽早拿到并本地持久化**（`CurrentUserUtil`），注入屏蔽脚本时作为 `selfUid` 回传给页面。手机版帖子页本身不带任何自身 uid 标识，必须靠提前存好的值。
 - 列表页「屏蔽」按钮用普通的 `.threadlist_foot li` 容器，与浏览/回复数按钮对齐，不要单独重置样式；帖子页按钮与用户名之间用四个不可断空格（`String.fromCharCode(160,...)`）保持间距。
+- 电脑版页面**只隐藏、不注入按钮**：列表行（`tbody[id^=normalthread_/stickthread_]`、标签页 `.tl` 表格行）由 `syncPcListPage` 按黑名单隐藏/恢复，不加占位提示（占位元素插进 `<table>` 会被浏览器移出表格错位）；取消屏蔽走黑名单弹窗或手机版页面。电脑版帖子楼层复用 `syncPostPage`（`[id^="pid"]` 恰好命中电脑版 `table#pidXXX`）。
 
 ### 链接直达
 

@@ -1744,6 +1744,31 @@ $styleString
                         }
                     }
 
+                    // 电脑版列表页（forumdisplay 的 #threadlisttableid 行、标签页 .tl 相关帖子表格）：
+                    // 只做隐藏/恢复，不注入屏蔽按钮——按钮排版依赖手机版模板的 .threadlist_foot，
+                    // 电脑版表格里没有安全的挂载点；取消屏蔽走黑名单弹窗或手机版页面。
+                    // 占位提示也不加：占位元素插进 <table> 会被浏览器移出表格错位显示。
+                    function syncPcListPage(map) {
+                        if (isOwnSpaceListPage()) return;
+                        var rows = document.querySelectorAll(
+                            'tbody[id^="normalthread_"], tbody[id^="stickthread_"], body.pg_tag .tl table tr'
+                        );
+                        for (var i = 0; i < rows.length; i++) {
+                            var row = rows[i];
+                            var tid = getRowTid(row);
+                            if (!tid) continue;
+                            var authorUid = getRowAuthorUid(row);
+                            if (isOwnUid(authorUid)) continue;
+                            var blocked = !!map[itemKey('thread', tid)] ||
+                                !!getBlockedUser(map, authorUid);
+                            if (blocked) {
+                                hideElement(row);
+                            } else {
+                                restoreElement(row);
+                            }
+                        }
+                    }
+
                     function syncPostPage(map) {
                         var currentTid = getCurrentTid();
                         var threadContainer = document.querySelector('#postlist, .viewthread');
@@ -1832,6 +1857,7 @@ $styleString
                             }
                             var map = blockedMap();
                             syncListPage(map);
+                            syncPcListPage(map);
                             syncPostPage(map);
                         } finally {
                             state.syncing = false;
