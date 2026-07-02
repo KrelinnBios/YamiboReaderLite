@@ -1521,11 +1521,9 @@ fun NativeMangaPage(
                         ?.takeIf { it.isNotBlank() }
                         ?: currentDirectory?.translationGroup.orEmpty()
                 }
-                val initialPublisher = remember(currentDirectory, currentTid) {
+                val initialPublisher = remember(currentDirectory) {
                     currentDirectory?.publisherName
                         ?: currentDirectory?.publisherUid
-                        ?: currentChapter?.authorName
-                        ?: currentChapter?.authorUid
                         ?: ""
                 }
                 MangaChapterPanel(
