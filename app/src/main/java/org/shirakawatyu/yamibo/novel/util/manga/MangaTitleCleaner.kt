@@ -341,6 +341,38 @@ class MangaTitleCleaner {
             val candidateName = normalizeSearchText(authorName.orEmpty())
             return targetName.isNotBlank() && candidateName == targetName
         }
+        fun matchesDirectoryConstraints(
+            rawTitle: String,
+            authorUid: String?,
+            authorName: String?,
+            translationGroup: String?,
+            publisherUid: String?,
+            publisherName: String?,
+            keepUnknownPublisher: Boolean
+        ): Boolean {
+            val group = translationGroup.orEmpty()
+            val hasGroup = group.isNotBlank()
+            val hasPublisher = !publisherUid.isNullOrBlank() || !publisherName.isNullOrBlank()
+
+            if (hasGroup && matchesTranslationGroup(rawTitle, group)) {
+                return true
+            }
+
+            if (hasPublisher) {
+                if (authorUid.isNullOrBlank() && authorName.isNullOrBlank()) {
+                    return keepUnknownPublisher
+                }
+                return matchesPublisher(
+                    authorUid = authorUid,
+                    authorName = authorName,
+                    publisherUid = publisherUid,
+                    publisherName = publisherName
+                )
+            }
+
+            return !hasGroup
+        }
+
         private fun normalizeSearchText(value: String): String =
             Normalizer.normalize(value, Normalizer.Form.NFKC)
                 .lowercase()
