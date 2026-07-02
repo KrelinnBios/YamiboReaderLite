@@ -84,30 +84,6 @@ class DirectoryRepository private constructor(private val context: Context) {
         return if (chapter.pid != null) "${chapter.tid}-pid-${chapter.pid}" else chapter.tid
     }
 
-    private fun chapterMatchesPublisher(
-        chapter: MangaChapterItem,
-        publisherUid: String?,
-        publisherName: String?,
-        keepUnknownPublisher: Boolean
-    ): Boolean {
-        if (publisherUid.isNullOrBlank() && publisherName.isNullOrBlank()) return true
-        if (chapter.authorUid.isNullOrBlank() && chapter.authorName.isNullOrBlank()) {
-            return keepUnknownPublisher
-        }
-        return MangaTitleCleaner.matchesPublisher(
-            authorUid = chapter.authorUid,
-            authorName = chapter.authorName,
-            publisherUid = publisherUid,
-            publisherName = publisherName
-        )
-    }
-
-    /**
-     * 同一目录默认按发布者收编，防止不同汉化组独立重发同名作品时被混进同一目录。
-     * 但短篇集这类作品常由同一汉化组内多人分号投稿，标题里的汉化组名才是更可靠的"同一批"
-     * 信号，比论坛账号更稳。所以改成"汉化组匹配 或 发布者匹配"任一命中即收，而不是两者都要求：
-     * 汉化组能对上就不再管账号是谁，账号对不上但汉化组也识别不出时才退回发布者过滤兜底。
-     */
     private fun filterChaptersByDirectoryConstraints(
         chapters: List<MangaChapterItem>,
         translationGroup: String?,
@@ -115,10 +91,11 @@ class DirectoryRepository private constructor(private val context: Context) {
         publisherName: String?,
         keepUnknownPublisher: Boolean
     ): List<MangaChapterItem> = chapters.filter { chapter ->
-        val groupMatches = !translationGroup.isNullOrBlank() &&
-                MangaTitleCleaner.matchesTranslationGroup(chapter.rawTitle, translationGroup)
-        groupMatches || chapterMatchesPublisher(
-            chapter = chapter,
+        MangaTitleCleaner.matchesDirectoryConstraints(
+            rawTitle = chapter.rawTitle,
+            authorUid = chapter.authorUid,
+            authorName = chapter.authorName,
+            translationGroup = translationGroup,
             publisherUid = publisherUid,
             publisherName = publisherName,
             keepUnknownPublisher = keepUnknownPublisher
@@ -564,7 +541,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                 Log.d(LOG_TAG, "mergedAll=${mergedAll.size} before filter")
                 val mergedChapters = filterChaptersByDirectoryConstraints(
                     chapters = mergedAll,
-                    translationGroup = null,
+                    translationGroup = detectedOrSavedGroup,
                     publisherUid = detectedOrSavedPublisherUid,
                     publisherName = detectedOrSavedPublisherName,
                     keepUnknownPublisher = true
@@ -608,18 +585,15 @@ class DirectoryRepository private constructor(private val context: Context) {
 
                 // 调用核心 TID 排序初始化
                 val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
+                val canAutoDetectPublisher = MangaTitleCleaner.isIndividualRelease(threadTitle)
                 val initialAll = mergeAndSortChapters(emptyList(), gatheredFromPage)
                 val initialChapters = filterChaptersByDirectoryConstraints(
                     chapters = initialAll,
-                    translationGroup = null,
-                    publisherUid = detectedAuthor.uid,
-                    publisherName = detectedAuthor.name,
+                    translationGroup = detectedGroup.takeIf { it.isNotBlank() },
+                    publisherUid = if (canAutoDetectPublisher) detectedAuthor.uid else null,
+                    publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null,
                     keepUnknownPublisher = true
                 )
-
-                // 见上面 cachedDir 分支的同款说明：默认不自动记发布者，只有个人/非固定团队
-                // 发布的作品才用发布者兜底区分。
-                val canAutoDetectPublisher = MangaTitleCleaner.isIndividualRelease(threadTitle)
                 val newDir = MangaDirectory(
                     cleanBookName = cleanName,
                     strategy = strategy,
@@ -649,21 +623,6 @@ class DirectoryRepository private constructor(private val context: Context) {
                 ?: currentDir.chapters.lastOrNull()
 
             val firstRawTitle = targetChapter?.rawTitle ?: currentDir.cleanBookName
-            val targetAuthor = if (targetChapter?.authorUid.isNullOrBlank() && targetChapter?.authorName.isNullOrBlank()) {
-                resolveThreadAuthor(currentTid ?: targetChapter?.tid)
-            } else {
-                ThreadAuthor(targetChapter?.authorUid, targetChapter?.authorName)
-            }
-            val targetPublisherUid = if (currentDir.hasPublisherSetting()) {
-                currentDir.publisherUid
-            } else {
-                targetAuthor.uid
-            }
-            val targetPublisherName = if (currentDir.hasPublisherSetting()) {
-                currentDir.publisherName
-            } else {
-                targetAuthor.name
-            }
             val exactKeyword = currentDir.searchKeyword
             val sourceFid = (
                     resolveSourceFid(currentTid ?: targetChapter?.tid)
@@ -730,16 +689,8 @@ class DirectoryRepository private constructor(private val context: Context) {
             }
             val latestSnapshot = loadDirectory(currentDir.cleanBookName) ?: currentDir
             val targetGroup = latestSnapshot.translationGroup.orEmpty()
-            val latestPublisherUid = if (latestSnapshot.hasPublisherSetting()) {
-                latestSnapshot.publisherUid
-            } else {
-                targetPublisherUid
-            }
-            val latestPublisherName = if (latestSnapshot.hasPublisherSetting()) {
-                latestSnapshot.publisherName
-            } else {
-                targetPublisherName
-            }
+            val latestPublisherUid = latestSnapshot.publisherUid
+            val latestPublisherName = latestSnapshot.publisherName
             val existingCandidates = filterChaptersByDirectoryConstraints(
                 chapters = latestSnapshot.chapters,
                 translationGroup = targetGroup,
