@@ -1509,6 +1509,7 @@ $styleString
                         var menuMuted = state.dark ? '#95acc4' : '#7b6259';
                         var menuButton = state.dark ? '#223247' : '#f5ead2';
                         var menuPrimary = state.dark ? '#31577a' : '#6e2b19';
+                        var linkColor = state.dark ? '#7dbdf2' : '#6e2b19';
                         style.textContent =
                             // 基础重置只作用于按钮本身的 <a>，保持极简，让它在不同容器里自然继承排版。
                             'a.yamibo-block-action{background:transparent!important;border:0!important;box-shadow:none!important;font:inherit!important;text-decoration:none!important;cursor:pointer!important;}' +
@@ -1522,9 +1523,9 @@ $styleString
                             '.threadlist_foot li.yamibo-block-li .yamibo-block-label{display:inline!important;line-height:inherit!important;vertical-align:baseline!important;}' +
                             // 帖子页：按钮在用户名后内联显示，间距由前面插入的四个不可断空格决定，这里清零边距。
                             '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
-                            '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + ';border:1px solid ' + border + ';color:' + text + ';font-size:12px;line-height:1.7;}' +
+                            '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + '!important;border:1px solid ' + border + '!important;color:' + text + '!important;font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
-                            '.yamibo-blocked-message a{font-size:12px!important;}' +
+                            '.yamibo-blocked-message a{font-size:12px!important;color:' + linkColor + '!important;}' +
                             '.yamibo-block-choice-backdrop{position:fixed!important;inset:0!important;z-index:2147483646!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:16px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-menu{width:min(420px,100%)!important;background:' + menuBackground + '!important;color:' + menuText + '!important;border:1px solid ' + border + '!important;border-radius:8px!important;box-shadow:0 10px 32px rgba(0,0,0,.28)!important;padding:14px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-title{font-size:16px!important;font-weight:600!important;line-height:24px!important;margin:0 0 4px!important;color:' + menuText + '!important;}' +
