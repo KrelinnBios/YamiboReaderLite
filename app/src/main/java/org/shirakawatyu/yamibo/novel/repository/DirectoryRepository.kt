@@ -102,6 +102,12 @@ class DirectoryRepository private constructor(private val context: Context) {
         )
     }
 
+    /**
+     * 同一目录默认按发布者收编，防止不同汉化组独立重发同名作品时被混进同一目录。
+     * 但短篇集这类作品常由同一汉化组内多人分号投稿，标题里的汉化组名才是更可靠的"同一批"
+     * 信号，比论坛账号更稳。所以改成"汉化组匹配 或 发布者匹配"任一命中即收，而不是两者都要求：
+     * 汉化组能对上就不再管账号是谁，账号对不上但汉化组也识别不出时才退回发布者过滤兜底。
+     */
     private fun filterChaptersByDirectoryConstraints(
         chapters: List<MangaChapterItem>,
         translationGroup: String?,
@@ -109,14 +115,14 @@ class DirectoryRepository private constructor(private val context: Context) {
         publisherName: String?,
         keepUnknownPublisher: Boolean
     ): List<MangaChapterItem> = chapters.filter { chapter ->
-        (translationGroup.isNullOrBlank() ||
-                MangaTitleCleaner.matchesTranslationGroup(chapter.rawTitle, translationGroup)) &&
-                chapterMatchesPublisher(
-                    chapter = chapter,
-                    publisherUid = publisherUid,
-                    publisherName = publisherName,
-                    keepUnknownPublisher = keepUnknownPublisher
-                )
+        val groupMatches = !translationGroup.isNullOrBlank() &&
+                MangaTitleCleaner.matchesTranslationGroup(chapter.rawTitle, translationGroup)
+        groupMatches || chapterMatchesPublisher(
+            chapter = chapter,
+            publisherUid = publisherUid,
+            publisherName = publisherName,
+            keepUnknownPublisher = keepUnknownPublisher
+        )
     }
 
     companion object {
@@ -680,9 +686,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                         rawTitle = firstRawTitle,
                         cleanBookName = currentDir.cleanBookName,
                         configuredKeywords = exactKeyword,
-                        sourceFid = sourceFid,
-                        publisherUid = targetPublisherUid,
-                        publisherName = targetPublisherName
+                        sourceFid = sourceFid
                     )
                     if (res.isFailure) return@withContext Result.failure(res.exceptionOrNull()!!)
                     newChapters.addAll(res.getOrNull()!!)
@@ -693,9 +697,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     rawTitle = firstRawTitle,
                     cleanBookName = currentDir.cleanBookName,
                     configuredKeywords = exactKeyword,
-                    sourceFid = sourceFid,
-                    publisherUid = targetPublisherUid,
-                    publisherName = targetPublisherName
+                    sourceFid = sourceFid
                 )
                 if (res.isFailure) return@withContext Result.failure(res.exceptionOrNull()!!)
                 newChapters.addAll(res.getOrNull()!!)
@@ -770,9 +772,7 @@ class DirectoryRepository private constructor(private val context: Context) {
         rawTitle: String,
         cleanBookName: String,
         configuredKeywords: String? = null,
-        sourceFid: String?,
-        publisherUid: String?,
-        publisherName: String?
+        sourceFid: String?
     ): Result<List<MangaChapterItem>> {
         val safeSourceFid = sourceFid
             ?.takeIf { it in MANGA_FIDS }
@@ -817,14 +817,9 @@ class DirectoryRepository private constructor(private val context: Context) {
                     configuredKeywords = configuredKeywords
                 )
             }
-            .filter {
-                chapterMatchesPublisher(
-                    chapter = it,
-                    publisherUid = publisherUid,
-                    publisherName = publisherName,
-                    keepUnknownPublisher = false
-                )
-            }
+            // 汉化组/发布者过滤统一交给调用方的 filterChaptersByDirectoryConstraints
+            // （同时看汉化组和发布者，任一命中即收），这里不再单独按发布者预过滤，
+            // 否则同一汉化组内不同账号投稿的章节会在这里就被提前挡掉。
             .distinctBy { it.tid }
             .toList()
 
