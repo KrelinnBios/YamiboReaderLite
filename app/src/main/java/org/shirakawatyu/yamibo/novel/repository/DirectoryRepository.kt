@@ -91,15 +91,19 @@ class DirectoryRepository private constructor(private val context: Context) {
         publisherName: String?,
         keepUnknownPublisher: Boolean
     ): List<MangaChapterItem> = chapters.filter { chapter ->
-        MangaTitleCleaner.matchesDirectoryConstraints(
-            rawTitle = chapter.rawTitle,
-            authorUid = chapter.authorUid,
-            authorName = chapter.authorName,
-            translationGroup = translationGroup,
-            publisherUid = publisherUid,
-            publisherName = publisherName,
-            keepUnknownPublisher = keepUnknownPublisher
-        )
+        if (MangaTitleCleaner.isUrlLikeChapterTitle(chapter.rawTitle)) {
+            false
+        } else {
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = chapter.rawTitle,
+                authorUid = chapter.authorUid,
+                authorName = chapter.authorName,
+                translationGroup = translationGroup,
+                publisherUid = publisherUid,
+                publisherName = publisherName,
+                keepUnknownPublisher = keepUnknownPublisher
+            )
+        }
     }
 
     companion object {
