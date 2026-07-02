@@ -46,6 +46,10 @@ class MangaTitleCleaner {
                 clean = clean.substring(0, markerMatch.range.first)
             }
 
+            // 截断章节标记后可能留下未闭合的书名号段（如"……动漫 ——《谈话室笔记"，
+            // 原标题是"……《谈话室笔记9-12》"），连同前面的连接符一起去掉。
+            clean = clean.replace(Regex("[—\\-～~\\s]*《[^》]*$"), "")
+
             clean = clean.replace(Regex("\\s*\\d+(\\.\\d+)?\\s*$"), "")
             clean = clean.replace(Regex("[！？\\?！!~。，、\\.]+$"), "")
             clean = clean.replace(Regex("^[\\s\\-|/\\)#]+|[\\s\\-|/\\(#:]+$"), "").trim()
@@ -154,7 +158,11 @@ class MangaTitleCleaner {
             if (bookName.isNotBlank()) {
                 text = text.replace(bookName, "").trim()
             }
-            text = text.trim(' ', '-', '—', '_', '|', '｜', ':', '：', '·')
+            // 去掉书名（如"……《谈话室笔记"）后残留的半截书名号/括号一并修剪
+            text = text.trim(
+                ' ', '-', '—', '_', '|', '｜', ':', '：', '·',
+                '《', '》', '「', '」', '『', '』', '（', '）', '(', ')'
+            )
             return text.ifBlank { fallback }
         }
 
@@ -318,12 +326,28 @@ class MangaTitleCleaner {
 
         private const val ARABIC = "(\\d+(?:\\.\\d+)?|[０-９]+(?:\\.[０-９]+)?)"
 
-        fun extractChapterNum(rawTitle: String): Float {
-            val cleanTitle = rawTitle
-                .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
+        /**
+         * 清洗出用于话数提取的标题。
+         * - strict（默认）：【】[]()（）「」《》 整段删除——括号内容多为组名/作者/杂项，
+         *   里面的数字通常不是话数；
+         * - keepQuotedContent：仅去掉《》「」引号本身、保留内容。话数写在书名号里的标题
+         *   （如"……《谈话室笔记9-12》"）严格模式会把数字连同书名一起删光，此时用这个
+         *   模式重试。
+         */
+        private fun cleanTitleForNumber(rawTitle: String, keepQuotedContent: Boolean): String {
+            val base = if (keepQuotedContent) {
+                rawTitle
+                    .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）"), "")
+                    .replace(Regex("[《》「」『』]"), " ")
+            } else {
+                rawTitle.replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
+            }
+            return base
                 .replace(Regex("\\d+\\s*[xX×]\\s*\\d+"), "")
                 .replace(Regex("(?i)\\bc\\d+\\b"), "")
+        }
 
+        fun extractChapterNum(rawTitle: String): Float {
             if (Regex(
                     "番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画",
                     RegexOption.IGNORE_CASE
@@ -331,6 +355,13 @@ class MangaTitleCleaner {
             ) {
                 return 0f
             }
+            val strict = chapterNumFromCleanTitle(cleanTitleForNumber(rawTitle, keepQuotedContent = false))
+            if (strict != 0f) return strict
+            // 常规提取完全失败时才保留书名号内容重试，避免书名里的数字干扰正常标题
+            return chapterNumFromCleanTitle(cleanTitleForNumber(rawTitle, keepQuotedContent = true))
+        }
+
+        private fun chapterNumFromCleanTitle(cleanTitle: String): Float {
             if (Regex("最终话|最終話|最终回|最終回|大结局").containsMatchIn(cleanTitle)) {
                 return 999f
             }
@@ -429,11 +460,6 @@ class MangaTitleCleaner {
          * chapterNum 数值格式化（如单纯的"7"或前后篇的"7.1"）。
          */
         fun extractChapterLabel(rawTitle: String): String? {
-            val cleanTitle = rawTitle
-                .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
-                .replace(Regex("\\d+\\s*[xX×]\\s*\\d+"), "")
-                .replace(Regex("(?i)\\bc\\d+\\b"), "")
-
             if (Regex(
                     "番外|特典|附录|SP|卷后附|卷彩页|小剧场|小漫画|最终话|最終話|最终回|最終回|大结局",
                     RegexOption.IGNORE_CASE
@@ -441,7 +467,13 @@ class MangaTitleCleaner {
             ) {
                 return null
             }
+            chapterLabelFromCleanTitle(cleanTitleForNumber(rawTitle, keepQuotedContent = false))
+                ?.let { return it }
+            // 与 extractChapterNum 的重试一致：话数写在书名号里时保留内容再试一次
+            return chapterLabelFromCleanTitle(cleanTitleForNumber(rawTitle, keepQuotedContent = true))
+        }
 
+        private fun chapterLabelFromCleanTitle(cleanTitle: String): String? {
             Regex("(?:第)?\\s*($ARABIC(?:\\s*[+＋]\\s*$ARABIC)+)\\s*[话話织回章节幕折更]?").find(cleanTitle)
                 ?.let { return formatCombinedChapterLabel(it.groupValues[1]) }
             Regex("(?:第)?\\s*$NUM\\s*[话話织回章节幕折更].*?其[之の]?\\s*$NUM").find(cleanTitle)?.let {
@@ -493,11 +525,19 @@ class MangaTitleCleaner {
                 .replace(Regex("【.*?】|\\[.*?\\]|\\(.*?\\)|（.*?）|「.*?」|《.*?》"), "")
                 .replace(Regex("(?i)\\bc\\d+\\b"), "")
             // 抓出所有范围在 [0, 999) 的有效数字
-            val matches = Regex(NUM)
+            var matches = Regex(NUM)
                 .findAll(cleanTitle)
                 .map { parseNumber(it.groupValues[1]) }
                 .filter { it in 0f..<999f }
                 .toList()
+            // 与 extractChapterNum 一致：数字全在书名号里时保留内容重试
+            if (matches.isEmpty()) {
+                matches = Regex(NUM)
+                    .findAll(cleanTitleForNumber(rawTitle, keepQuotedContent = true))
+                    .map { parseNumber(it.groupValues[1]) }
+                    .filter { it in 0f..<999f }
+                    .toList()
+            }
 
             val pool = mutableSetOf<Float>()
             pool.addAll(matches)

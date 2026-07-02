@@ -144,6 +144,47 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun chapterNumberInsideTitleQuotesIsExtracted() {
+        // 话数写在书名号里（《谈话室笔记9-12》）：严格清洗会把《..》整段删光导致话数丢失，
+        // 需要"保留书名号内容"的重试路径兜住
+        val title = "[百合雜誌]【个人翻译】《上伊那牡丹，酒醉身姿似百合花般》动漫 ——《谈话室笔记9-12》"
+        assertEquals(9.12f, MangaTitleCleaner.extractChapterNum(title))
+        assertEquals("9-12", MangaTitleCleaner.extractChapterLabel(title))
+        assertEquals("9-12", MangaTitleCleaner.formatChapterDisplayNumber(title, 9.12f, 4))
+        // 截断话数后不能留下未闭合的"——《谈话室笔记"尾巴
+        assertEquals(
+            "《上伊那牡丹，酒醉身姿似百合花般》动漫",
+            MangaTitleCleaner.getCleanBookName(title)
+        )
+        // 目录标题列：去掉作品名后应显示"谈话室笔记9-12"，不带残留书名号
+        assertEquals(
+            "谈话室笔记9-12",
+            MangaTitleCleaner.getDisplayChapterTitle(
+                title,
+                "《上伊那牡丹，酒醉身姿似百合花般》动漫",
+                "9-12"
+            )
+        )
+        // 旧目录里存的是带尾巴的书名，标题列也要能修剪出干净结果
+        assertEquals(
+            "9-12",
+            MangaTitleCleaner.getDisplayChapterTitle(
+                title,
+                "《上伊那牡丹，酒醉身姿似百合花般》动漫 ——《谈话室笔记",
+                "9-12"
+            )
+        )
+    }
+
+    @Test
+    fun quotedRetryDoesNotAffectNormalTitles() {
+        // 常规标题（话数在书名号外）不受重试路径影响
+        assertEquals(5f, MangaTitleCleaner.extractChapterNum("【某汉化组】《某部作品》 第5话"))
+        // 完全无数字的标题依旧返回 0（走列表位置兜底）
+        assertEquals(0f, MangaTitleCleaner.extractChapterNum("【提灯喵汉化组】就像你一样"))
+    }
+
+    @Test
     fun displayChapterTitleStripsBracketsAndBookName() {
         // 目录标题列去掉【汉化组】[原作者]和作品名，只留话数
         assertEquals(
