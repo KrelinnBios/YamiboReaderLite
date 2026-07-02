@@ -370,10 +370,12 @@ class DirectoryRepository private constructor(private val context: Context) {
         val existingDir = allDirs.find { dir -> dir.chapters.any { it.tid == tid } }
         val detectedSourceFid = existingDir?.sourceFid ?: resolveSourceFid(tid)
 
-        // 自愈旧版清洗器留下的残次目录名（如"作品名 52+"）：重命名到当前清洗结果
+        // 自愈旧版清洗器留下的残次目录名：切多了（如"作品名 52+"）或切少了
+        // （如短篇集类作品旧版没有集合后缀识别，把"作品名短篇集"截成"作品名"）都重命名到当前清洗结果
         val freshCleanName = MangaTitleCleaner.getCleanBookName(rawTitle)
         val migratedDir = if (existingDir != null &&
-            MangaTitleCleaner.isStaleCleanBookName(existingDir.cleanBookName, freshCleanName)
+            (MangaTitleCleaner.isStaleCleanBookName(existingDir.cleanBookName, freshCleanName) ||
+                    MangaTitleCleaner.isTruncatedCleanBookName(existingDir.cleanBookName, freshCleanName))
         ) {
             migrateStaleDirectoryName(existingDir, freshCleanName)
         } else {
@@ -538,12 +540,21 @@ class DirectoryRepository private constructor(private val context: Context) {
                     cachedGroupStale -> null
                     else -> cachedDir.translationGroup
                 }
-                val detectedOrSavedPublisherUid = if (preferCurrentThreadMetadata || !cachedDir.hasPublisherSetting()) {
+                // 默认只按作品名和汉化组归目录，不自动记发布者（同一汉化组多人分工投稿时，
+                // 按发布者会把本该同目录的章节拆开）。只有标题标注为个人/非固定团队发布
+                // （个人汉化/个人翻译/合作汉化/自翻/代发）时，才用发布者当兜底区分依据；
+                // 已有的发布者设置（无论是这样自动写入的还是手动填的）不会被清空。
+                val canAutoDetectPublisher = MangaTitleCleaner.isIndividualRelease(threadTitle)
+                val detectedOrSavedPublisherUid = if (canAutoDetectPublisher &&
+                    (preferCurrentThreadMetadata || !cachedDir.hasPublisherSetting())
+                ) {
                     detectedAuthor.uid ?: cachedDir.publisherUid
                 } else {
                     cachedDir.publisherUid
                 }
-                val detectedOrSavedPublisherName = if (preferCurrentThreadMetadata || !cachedDir.hasPublisherSetting()) {
+                val detectedOrSavedPublisherName = if (canAutoDetectPublisher &&
+                    (preferCurrentThreadMetadata || !cachedDir.hasPublisherSetting())
+                ) {
                     detectedAuthor.name ?: cachedDir.publisherName
                 } else {
                     cachedDir.publisherName
@@ -606,6 +617,9 @@ class DirectoryRepository private constructor(private val context: Context) {
                     keepUnknownPublisher = true
                 )
 
+                // 见上面 cachedDir 分支的同款说明：默认不自动记发布者，只有个人/非固定团队
+                // 发布的作品才用发布者兜底区分。
+                val canAutoDetectPublisher = MangaTitleCleaner.isIndividualRelease(threadTitle)
                 val newDir = MangaDirectory(
                     cleanBookName = cleanName,
                     strategy = strategy,
@@ -613,8 +627,8 @@ class DirectoryRepository private constructor(private val context: Context) {
                     chapters = initialChapters,
                     sourceFid = detectedSourceFid,
                     translationGroup = detectedGroup.takeIf { it.isNotBlank() },
-                    publisherUid = detectedAuthor.uid,
-                    publisherName = detectedAuthor.name
+                    publisherUid = if (canAutoDetectPublisher) detectedAuthor.uid else null,
+                    publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null
                 )
 
                 saveDirectory(newDir)
