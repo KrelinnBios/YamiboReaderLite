@@ -1,7 +1,9 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class YamiboPostLinkUtilTest {
@@ -85,6 +87,23 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541"
             )
         )
+    }
+
+    @Test
+    fun detectsDesktopSessionFromMobileCookie() {
+        // 点过论坛底部「电脑版」后 Discuz 写入带站点前缀的 mobile=no cookie
+        assertTrue(
+            YamiboPostLinkUtil.isDesktopSessionCookie(
+                "EeqY_2132_saltkey=abc; EeqY_2132_mobile=no; EeqY_2132_sid=xyz"
+            )
+        )
+        assertTrue(YamiboPostLinkUtil.isDesktopSessionCookie("mobile=no"))
+        // 手机版会话（mobile=2 或无 mobile cookie）不是电脑版
+        assertFalse(YamiboPostLinkUtil.isDesktopSessionCookie("EeqY_2132_mobile=2"))
+        assertFalse(YamiboPostLinkUtil.isDesktopSessionCookie("EeqY_2132_saltkey=abc"))
+        assertFalse(YamiboPostLinkUtil.isDesktopSessionCookie(null))
+        // 名字只是碰巧含 mobile 的 cookie 不误判
+        assertFalse(YamiboPostLinkUtil.isDesktopSessionCookie("automobile=no"))
     }
 
     @Test
