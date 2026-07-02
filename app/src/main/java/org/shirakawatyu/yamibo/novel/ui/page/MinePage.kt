@@ -18,6 +18,8 @@ import android.webkit.WebView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeOut
@@ -120,6 +122,7 @@ import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateDialog
 import org.shirakawatyu.yamibo.novel.ui.component.AppUpdateFailureDialog
 import org.shirakawatyu.yamibo.novel.util.AppUpdateCheckResult
 import org.shirakawatyu.yamibo.novel.util.AppStrings
+import org.shirakawatyu.yamibo.novel.util.BackupUtil
 import org.shirakawatyu.yamibo.novel.util.AppUpdateInfo
 import org.shirakawatyu.yamibo.novel.util.AppUpdateManager
 import org.shirakawatyu.yamibo.novel.util.AccountSyncManager
@@ -1572,6 +1575,36 @@ fun MinePage(
                     var cacheSizeBytes by remember { mutableStateOf(0L) }
                     var isClearingCache by remember { mutableStateOf(false) }
                     var showClearCacheDialog by remember { mutableStateOf(false) }
+                    var showBackupDialog by remember { mutableStateOf(false) }
+                    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+                    var showImportDoneDialog by remember { mutableStateOf(false) }
+                    var isBackupWorking by remember { mutableStateOf(false) }
+
+                    val exportBackupLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.CreateDocument("application/zip")
+                    ) { uri ->
+                        if (uri != null) {
+                            isBackupWorking = true
+                            scope.launch {
+                                BackupUtil.exportBackup(context, uri)
+                                    .onSuccess {
+                                        YamiboToast.show(message = strings.backupExported)
+                                    }
+                                    .onFailure {
+                                        YamiboToast.show(
+                                            message = strings.backupFailed.format(it.message ?: "")
+                                        )
+                                    }
+                                isBackupWorking = false
+                                showBackupDialog = false
+                            }
+                        }
+                    }
+                    val importBackupLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) pendingImportUri = uri
+                    }
 
                     fun setLanguageMode(mode: String) {
                         val normalized = LanguageModeUtil.normalize(mode)
@@ -1822,6 +1855,13 @@ fun MinePage(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     TextButton(
+                                        onClick = { showBackupDialog = true },
+                                        modifier = Modifier.defaultMinSize(minWidth = 1.dp),
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                    ) {
+                                        Text(strings.backup)
+                                    }
+                                    TextButton(
                                         onClick = { mineDialog = MineDialogState.Blocklist },
                                         modifier = Modifier.defaultMinSize(minWidth = 1.dp),
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
@@ -1914,6 +1954,107 @@ fun MinePage(
                             dismissButton = {
                                 TextButton(onClick = { showClearCacheDialog = false }) {
                                     Text(strings.cancel, fontSize = 15.sp)
+                                }
+                            }
+                        )
+                    }
+
+                    if (showBackupDialog) {
+                        AlertDialog(
+                            onDismissRequest = { if (!isBackupWorking) showBackupDialog = false },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.primary,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
+                            title = { Text(strings.backup, fontSize = 18.sp) },
+                            text = { Text(strings.backupDialogText, fontSize = 14.sp) },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = !isBackupWorking,
+                                    onClick = {
+                                        exportBackupLauncher.launch(BackupUtil.suggestedFileName())
+                                    }
+                                ) {
+                                    Text(strings.exportBackup, fontSize = 15.sp)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    enabled = !isBackupWorking,
+                                    onClick = {
+                                        importBackupLauncher.launch(
+                                            arrayOf(
+                                                "application/zip",
+                                                "application/x-zip-compressed",
+                                                "application/octet-stream"
+                                            )
+                                        )
+                                    }
+                                ) {
+                                    Text(strings.importBackup, fontSize = 15.sp)
+                                }
+                            }
+                        )
+                    }
+
+                    pendingImportUri?.let { importUri ->
+                        AlertDialog(
+                            onDismissRequest = { if (!isBackupWorking) pendingImportUri = null },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.primary,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
+                            title = { Text(strings.importConfirmTitle, fontSize = 18.sp) },
+                            text = { Text(strings.importConfirmText, fontSize = 15.sp) },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = !isBackupWorking,
+                                    onClick = {
+                                        isBackupWorking = true
+                                        scope.launch {
+                                            BackupUtil.importBackup(context, importUri)
+                                                .onSuccess {
+                                                    showImportDoneDialog = true
+                                                }
+                                                .onFailure {
+                                                    YamiboToast.show(
+                                                        message = strings.backupFailed
+                                                            .format(it.message ?: "")
+                                                    )
+                                                }
+                                            isBackupWorking = false
+                                            pendingImportUri = null
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        strings.confirm,
+                                        fontSize = 15.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    enabled = !isBackupWorking,
+                                    onClick = { pendingImportUri = null }
+                                ) {
+                                    Text(strings.cancel, fontSize = 15.sp)
+                                }
+                            }
+                        )
+                    }
+
+                    if (showImportDoneDialog) {
+                        AlertDialog(
+                            // 恢复完成后运行中的 DataStore 缓存已过期，必须重启，不允许点外部关闭
+                            onDismissRequest = {},
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.primary,
+                            textContentColor = MaterialTheme.colorScheme.onSurface,
+                            title = { Text(strings.importDoneTitle, fontSize = 18.sp) },
+                            text = { Text(strings.importDoneText, fontSize = 15.sp) },
+                            confirmButton = {
+                                TextButton(onClick = { BackupUtil.restartApp(context) }) {
+                                    Text(strings.restartNow, fontSize = 15.sp)
                                 }
                             }
                         )
