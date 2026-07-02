@@ -273,6 +273,21 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun samePageLinksPreservePidInChapterUrls() {
+        val html = """
+            <div class="message">
+                <a href="https://bbs.yamibo.com/forum.php?mod=redirect&amp;goto=findpost&amp;ptid=573142&amp;pid=41573469">2</a>
+            </div>
+        """.trimIndent()
+
+        val parsed = MangaHtmlParser.extractSamePageLinks(html)
+
+        assertEquals(1, parsed.size)
+        assertEquals("41573469", parsed.single().pid)
+        assertTrue(parsed.single().url.contains("pid=41573469"))
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))
