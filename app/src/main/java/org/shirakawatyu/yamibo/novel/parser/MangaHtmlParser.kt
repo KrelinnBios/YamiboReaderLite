@@ -47,8 +47,8 @@ class MangaHtmlParser {
 
             for (link in links) {
                 val url = link.attr("href")
-                val title = link.text()
-                if (title.isBlank()) continue
+                val title = link.text().trim()
+                if (title.isBlank() || MangaTitleCleaner.isUrlLikeChapterTitle(title)) continue
                 val tid = MangaTitleCleaner.extractTidFromUrl(url) ?: continue
                 val chapterNum = MangaTitleCleaner.extractChapterNum(title)
                 val pid = extractPidFromUrl(url)
