@@ -1719,7 +1719,13 @@ $styleString
                                     var holder = document.createElement('li');
                                     holder.className = 'yamibo-block-li';
                                     var titleLink = row.querySelector('a[href*="tid="], a[href*="thread-"], a[href*="viewthread"]');
-                                    var title = titleLink ? String(titleLink.textContent || '').trim() : '';
+                                    // 标题只取 .threadlist_tit em：投票/悬赏/活动等特殊主题在标题前还有
+                                    // 一个 .micon 徽标（如“投票”），直接取整个链接的 textContent 会把徽标
+                                    // 文字和真实标题拼在一起，徽标与标题间的换行还会让展示层截断成只剩徽标。
+                                    var titleEm = titleLink ? titleLink.querySelector('.threadlist_tit em') : null;
+                                    var title = titleEm
+                                        ? String(titleEm.textContent || '').trim()
+                                        : (titleLink ? String(titleLink.textContent || '').trim() : '');
                                     action = makeAction('thread', tid, title, isBlocked, authorUid, authorName);
                                     setListActionLabel(action);
                                     holder.appendChild(action);
