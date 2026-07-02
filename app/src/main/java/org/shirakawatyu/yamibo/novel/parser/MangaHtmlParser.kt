@@ -52,7 +52,7 @@ class MangaHtmlParser {
                 val tid = MangaTitleCleaner.extractTidFromUrl(url) ?: continue
                 val chapterNum = MangaTitleCleaner.extractChapterNum(title)
                 val pid = extractPidFromUrl(url)
-                val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                val safeUrl = buildThreadUrl(tid, pid)
                 result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
             }
             return result
@@ -64,6 +64,11 @@ class MangaHtmlParser {
          */
         private fun extractPidFromUrl(url: String): String? {
             return Regex("[?&]pid=(\\d+)").find(url)?.groupValues?.get(1)
+        }
+
+        private fun buildThreadUrl(tid: String, pid: String? = null): String {
+            val base = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+            return if (pid.isNullOrBlank()) base else "$base&pid=$pid"
         }
 
         /**
@@ -88,7 +93,7 @@ class MangaHtmlParser {
                     ?: li.text().trim().takeIf { it.isNotBlank() }
                     ?: continue
                 val chapterNum = MangaTitleCleaner.extractChapterNum(title)
-                val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                val safeUrl = buildThreadUrl(tid, pid)
                 result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
             }
             return result
@@ -116,7 +121,7 @@ class MangaHtmlParser {
                     val title = titleEl.text().trim()
                     if (title.isBlank() || title.length > 100) continue
                     val chapterNum = MangaTitleCleaner.extractChapterNum(title)
-                    val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                    val safeUrl = buildThreadUrl(tid, pid)
                     result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
                 }
             }
@@ -133,7 +138,7 @@ class MangaHtmlParser {
                     val title = titleEl.text().trim()
                     if (title.isBlank() || title.length > 100) continue
                     val chapterNum = MangaTitleCleaner.extractChapterNum(title)
-                    val safeUrl = "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=$tid&mobile=2"
+                    val safeUrl = buildThreadUrl(tid, pid)
                     result.add(MangaChapterItem(tid, title, chapterNum, safeUrl, null, null, pid = pid))
                 }
             }
