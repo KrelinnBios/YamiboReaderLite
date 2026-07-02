@@ -328,6 +328,72 @@ class MangaSearchParsingTest {
         )
     }
     @Test
+    fun directoryConstraintsUseGroupWhenPublisherIsBlank() {
+        val targetGroup = "\u63d0\u706f\u55b5\u6c49\u5316\u7ec4"
+
+        assertTrue(
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = "\u3010${targetGroup}\u3011\u6c89\u6eba\u4e8e\u7f6a\u6076\u7684\u72af\u7f6a\u767e\u5408\u77ed\u7bc7\u96c6 \u7b2c5\u8bdd",
+                authorUid = "200",
+                authorName = "other-publisher",
+                translationGroup = targetGroup,
+                publisherUid = null,
+                publisherName = null,
+                keepUnknownPublisher = false
+            )
+        )
+        assertFalse(
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = "\u3010\u5176\u4ed6\u6c49\u5316\u7ec4\u3011\u6c89\u6eba\u4e8e\u7f6a\u6076\u7684\u72af\u7f6a\u767e\u5408\u77ed\u7bc7\u96c6 \u7b2c3\u8bdd",
+                authorUid = "100",
+                authorName = "homura1014",
+                translationGroup = targetGroup,
+                publisherUid = null,
+                publisherName = null,
+                keepUnknownPublisher = true
+            )
+        )
+    }
+
+    @Test
+    fun directoryConstraintsUsePublisherOnlyWhenConfigured() {
+        val targetGroup = "\u63d0\u706f\u55b5\u6c49\u5316\u7ec4"
+
+        assertTrue(
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = "No explicit group title",
+                authorUid = "100",
+                authorName = "homura1014",
+                translationGroup = targetGroup,
+                publisherUid = "100",
+                publisherName = null,
+                keepUnknownPublisher = false
+            )
+        )
+        assertFalse(
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = "No explicit group title",
+                authorUid = "200",
+                authorName = "other-publisher",
+                translationGroup = targetGroup,
+                publisherUid = "100",
+                publisherName = null,
+                keepUnknownPublisher = false
+            )
+        )
+        assertTrue(
+            MangaTitleCleaner.matchesDirectoryConstraints(
+                rawTitle = "No explicit group title",
+                authorUid = "200",
+                authorName = "other-publisher",
+                translationGroup = null,
+                publisherUid = null,
+                publisherName = null,
+                keepUnknownPublisher = false
+            )
+        )
+    }
+    @Test
     fun mobileSearchParserReturnsCompleteTitleInsteadOfHighlightOnly() {
         val html = """
             <html><body id="search">
