@@ -24,6 +24,17 @@ class MangaTitleCleaner {
             clean = clean.replace(Regex("【.*?】|\\[.*?\\]"), "")
             clean = clean.replace(Regex("(?i)[\\(（]?c\\d+[\\)）]?"), "")
             clean = clean.replace(Regex("\\s*[|｜].*$"), "")
+
+            // 2.5 集合类后缀（短篇集/合集/选集/总集等）本身就是书名的一部分，其后紧跟的通常是
+            // 单篇标题（如"……短篇集[原作：xxx]天使的抉择"去括号后变成"……短篇集天使的抉择"，
+            // 中间没有任何分隔符）。必须在下面的章节标记截断之前先在后缀词处截住，否则要么把
+            // "集"字当成普通文字被后面的规则连同单篇标题一起吞掉，要么（若单篇标题里没有可识别
+            // 的章节标记）整段单篇标题会被误当成书名的一部分。
+            val collectionSuffixPattern = Regex("(短篇集|合集|选集|選集|总集|總集|精选集|精選集)")
+            collectionSuffixPattern.find(clean)?.let { suffixMatch ->
+                clean = clean.substring(0, suffixMatch.range.last + 1)
+            }
+
             // 3. 截断章节标记及其后面的所有内容
             val chapterMarkerPattern = Regex(
                 "(?i)(" +
@@ -34,7 +45,7 @@ class MangaTitleCleaner {
                         "[-—\\s]*EP\\d+|" +
                         "[-—\\s]*Vol\\.?\\s*\\d+|" +
                         "[-—\\s]*Ch\\.?\\s*\\d+|" +
-                        "[-—\\s]*(番外|特典|卷后附|卷彩页|附录|短篇|单行本|最终话|最終話|最终回|最終回|大结局)|" +
+                        "[-—\\s]*(番外|特典|卷后附|卷彩页|附录|短篇(?!集)|单行本|最终话|最終話|最终回|最終回|大结局)|" +
                         "(前篇|上篇|中篇|后篇|下篇)|" +
                         "[-—\\s]+(上|中|下)|" +
                         "[-—\\s]*[(（]\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+\\s*[)）]|" +
