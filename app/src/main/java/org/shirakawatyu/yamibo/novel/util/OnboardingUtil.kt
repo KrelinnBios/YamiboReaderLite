@@ -13,6 +13,7 @@ object OnboardingUtil {
         MANGA_READER("manga_reader"),
         FAVORITE("favorite"),
         NOVEL_READER("novel_reader"),
+        HISTORY("history"),
     }
 
     private fun keyFor(page: Page) = stringPreferencesKey("onboarding_${page.storageKey}_shown")
