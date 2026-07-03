@@ -273,6 +273,41 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun samePageLinksIgnoreNavigationLinkText() {
+        // 首楼"上一话/下一话/目录"这类导航链接不是章节，不能收进目录
+        val html = """
+            <div class="message">
+                <a href="https://bbs.yamibo.com/thread-566102-1-1.html">←上一话</a><br>
+                <a href="https://bbs.yamibo.com/thread-573149-1-1.html">下一話→</a><br>
+                <a href="https://bbs.yamibo.com/thread-570000-1-1.html">目录</a><br>
+                <a href="https://bbs.yamibo.com/thread-573150-1-1.html">第3话 出差</a>
+            </div>
+        """.trimIndent()
+
+        val parsed = MangaHtmlParser.extractSamePageLinks(html)
+
+        assertEquals(1, parsed.size)
+        assertEquals("573150", parsed.single().tid)
+    }
+
+    @Test
+    fun navigationLinkTitleDetection() {
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("上一话"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("下一話"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("←上一话"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("【某某汉化组】下一话"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("返回目录"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("目錄"))
+        assertTrue(MangaTitleCleaner.isNavigationLinkTitle("传送门"))
+        // 真实标题、分篇标记不受影响
+        assertFalse(MangaTitleCleaner.isNavigationLinkTitle("第1话"))
+        assertFalse(MangaTitleCleaner.isNavigationLinkTitle("前篇"))
+        assertFalse(MangaTitleCleaner.isNavigationLinkTitle("后篇"))
+        assertFalse(MangaTitleCleaner.isNavigationLinkTitle("上一话的回忆"))
+        assertFalse(MangaTitleCleaner.isNavigationLinkTitle("2、去你家/君の家まで"))
+    }
+
+    @Test
     fun samePageLinksPreservePidInChapterUrls() {
         val html = """
             <div class="message">
