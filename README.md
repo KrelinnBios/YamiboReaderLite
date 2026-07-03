@@ -84,6 +84,8 @@ Android 7.0（API 24）及以上。
 
 本项目依据 [GNU AGPL-3.0](./LICENSE) 发布。
 
+第三方资源以其原作者或原项目的许可证声明为准。
+
 相关项目：
 
 - [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)
