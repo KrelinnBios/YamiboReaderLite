@@ -140,6 +140,7 @@ import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
 import org.shirakawatyu.yamibo.novel.util.manga.MangaReaderManager
+import org.shirakawatyu.yamibo.novel.repository.DirectoryRepository
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.manga.ZoomPanGestureHandler
 import org.shirakawatyu.yamibo.novel.util.manga.verticalMangaZoomGesture
@@ -1505,21 +1506,16 @@ fun NativeMangaPage(
                 val selectedGroup = directory?.translationGroup.orEmpty()
                 val selectedPublisherUid = directory?.publisherUid.orEmpty()
                 val selectedPublisherName = directory?.publisherName.orEmpty()
+                // 与 DirectoryRepository 共用同一套过滤规则，避免目录面板和持久化目录不一致。
                 val displayChapters = directory?.chapters
-                    ?.filter {
-                        !MangaTitleCleaner.isUrlLikeChapterTitle(it.rawTitle) &&
-                                (selectedGroup.isBlank() ||
-                                MangaTitleCleaner.matchesTranslationGroup(
-                                    it.rawTitle,
-                                    selectedGroup
-                                )) &&
-                                (selectedPublisherUid.isBlank() && selectedPublisherName.isBlank() ||
-                                        MangaTitleCleaner.matchesPublisher(
-                                            authorUid = it.authorUid,
-                                            authorName = it.authorName,
-                                            publisherUid = selectedPublisherUid,
-                                            publisherName = selectedPublisherName
-                                        ))
+                    ?.let {
+                        DirectoryRepository.filterChaptersByDirectoryConstraints(
+                            chapters = it,
+                            translationGroup = selectedGroup.takeIf(String::isNotBlank),
+                            publisherUid = selectedPublisherUid.takeIf(String::isNotBlank),
+                            publisherName = selectedPublisherName.takeIf(String::isNotBlank),
+                            keepUnknownPublisher = true
+                        )
                     }
                     ?.mapIndexed { chapterIndex, chapter ->
                         val chapterKey = if (!chapter.pid.isNullOrBlank()) {
