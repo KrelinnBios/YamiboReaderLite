@@ -61,6 +61,13 @@ class DirectoryRepository private constructor(private val context: Context) {
     private fun MangaDirectory.hasPublisherSetting(): Boolean =
         publisherUid != null || publisherName != null
 
+    private fun MangaChapterItem.withInheritedReleaseGroup(group: String): MangaChapterItem {
+        if (group.isBlank() || MangaTitleCleaner.matchesTranslationGroup(rawTitle, group)) {
+            return this
+        }
+        return copy(rawTitle = "【$group】$rawTitle")
+    }
+
     private suspend fun resolveThreadAuthor(tid: String?): ThreadAuthor {
         if (tid.isNullOrBlank()) return ThreadAuthor()
         return runCatching {
@@ -77,35 +84,6 @@ class DirectoryRepository private constructor(private val context: Context) {
         }.getOrDefault(ThreadAuthor())
     }
 
-    /**
-     * 章节唯一键：跨帖时用 tid，单帖多章时用 tid-pid
-     */
-    private fun chapterUniqueKey(chapter: MangaChapterItem): String {
-        return if (chapter.pid != null) "${chapter.tid}-pid-${chapter.pid}" else chapter.tid
-    }
-
-    private fun filterChaptersByDirectoryConstraints(
-        chapters: List<MangaChapterItem>,
-        translationGroup: String?,
-        publisherUid: String?,
-        publisherName: String?,
-        keepUnknownPublisher: Boolean
-    ): List<MangaChapterItem> = chapters.filter { chapter ->
-        if (MangaTitleCleaner.isUrlLikeChapterTitle(chapter.rawTitle)) {
-            false
-        } else {
-            MangaTitleCleaner.matchesDirectoryConstraints(
-                rawTitle = chapter.rawTitle,
-                authorUid = chapter.authorUid,
-                authorName = chapter.authorName,
-                translationGroup = translationGroup,
-                publisherUid = publisherUid,
-                publisherName = publisherName,
-                keepUnknownPublisher = keepUnknownPublisher
-            )
-        }
-    }
-
     companion object {
         private val MANGA_FIDS = setOf("30", "37")
 
@@ -113,6 +91,65 @@ class DirectoryRepository private constructor(private val context: Context) {
         private var instance: DirectoryRepository? = null
         fun getInstance(context: Context): DirectoryRepository = instance ?: synchronized(this) {
             instance ?: DirectoryRepository(context.applicationContext).also { instance = it }
+        }
+
+        /**
+         * 章节唯一键：跨帖时用 tid，单帖多章时用 tid-pid
+         */
+        internal fun chapterUniqueKey(chapter: MangaChapterItem): String {
+            return if (chapter.pid != null) "${chapter.tid}-pid-${chapter.pid}" else chapter.tid
+        }
+
+        /**
+         * 目录章节过滤：
+         * - 未设汉化组/发布者约束时全部保留。
+         * - 设了约束时只保留匹配约束的章节；不同汉化组的同名作品不再按话数补缺混入。
+         * - 发布者约束仍尊重 keepUnknownPublisher，用于个人/转载类标题的旧数据兼容。
+         */
+        internal fun filterChaptersByDirectoryConstraints(
+            chapters: List<MangaChapterItem>,
+            translationGroup: String?,
+            publisherUid: String?,
+            publisherName: String?,
+            keepUnknownPublisher: Boolean
+        ): List<MangaChapterItem> {
+            val valid = chapters.filterNot { MangaTitleCleaner.isUrlLikeChapterTitle(it.rawTitle) }
+            val hasConstraint = !translationGroup.isNullOrBlank() ||
+                    !publisherUid.isNullOrBlank() || !publisherName.isNullOrBlank()
+            if (!hasConstraint) return valid
+
+            fun isPreferred(chapter: MangaChapterItem): Boolean =
+                MangaTitleCleaner.matchesDirectoryConstraints(
+                    rawTitle = chapter.rawTitle,
+                    authorUid = chapter.authorUid,
+                    authorName = chapter.authorName,
+                    translationGroup = translationGroup,
+                    publisherUid = publisherUid,
+                    publisherName = publisherName,
+                    keepUnknownPublisher = keepUnknownPublisher
+                )
+
+            return valid.filter { isPreferred(it) }
+        }
+
+        internal fun hasAuthoritativeCrossWorkPageLinks(
+            currentTid: String,
+            cleanBookName: String,
+            pageLinks: List<MangaChapterItem>
+        ): Boolean {
+            if (pageLinks.isEmpty()) return false
+            val numberedLinkCount = pageLinks.count { chapter ->
+                chapter.rawTitle.trim().matches(Regex("^\\d+\\s*[、.．].*"))
+            }
+            if (numberedLinkCount < 2) return false
+            return pageLinks.any { chapter ->
+                chapter.tid != currentTid &&
+                        !MangaTitleCleaner.matchesDirectoryCandidate(
+                            rawText = chapter.rawTitle,
+                            cleanBookName = cleanBookName,
+                            configuredKeywords = null
+                        )
+            }
         }
     }
 
@@ -161,21 +198,40 @@ class DirectoryRepository private constructor(private val context: Context) {
     /**
      * 把残次名目录迁移到正确的清洗名下：若目标名已有目录则合并章节，随后删除旧文件。
      * 返回迁移后的目录；迁移失败时返回 null（调用方继续沿用旧名，不影响功能）。
+     * revalidateBookName：parody 残次目录（书名曾是原作标记）里通常混着同 parody 的
+     * 不相干作品，迁移时按新书名重新校验章节，只带走属于本作品的部分；被甩掉的作品
+     * 在用户下次打开对应帖子时会各自建新目录。
      */
     private suspend fun migrateStaleDirectoryName(
         oldDir: MangaDirectory,
-        newCleanName: String
+        newCleanName: String,
+        revalidateBookName: Boolean = false
     ): MangaDirectory? = withContext(Dispatchers.IO) {
         try {
+            val carriedChapters = if (revalidateBookName) {
+                oldDir.chapters.filter {
+                    MangaTitleCleaner.matchesDirectoryCandidate(
+                        rawText = "${it.rawTitle} ${it.authorName.orEmpty()}",
+                        cleanBookName = newCleanName,
+                        configuredKeywords = null
+                    )
+                }
+            } else {
+                oldDir.chapters
+            }
             val target = loadDirectory(newCleanName)
             val migrated = if (target != null) {
-                target.copy(chapters = mergeAndSortChapters(oldDir.chapters, target.chapters))
+                target.copy(chapters = mergeAndSortChapters(carriedChapters, target.chapters))
             } else {
-                oldDir.copy(cleanBookName = newCleanName)
+                oldDir.copy(
+                    cleanBookName = newCleanName,
+                    chapters = mergeAndSortChapters(emptyList(), carriedChapters)
+                )
             }
             saveDirectory(migrated)
             deleteDirectory(oldDir.cleanBookName)
-            Log.d(LOG_TAG, "迁移残次目录名: '${oldDir.cleanBookName}' -> '$newCleanName'")
+            Log.d(LOG_TAG, "迁移残次目录名: '${oldDir.cleanBookName}' -> '$newCleanName' " +
+                    "(章节 ${oldDir.chapters.size} -> ${migrated.chapters.size})")
             migrated
         } catch (e: Exception) {
             Log.w(LOG_TAG, "残次目录名迁移失败: ${oldDir.cleanBookName}", e)
@@ -347,18 +403,26 @@ class DirectoryRepository private constructor(private val context: Context) {
         mobileHtml: String
     ): MangaDirectory {
         val threadTitle = MangaTitleCleaner.getCleanThreadTitle(rawTitle)
+        val detectedGroup = MangaTitleCleaner.extractReleaseGroup(threadTitle)
         val allDirs = getAllDirectories()
         val existingDir = allDirs.find { dir -> dir.chapters.any { it.tid == tid } }
         val detectedSourceFid = existingDir?.sourceFid ?: resolveSourceFid(tid)
 
-        // 自愈旧版清洗器留下的残次目录名：切多了（如"作品名 52+"）或切少了
-        // （如短篇集类作品旧版没有集合后缀识别，把"作品名短篇集"截成"作品名"）都重命名到当前清洗结果
+        // 自愈旧版清洗器留下的残次目录名：切多了（如"作品名 52+"）、切少了
+        // （如短篇集类作品旧版没有集合后缀识别，把"作品名短篇集"截成"作品名"）、
+        // 括号残渣，以及把开头原作标记当书名的 parody 残次目录，都重命名到当前清洗结果
         val freshCleanName = MangaTitleCleaner.getCleanBookName(rawTitle)
+        val parodyResidue = existingDir != null &&
+                MangaTitleCleaner.isParodyResidueCleanBookName(
+                    existingDir.cleanBookName, rawTitle, freshCleanName
+                )
         val migratedDir = if (existingDir != null &&
             (MangaTitleCleaner.isStaleCleanBookName(existingDir.cleanBookName, freshCleanName) ||
-                    MangaTitleCleaner.isTruncatedCleanBookName(existingDir.cleanBookName, freshCleanName))
+                    MangaTitleCleaner.isTruncatedCleanBookName(existingDir.cleanBookName, freshCleanName) ||
+                    MangaTitleCleaner.isParenResidueCleanBookName(existingDir.cleanBookName, freshCleanName) ||
+                    parodyResidue)
         ) {
-            migrateStaleDirectoryName(existingDir, freshCleanName)
+            migrateStaleDirectoryName(existingDir, freshCleanName, revalidateBookName = parodyResidue)
         } else {
             null
         }
@@ -420,9 +484,17 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
             }
 
+            val hasAuthoritativePageLinks = hasAuthoritativeCrossWorkPageLinks(
+                currentTid = tid,
+                cleanBookName = cleanName,
+                pageLinks = rawSamePageLinks
+            )
+
             // ===== 补充：PC HTML 也未获目录时，走 API 逐页扫描楼主发帖 =====
             val supplementaryLinks = mutableListOf<MangaChapterItem>()
-            val needApiFallback = pcHtmlThreadindexLinks.isEmpty() && threadindexLinks.isEmpty() && (
+            var firstFloorPid: String? = null
+            val needApiFallback = !hasAuthoritativePageLinks &&
+                    pcHtmlThreadindexLinks.isEmpty() && threadindexLinks.isEmpty() && (
                     rawSamePageLinks.any { it.tid == tid } ||
                             (rawSamePageLinks.isNotEmpty() && rawSamePageLinks.size < 5)
                     )
@@ -449,6 +521,13 @@ class DirectoryRepository private constructor(private val context: Context) {
                             if (pid in seenAuthorPids) continue
                             seenAuthorPids.add(pid)
                             pageFound++
+                            // 楼主首帖就是本帖章节本身（currentChapter 已覆盖），里面的加粗
+                            // 文字多是制作名单/转载警告等正文内容，不能当章节标题收进目录
+                            val position = post.getString("position")?.toIntOrNull()
+                            if (position == 1 || (position == null && page == 1 && i == 0)) {
+                                firstFloorPid = pid
+                                continue
+                            }
                             val msg = post.getString("message") ?: continue
                             val title = org.jsoup.Jsoup.parse(msg).select("strong, b")
                                 .firstOrNull()?.text()?.trim()
@@ -485,40 +564,52 @@ class DirectoryRepository private constructor(private val context: Context) {
                 authorName = detectedAuthor.name
             )
 
-            val allLinks = rawSamePageLinks + threadindexLinks + pcHtmlThreadindexLinks + supplementaryLinks
+            val allLinks = if (hasAuthoritativePageLinks) {
+                rawSamePageLinks
+            } else {
+                rawSamePageLinks.map { it.withInheritedReleaseGroup(detectedGroup) } +
+                        threadindexLinks.map { it.withInheritedReleaseGroup(detectedGroup) } +
+                        pcHtmlThreadindexLinks.map { it.withInheritedReleaseGroup(detectedGroup) } +
+                        supplementaryLinks.map { it.withInheritedReleaseGroup(detectedGroup) }
+            }
             Log.d(LOG_TAG, "rawSamePageLinks=${rawSamePageLinks.size} threadindex=${threadindexLinks.size} pcHtmlThreadindex=${pcHtmlThreadindexLinks.size} apiSupplementary=${supplementaryLinks.size}")
             rawSamePageLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  raw[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
             supplementaryLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  supp[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
+            Log.d(LOG_TAG, "authoritativePageLinks=$hasAuthoritativePageLinks")
 
-            val gatheredFromPage = (listOf(currentChapter) + allLinks).distinctBy { chapterUniqueKey(it) }
+            val gatheredFromPage = if (hasAuthoritativePageLinks) {
+                (allLinks + currentChapter).distinctBy { chapterUniqueKey(it) }
+            } else {
+                (listOf(currentChapter) + allLinks).distinctBy { chapterUniqueKey(it) }
+            }
             Log.d(LOG_TAG, "gatheredFromPage=${gatheredFromPage.size}")
 
             if (cachedDir != null) {
-                val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
                 val hasPageLinks = allLinks.isNotEmpty()
                 val newStrategy =
-                    if (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks) {
+                    if (hasAuthoritativePageLinks ||
+                        (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks)
+                    ) {
                         DirectoryStrategy.LINKS
                     } else cachedDir.strategy
 
                 val existingChapterKeys = cachedDir.chapters.map { chapterUniqueKey(it) }.toSet()
                 Log.d(LOG_TAG, "cached chapters=${cachedDir.chapters.size} existingKeys=${existingChapterKeys.size}")
 
-                val supplementaryChapters = gatheredFromPage.filter { chapterUniqueKey(it) !in existingChapterKeys }
                 val preferCurrentThreadMetadata = tid !in cachedDir.chapters.map { it.tid }.toSet()
 
                 // 同名不同版本（不同汉化组/发布者）的作品会落到同一个 cleanBookName 目录。
-                // 若旧目录记录的汉化组与当前打开的帖子对不上，继承它会让面板用旧组把当前
-                // 版本的所有章节过滤成空目录，故此时必须丢弃旧组（同时可自愈已经写坏的目录）。
-                val cachedGroupStale = !cachedDir.translationGroup.isNullOrBlank() &&
-                        !MangaTitleCleaner.matchesTranslationGroup(
-                            threadTitle,
-                            cachedDir.translationGroup!!
-                        )
-
+                // 既然目录按组硬过滤，旧目录组与当前帖不一致时应优先切到当前组；
+                // 只有当前帖识别不出组名时，才沿用旧组，避免把目录约束清空。
+                // 若首楼提供跨作品编号链接列表，则这些链接就是权威目录，去掉当前汉化组约束。
+                val cachedGroupMatchesThread = MangaTitleCleaner.matchesTranslationGroup(
+                    threadTitle, cachedDir.translationGroup.orEmpty()
+                )
                 val detectedOrSavedGroup = when {
+                    hasAuthoritativePageLinks -> null
+                    cachedDir.translationGroup.isNullOrBlank() -> detectedGroup.takeIf { it.isNotBlank() }
+                    cachedGroupMatchesThread -> cachedDir.translationGroup
                     detectedGroup.isNotBlank() -> detectedGroup
-                    cachedGroupStale -> null
                     else -> cachedDir.translationGroup
                 }
                 // 默认只按作品名和汉化组归目录，不自动记发布者（同一汉化组多人分工投稿时，
@@ -541,7 +632,17 @@ class DirectoryRepository private constructor(private val context: Context) {
                     cachedDir.publisherName
                 }
                 Log.d(LOG_TAG, "filter group='$detectedOrSavedGroup'")
-                val mergedAll = mergeAndSortChapters(cachedDir.chapters, supplementaryChapters)
+                // 自愈旧版兜底写进目录的"楼主首帖伪章节"（正文加粗文字被当成了章节标题）
+                val cachedChapters = if (firstFloorPid != null) {
+                    cachedDir.chapters.filterNot { it.tid == tid && it.pid == firstFloorPid }
+                } else {
+                    cachedDir.chapters
+                }
+                val mergedAll = if (hasAuthoritativePageLinks) {
+                    gatheredFromPage
+                } else {
+                    mergeAndSortChapters(cachedChapters, gatheredFromPage)
+                }
                 Log.d(LOG_TAG, "mergedAll=${mergedAll.size} before filter")
                 val mergedChapters = filterChaptersByDirectoryConstraints(
                     chapters = mergedAll,
@@ -557,7 +658,12 @@ class DirectoryRepository private constructor(private val context: Context) {
                     sourceFid = cachedDir.sourceFid ?: detectedSourceFid,
                     translationGroup = detectedOrSavedGroup,
                     publisherUid = detectedOrSavedPublisherUid,
-                    publisherName = detectedOrSavedPublisherName
+                    publisherName = detectedOrSavedPublisherName,
+                    lastUpdateTime = if (hasAuthoritativePageLinks) {
+                        System.currentTimeMillis()
+                    } else {
+                        cachedDir.lastUpdateTime
+                    }
                 )
 
                 if (mergedChapters.size != cachedDir.chapters.size ||
@@ -565,7 +671,8 @@ class DirectoryRepository private constructor(private val context: Context) {
                     updatedDir.sourceFid != cachedDir.sourceFid ||
                     updatedDir.translationGroup != cachedDir.translationGroup ||
                     updatedDir.publisherUid != cachedDir.publisherUid ||
-                    updatedDir.publisherName != cachedDir.publisherName
+                    updatedDir.publisherName != cachedDir.publisherName ||
+                    updatedDir.lastUpdateTime != cachedDir.lastUpdateTime
                 ) {
                     saveDirectory(updatedDir)
                 }
@@ -576,7 +683,10 @@ class DirectoryRepository private constructor(private val context: Context) {
                 val strategy: DirectoryStrategy
                 val sourceKey: String
 
-                if (tagIds.isNotEmpty()) {
+                if (hasAuthoritativePageLinks) {
+                    strategy = DirectoryStrategy.LINKS
+                    sourceKey = cleanName
+                } else if (tagIds.isNotEmpty()) {
                     strategy = DirectoryStrategy.TAG
                     sourceKey = tagIds.joinToString(",")
                 } else if (allLinks.isNotEmpty()) {
@@ -588,12 +698,19 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
 
                 // 调用核心 TID 排序初始化
-                val detectedGroup = MangaTitleCleaner.extractTranslationGroup(threadTitle)
                 val canAutoDetectPublisher = MangaTitleCleaner.isIndividualRelease(threadTitle)
-                val initialAll = mergeAndSortChapters(emptyList(), gatheredFromPage)
+                val initialAll = if (hasAuthoritativePageLinks) {
+                    gatheredFromPage
+                } else {
+                    mergeAndSortChapters(emptyList(), gatheredFromPage)
+                }
                 val initialChapters = filterChaptersByDirectoryConstraints(
                     chapters = initialAll,
-                    translationGroup = detectedGroup.takeIf { it.isNotBlank() },
+                    translationGroup = if (hasAuthoritativePageLinks) {
+                        null
+                    } else {
+                        detectedGroup.takeIf { it.isNotBlank() }
+                    },
                     publisherUid = if (canAutoDetectPublisher) detectedAuthor.uid else null,
                     publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null,
                     keepUnknownPublisher = true
@@ -604,9 +721,18 @@ class DirectoryRepository private constructor(private val context: Context) {
                     sourceKey = sourceKey,
                     chapters = initialChapters,
                     sourceFid = detectedSourceFid,
-                    translationGroup = detectedGroup.takeIf { it.isNotBlank() },
+                    translationGroup = if (hasAuthoritativePageLinks) {
+                        null
+                    } else {
+                        detectedGroup.takeIf { it.isNotBlank() }
+                    },
                     publisherUid = if (canAutoDetectPublisher) detectedAuthor.uid else null,
-                    publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null
+                    publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null,
+                    lastUpdateTime = if (hasAuthoritativePageLinks) {
+                        System.currentTimeMillis()
+                    } else {
+                        0L
+                    }
                 )
 
                 saveDirectory(newDir)
@@ -718,8 +844,15 @@ class DirectoryRepository private constructor(private val context: Context) {
                     publisherName = latestPublisherName,
                     keepUnknownPublisher = false
                 )
-                val merged =
-                    mergeAndSortChapters(verifiedExistingChapters, filteredNewChapters)
+                // 合并后再整体过一遍约束：两侧分别预过滤后，跨侧的同话数重复
+                // （如既有里是本组版本、新搜到其它组的同一话）要在这里收敛
+                val merged = filterChaptersByDirectoryConstraints(
+                    chapters = mergeAndSortChapters(verifiedExistingChapters, filteredNewChapters),
+                    translationGroup = targetGroup,
+                    publisherUid = latestPublisherUid,
+                    publisherName = latestPublisherName,
+                    keepUnknownPublisher = true
+                )
                 val updated = latest.copy(
                     chapters = merged,
                     lastUpdateTime = System.currentTimeMillis(),
