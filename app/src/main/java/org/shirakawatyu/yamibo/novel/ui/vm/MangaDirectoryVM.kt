@@ -73,6 +73,7 @@ class MangaDirectoryVM(application: Application) : AndroidViewModel(application)
     }
 
     private fun shouldForceSearchOnOpen(dir: MangaDirectory): Boolean {
+        if (dir.strategy == DirectoryStrategy.LINKS) return false
         val smallDirectoryNeedsRetry = dir.chapters.size <= 2 &&
                 (dir.lastUpdateTime == 0L || System.currentTimeMillis() - dir.lastUpdateTime > 30 * 60 * 1000L)
         if (smallDirectoryNeedsRetry) return true
