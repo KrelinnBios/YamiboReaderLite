@@ -32,6 +32,23 @@ class MangaTitleCleaner {
         }
 
         /**
+         * 剥掉标题开头的括号标注段。同人作品常以"(原作名!#N)"这类原作/出处标记开头
+         * （如"( ぼっち・ざ・おんりー!#2)ぼ喜多・が・ろっく2"），真实作品名在括号段
+         * 后面；把标记留在书名里会让同 parody 的不同作品全部撞进同一个目录。
+         * 仅当括号段后仍有实质内容时剥掉，作品名本身写在括号里的整段标题不动。
+         */
+        private fun stripLeadingParenAnnotations(value: String): String {
+            var text = value
+            while (true) {
+                val lead = Regex("^\\s*[（(][^()（）]+[)）]").find(text) ?: break
+                val rest = text.substring(lead.range.last + 1).trim()
+                if (rest.length < 2) break
+                text = rest
+            }
+            return text
+        }
+
+        /**
          * Extract cleaned book title for directory and search matching.
          */
         fun getCleanBookName(rawTitle: String): String {
@@ -40,6 +57,7 @@ class MangaTitleCleaner {
             clean = clean.replace(Regex("\\s+-\\s+.*?(中文百合漫画区|百合会|论坛).*$"), "")
             clean = clean.replace(Regex("【.*?】|\\[.*?\\]"), "")
             clean = clean.replace(Regex("(?i)[\\(（]?c\\d+[\\)）]?"), "")
+            clean = stripLeadingParenAnnotations(clean)
             clean = clean.replace(Regex("\\s*[|｜].*$"), "")
 
             // 2.5 集合类后缀（短篇集/合集/选集/总集等）本身就是书名的一部分，其后紧跟的通常是
@@ -82,6 +100,15 @@ class MangaTitleCleaner {
             clean = clean.replace(Regex("[！？\\?！!~。，、\\.]+$"), "")
             clean = clean.replace(Regex("^[\\s\\-|/\\)#]+|[\\s\\-|/\\(#:]+$"), "").trim()
 
+            // 章节标记截断可能留下未配对的括号（如"( ぼっち・ざ・おんりー!#2)…"被截成
+            // "( ぼっち・ざ・おんりー"）。只在整串里找不到另一半括号时才剥掉，配对括号不动。
+            if (!clean.contains(')') && !clean.contains('）')) {
+                clean = clean.trimStart('(', '（', ' ')
+            }
+            if (!clean.contains('(') && !clean.contains('（')) {
+                clean = clean.trimEnd(')', '）', ' ')
+            }
+
             return clean
         }
 
@@ -94,6 +121,22 @@ class MangaTitleCleaner {
             if (!bracketCandidate.isNullOrBlank()) return bracketCandidate
 
             return extractExplicitTranslationGroup(title).orEmpty()
+        }
+
+        /**
+         * 目录归并用的"发布组"标识。优先取显式汉化组名；部分制作组不带"汉化"字样
+         * （如【大友同好會】），按论坛惯例【】放组名、[] 放分类/原作者，此时取第一个
+         * 【】段兜底。个人发布标注（个人翻译/转载等）不算组名，交给发布者逻辑处理。
+         * 仅供 DirectoryRepository 做版本归并，不影响搜索关键词等其他链路。
+         */
+        fun extractReleaseGroup(rawTitle: String): String {
+            val explicit = extractTranslationGroup(rawTitle)
+            if (explicit.isNotBlank()) return explicit
+
+            val bracket = Regex("【([^【】]{2,20})】").find(getCleanThreadTitle(rawTitle))
+                ?.groupValues?.get(1)?.trim().orEmpty()
+            if (bracket.isBlank() || isIndividualRelease(bracket)) return ""
+            return bracket
         }
 
         fun matchesTranslationGroup(rawTitle: String, translationGroup: String): Boolean {
@@ -135,6 +178,10 @@ class MangaTitleCleaner {
 
         private fun normalizeTranslationGroup(value: String): String =
             value.lowercase()
+                .replace('會', '会')
+                .replace('組', '组')
+                .replace('漢', '汉')
+                .replace('譯', '译')
                 .replace(Regex("[\\s\\p{Punct}【】（）「」『』·・＆＋×、／]+"), "")
 
         private val TRANSLATION_ROLE_PATTERN = Regex(
@@ -183,14 +230,29 @@ class MangaTitleCleaner {
             var text = getCleanThreadTitle(rawTitle)
                 .replace(Regex("【.*?】|\\[.*?\\]"), "")
                 .trim()
+            // 与 getCleanBookName 一致：开头的原作/出处括号标注不属于章节标题
+            text = stripLeadingParenAnnotations(text)
             if (bookName.isNotBlank()) {
-                text = text.replace(bookName, "").trim()
+                // 书名常整体落在括号段里（如"( ぼっち・ざ・おんりー!#2)副标题"），只删书名
+                // 会留下"!#2)"这样的残渣，此时把包含书名的整个括号段删掉
+                val parenGroup =
+                    Regex("[（(][^()（）]*${Regex.escape(bookName)}[^()（）]*[)）]")
+                text = if (parenGroup.containsMatchIn(text)) {
+                    parenGroup.replace(text, "")
+                } else {
+                    text.replace(bookName, "")
+                }.trim()
             }
+            // (C102) 这类场刊编号是发布信息，不是章节副标题
+            text = text.replace(Regex("(?i)[（(]\\s*c\\d+\\s*[)）]"), "").trim()
             // 去掉书名（如"……《谈话室笔记"）后残留的半截书名号/括号一并修剪
             text = text.trim(
                 ' ', '-', '—', '_', '|', '｜', ':', '：', '·',
                 '《', '》', '「', '」', '『', '』', '（', '）', '(', ')'
             )
+            // 旧目录名尚未迁移（书名仍带"( "前缀）时，删书名会剩下"!#2)"这样的
+            // 章节标记尾巴，这里兜底剥掉；话数在左侧编号列有展示，不损失信息
+            text = text.replace(Regex("^[!！]*\\s*[#＃]\\s*\\d+(?:[\\.．]\\d+)?\\s*[)）]?\\s*"), "")
             return text.ifBlank { fallback }
         }
 
@@ -218,6 +280,39 @@ class MangaTitleCleaner {
             if (!freshName.startsWith(storedName)) return false
             val residue = freshName.removePrefix(storedName)
             return residue in COLLECTION_SUFFIXES
+        }
+
+        /**
+         * 判断已存目录名是否是旧版清洗器留下的"未配对括号"残次品（如"( ぼっち・ざ・おんりー"——
+         * 旧版截断章节标记后没有剥掉残留的左括号）。条件：去掉首尾括号和空白后与新清洗名相同，
+         * 用户手动起的名字（多出的不只是括号）不会命中。
+         */
+        fun isParenResidueCleanBookName(storedName: String, freshName: String): Boolean {
+            if (freshName.isBlank() || storedName == freshName) return false
+            return storedName.trim(' ', '(', '（', ')', '）') == freshName
+        }
+
+        /**
+         * 判断已存目录名是否是旧版清洗器留下的"原作标注"残次品：旧版把开头括号里的
+         * 原作名（如"( ぼっち・ざ・おんりー!#2)…"里的"ぼっち・ざ・おんりー"）当成了
+         * 书名，导致同 parody 的不同作品全撞进一个目录。条件：存量名（去掉首尾括号后）
+         * 出现在当前帖标题的开头括号标注段里，且新清洗名与之不同。命中后目录应迁移到
+         * 新名，并按新书名重新校验既有章节（甩掉混进来的其它作品）。
+         */
+        fun isParodyResidueCleanBookName(
+            storedName: String,
+            rawTitle: String,
+            freshName: String
+        ): Boolean {
+            if (freshName.isBlank() || storedName == freshName) return false
+            val core = storedName.trim(' ', '(', '（', ')', '）')
+            if (core.isBlank() || core == freshName) return false
+            val stripped = getCleanThreadTitle(rawTitle)
+                .replace(Regex("【.*?】|\\[.*?\\]"), "")
+                .trim()
+            val lead = Regex("^\\s*[（(]([^()（）]+)[)）]").find(stripped)
+                ?.groupValues?.get(1) ?: return false
+            return lead.contains(core)
         }
 
         private val COLLECTION_SUFFIXES =
