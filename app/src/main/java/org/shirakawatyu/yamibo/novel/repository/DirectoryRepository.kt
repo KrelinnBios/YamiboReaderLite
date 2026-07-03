@@ -585,9 +585,12 @@ class DirectoryRepository private constructor(private val context: Context) {
             Log.d(LOG_TAG, "gatheredFromPage=${gatheredFromPage.size}")
 
             if (cachedDir != null) {
+                // 目录一旦确认为"首楼权威链接目录"就保持该属性：即使某次打开时页面
+                // 没解析出链接（HTML 异常等），也不能退回按组过滤/搜索合并的普通逻辑
+                val dirIsAuthoritative = hasAuthoritativePageLinks || cachedDir.authoritativeLinks
                 val hasPageLinks = allLinks.isNotEmpty()
                 val newStrategy =
-                    if (hasAuthoritativePageLinks ||
+                    if (dirIsAuthoritative ||
                         (cachedDir.strategy == DirectoryStrategy.PENDING_SEARCH && hasPageLinks)
                     ) {
                         DirectoryStrategy.LINKS
@@ -606,7 +609,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     threadTitle, cachedDir.translationGroup.orEmpty()
                 )
                 val detectedOrSavedGroup = when {
-                    hasAuthoritativePageLinks -> null
+                    dirIsAuthoritative -> null
                     cachedDir.translationGroup.isNullOrBlank() -> detectedGroup.takeIf { it.isNotBlank() }
                     cachedGroupMatchesThread -> cachedDir.translationGroup
                     detectedGroup.isNotBlank() -> detectedGroup
@@ -638,10 +641,17 @@ class DirectoryRepository private constructor(private val context: Context) {
                 } else {
                     cachedDir.chapters
                 }
-                val mergedAll = if (hasAuthoritativePageLinks) {
-                    gatheredFromPage
-                } else {
-                    mergeAndSortChapters(cachedChapters, gatheredFromPage)
+                val mergedAll = when {
+                    // 本次打开解析出了权威列表：整体以列表为准（顺序、标题、编号都跟列表走）
+                    hasAuthoritativePageLinks -> gatheredFromPage
+                    // 目录是权威列表但本次页面没解析出链接：保持已存列表原样（含顺序），
+                    // 只补充列表里没有的新条目，绝不能让 currentChapter 的原始帖子标题
+                    // 覆盖列表里带编号的条目（如"2、去你家/君の家まで"）
+                    cachedDir.authoritativeLinks -> {
+                        val existingKeys = cachedChapters.map { chapterUniqueKey(it) }.toSet()
+                        cachedChapters + gatheredFromPage.filter { chapterUniqueKey(it) !in existingKeys }
+                    }
+                    else -> mergeAndSortChapters(cachedChapters, gatheredFromPage)
                 }
                 Log.d(LOG_TAG, "mergedAll=${mergedAll.size} before filter")
                 val mergedChapters = filterChaptersByDirectoryConstraints(
@@ -659,6 +669,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     translationGroup = detectedOrSavedGroup,
                     publisherUid = detectedOrSavedPublisherUid,
                     publisherName = detectedOrSavedPublisherName,
+                    authoritativeLinks = dirIsAuthoritative,
                     lastUpdateTime = if (hasAuthoritativePageLinks) {
                         System.currentTimeMillis()
                     } else {
@@ -666,12 +677,13 @@ class DirectoryRepository private constructor(private val context: Context) {
                     }
                 )
 
-                if (mergedChapters.size != cachedDir.chapters.size ||
+                if (mergedChapters != cachedDir.chapters ||
                     updatedDir.strategy != cachedDir.strategy ||
                     updatedDir.sourceFid != cachedDir.sourceFid ||
                     updatedDir.translationGroup != cachedDir.translationGroup ||
                     updatedDir.publisherUid != cachedDir.publisherUid ||
                     updatedDir.publisherName != cachedDir.publisherName ||
+                    updatedDir.authoritativeLinks != cachedDir.authoritativeLinks ||
                     updatedDir.lastUpdateTime != cachedDir.lastUpdateTime
                 ) {
                     saveDirectory(updatedDir)
@@ -728,6 +740,7 @@ class DirectoryRepository private constructor(private val context: Context) {
                     },
                     publisherUid = if (canAutoDetectPublisher) detectedAuthor.uid else null,
                     publisherName = if (canAutoDetectPublisher) detectedAuthor.name else null,
+                    authoritativeLinks = hasAuthoritativePageLinks,
                     lastUpdateTime = if (hasAuthoritativePageLinks) {
                         System.currentTimeMillis()
                     } else {
@@ -749,6 +762,20 @@ class DirectoryRepository private constructor(private val context: Context) {
         val newChapters = mutableListOf<MangaChapterItem>()
         var searchPerformed = false
         try {
+            // 首楼编号链接列表是权威目录：搜索更新会用原始帖子标题覆盖列表条目、
+            // 按 tid 打乱列表顺序、甚至把未列出的帖子混进来，这里整体跳过。
+            // 列表内容在每次打开原帖时按首楼自动刷新。
+            val latestForAuthoritativeCheck = loadDirectory(currentDir.cleanBookName) ?: currentDir
+            if (latestForAuthoritativeCheck.authoritativeLinks) {
+                val refreshed = getFileLock(currentDir.cleanBookName).withLock {
+                    val latest = loadDirectory(currentDir.cleanBookName) ?: currentDir
+                    latest.copy(lastUpdateTime = System.currentTimeMillis()).also { saveDirectory(it) }
+                }
+                // searchPerformed 报 true：强制搜索对权威目录同样跳过，
+                // 报 false 会让面板弹出"强制搜索"快捷入口，点了也没有意义
+                return@withContext Result.success(DirectoryUpdateResult(refreshed, true))
+            }
+
             val targetChapter = currentDir.chapters.find { it.tid == currentTid }
                 ?: currentDir.chapters.lastOrNull()
 
