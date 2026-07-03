@@ -48,6 +48,18 @@ class DirectoryChapterFilterTest {
     }
 
     @Test
+    fun dropsNavigationLinkPseudoChapters() {
+        // 已经写进目录的"上一话/下一话"导航链接伪章节要被过滤自愈，无约束时也一样
+        val chapters = listOf(
+            chapter("100", "【A汉化组】某作品 第1话", 1f),
+            chapter("101", "上一话", 1f),
+            chapter("102", "【A汉化组】下一话", 1f)
+        )
+        assertEquals(listOf("100"), filter(chapters, null).map { it.tid })
+        assertEquals(listOf("100"), filter(chapters, "A汉化组").map { it.tid })
+    }
+
+    @Test
     fun dropsOtherGroupsInsteadOfGapFilling() {
         val chapters = listOf(
             chapter("100", "【A汉化组】某作品 第1话", 1f),
