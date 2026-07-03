@@ -113,7 +113,11 @@ class DirectoryRepository private constructor(private val context: Context) {
             publisherName: String?,
             keepUnknownPublisher: Boolean
         ): List<MangaChapterItem> {
-            val valid = chapters.filterNot { MangaTitleCleaner.isUrlLikeChapterTitle(it.rawTitle) }
+            // 顺带自愈已经写进目录的"上一话/下一话"等导航链接伪章节
+            val valid = chapters.filterNot {
+                MangaTitleCleaner.isUrlLikeChapterTitle(it.rawTitle) ||
+                        MangaTitleCleaner.isNavigationLinkTitle(it.rawTitle)
+            }
             val hasConstraint = !translationGroup.isNullOrBlank() ||
                     !publisherUid.isNullOrBlank() || !publisherName.isNullOrBlank()
             if (!hasConstraint) return valid
