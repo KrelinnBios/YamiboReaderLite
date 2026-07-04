@@ -91,6 +91,8 @@ Android 7.0（API 24）及以上。
 - [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro)
 - [flben233/YamiboReader](https://github.com/flben233/YamiboReader)
 - [duck123ducker/yamibo_manga_reader](https://github.com/duck123ducker/yamibo_manga_reader)（参考）
+- [LittleSurvival/yamibo-app](https://github.com/LittleSurvival/yamibo-app)（Compose Multiplatform 跨平台客户端）
+- [Arkalin/YamiboReaderSwift](https://github.com/Arkalin/YamiboReaderSwift)（SwiftUI iOS 客户端）
 
 ## 反馈与贡献
 
