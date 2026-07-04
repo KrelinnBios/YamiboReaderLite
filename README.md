@@ -9,6 +9,12 @@
   面向百合会论坛的非官方 Android 阅读客户端
 </p>
 
+<p align="center">
+  <a href="https://github.com/KrelinnBios/YamiboReaderLite/releases"><img src="https://img.shields.io/github/v/release/KrelinnBios/YamiboReaderLite?style=flat-square&label=下载&color=2f6f73" alt="最新版本"></a>
+  <img src="https://img.shields.io/badge/平台-Android%207.0%2B-247344?style=flat-square" alt="Android 7.0+">
+  <img src="https://img.shields.io/badge/许可-AGPL--3.0-1f5f9c?style=flat-square" alt="AGPL-3.0 License">
+</p>
+
 > [!IMPORTANT]
 > YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
 
