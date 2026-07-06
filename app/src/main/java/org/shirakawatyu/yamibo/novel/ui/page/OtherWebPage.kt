@@ -2,7 +2,6 @@ package org.shirakawatyu.yamibo.novel.ui.page
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -89,7 +88,6 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.util.ActivityWebViewLifecycleObserver
 import org.shirakawatyu.yamibo.novel.util.ComposeUtil.Companion.SetStatusBarColor
-import org.shirakawatyu.yamibo.novel.util.ImageSaveUtil
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import kotlin.text.Charsets
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
@@ -105,7 +103,6 @@ import androidx.core.view.WindowInsetsCompat
 class FullscreenApiOther {
     var onStateChange: ((Boolean) -> Unit)? = null
     var onMangaActionDone: (() -> Unit)? = null
-    var onSaveImage: ((String) -> Unit)? = null
     var onCopyLink: ((String, String) -> Unit)? = null
 
     @JavascriptInterface
@@ -118,10 +115,6 @@ class FullscreenApiOther {
         Handler(Looper.getMainLooper()).post { onMangaActionDone?.invoke() }
     }
 
-    @JavascriptInterface
-    fun saveImage(url: String) {
-        Handler(Looper.getMainLooper()).post { onSaveImage?.invoke(url) }
-    }
 
     @JavascriptInterface
     fun copyLink(title: String, url: String) {
@@ -245,18 +238,6 @@ fun OtherWebPage(
     }
     fullscreenApi.onStateChange = { isFullscreen -> isFullscreenState.value = isFullscreen }
     fullscreenApi.onMangaActionDone = { autoOpenMangaMode = false }
-    fullscreenApi.onSaveImage = { url ->
-        AlertDialog.Builder(context)
-            .setTitle("保存图片")
-            .setMessage("是否保存当前图片到手机？")
-            .setPositiveButton("保存") { _, _ ->
-                scope.launch {
-                    ImageSaveUtil.saveImage(context, url)
-                }
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
     fullscreenApi.onCopyLink = { title, url ->
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("yamibo_link", "$title\n$url")
