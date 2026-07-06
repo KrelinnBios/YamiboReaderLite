@@ -39,6 +39,56 @@ object PageJsScripts {
     }
 
 
+    // 图片查看器（PhotoSwipe）长按 0.5 秒保存图片；多指手势（双指缩放）和移动超阈值取消。
+    // 由 BBS/Mine/OtherWeb 三个注入脚本共用，必须声明在它们之前（object 属性按声明顺序初始化）。
+    private val PSWP_LONG_PRESS_SAVE_JS = """
+        if (!window.__pswpLongPressInjected) {
+            window.__pswpLongPressInjected = true;
+            var _lpTimer = null;
+            var _lpStartPos = null;
+            var _lpPointerId = null;
+            var _lpPointerCount = 0;
+            var _lpCancel = function() {
+                if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+            };
+            document.addEventListener('pointerdown', function(e) {
+                var pswp = document.querySelector('.pswp');
+                if (!pswp || !pswp.classList.contains('pswp--open')) return;
+                _lpPointerCount++;
+                if (_lpPointerCount > 1) {
+                    _lpCancel();
+                    return;
+                }
+                _lpPointerId = e.pointerId;
+                _lpStartPos = { x: e.clientX, y: e.clientY };
+                _lpCancel();
+                _lpTimer = setTimeout(function() {
+                    _lpTimer = null;
+                    if (_lpPointerCount !== 1) return;
+                    if (!pswp.classList.contains('pswp--open')) return;
+                    var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
+                    if (img && img.src && window.AndroidFullscreen) {
+                        window.AndroidFullscreen.saveImage(img.src);
+                    }
+                }, 500);
+            }, { passive: true });
+            document.addEventListener('pointermove', function(e) {
+                if (!_lpTimer || !_lpStartPos || e.pointerId !== _lpPointerId) return;
+                if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
+                    _lpCancel();
+                }
+            }, { passive: true });
+            document.addEventListener('pointerup', function() {
+                if (_lpPointerCount > 0) _lpPointerCount--;
+                _lpCancel();
+            }, { passive: true });
+            document.addEventListener('pointercancel', function() {
+                if (_lpPointerCount > 0) _lpPointerCount--;
+                _lpCancel();
+            }, { passive: true });
+        }
+    """.trimIndent()
+
     val FIX_CAROUSEL_LAYOUT_JS = """
         (function() {
             if (document.getElementById('carousel-fix-style')) return;
@@ -121,35 +171,7 @@ object PageJsScripts {
                 checkState();
             };
             window.__pswpInit();
-            if (!window.__pswpLongPressInjected) {
-                window.__pswpLongPressInjected = true;
-                var _lpTimer = null;
-                var _lpStartPos = null;
-                document.addEventListener('pointerdown', function(e) {
-                    var pswp = document.querySelector('.pswp');
-                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
-                    _lpStartPos = { x: e.clientX, y: e.clientY };
-                    _lpTimer = setTimeout(function() {
-                        _lpTimer = null;
-                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
-                        if (img && img.src && window.AndroidFullscreen) {
-                            window.AndroidFullscreen.saveImage(img.src);
-                        }
-                    }, 500);
-                }, { passive: true });
-                document.addEventListener('pointermove', function(e) {
-                    if (!_lpTimer || !_lpStartPos) return;
-                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
-                        clearTimeout(_lpTimer); _lpTimer = null;
-                    }
-                }, { passive: true });
-                document.addEventListener('pointerup', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-                document.addEventListener('pointercancel', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-            }
+            $PSWP_LONG_PRESS_SAVE_JS
             if (!window._backBtnFixed) {
                 window._backBtnFixed = true;
                 document.addEventListener('click', function(e) {
@@ -614,35 +636,7 @@ object PageJsScripts {
                 checkState();
             };
             window.__pswpInit();
-            if (!window.__pswpLongPressInjected) {
-                window.__pswpLongPressInjected = true;
-                var _lpTimer = null;
-                var _lpStartPos = null;
-                document.addEventListener('pointerdown', function(e) {
-                    var pswp = document.querySelector('.pswp');
-                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
-                    _lpStartPos = { x: e.clientX, y: e.clientY };
-                    _lpTimer = setTimeout(function() {
-                        _lpTimer = null;
-                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
-                        if (img && img.src && window.AndroidFullscreen) {
-                            window.AndroidFullscreen.saveImage(img.src);
-                        }
-                    }, 500);
-                }, { passive: true });
-                document.addEventListener('pointermove', function(e) {
-                    if (!_lpTimer || !_lpStartPos) return;
-                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
-                        clearTimeout(_lpTimer); _lpTimer = null;
-                    }
-                }, { passive: true });
-                document.addEventListener('pointerup', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-                document.addEventListener('pointercancel', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-            }
+            $PSWP_LONG_PRESS_SAVE_JS
 
             var rewriteHomeLink = function() {
                 var homeLink = document.querySelector('.my a[href*="index.php"]');
@@ -912,35 +906,7 @@ object PageJsScripts {
                 checkState();
             };
             window.__pswpInit();
-            if (!window.__pswpLongPressInjected) {
-                window.__pswpLongPressInjected = true;
-                var _lpTimer = null;
-                var _lpStartPos = null;
-                document.addEventListener('pointerdown', function(e) {
-                    var pswp = document.querySelector('.pswp');
-                    if (!pswp || !pswp.classList.contains('pswp--open')) return;
-                    _lpStartPos = { x: e.clientX, y: e.clientY };
-                    _lpTimer = setTimeout(function() {
-                        _lpTimer = null;
-                        var img = pswp.querySelector('.pswp__item--active img') || pswp.querySelector('.pswp__img');
-                        if (img && img.src && window.AndroidFullscreen) {
-                            window.AndroidFullscreen.saveImage(img.src);
-                        }
-                    }, 500);
-                }, { passive: true });
-                document.addEventListener('pointermove', function(e) {
-                    if (!_lpTimer || !_lpStartPos) return;
-                    if (Math.abs(e.clientX - _lpStartPos.x) > 10 || Math.abs(e.clientY - _lpStartPos.y) > 10) {
-                        clearTimeout(_lpTimer); _lpTimer = null;
-                    }
-                }, { passive: true });
-                document.addEventListener('pointerup', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-                document.addEventListener('pointercancel', function() {
-                    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
-                }, { passive: true });
-            }
+            $PSWP_LONG_PRESS_SAVE_JS
         })()
     """.trimIndent()
 
