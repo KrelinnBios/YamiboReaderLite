@@ -22,8 +22,6 @@
 
 YamiboReaderLite 是面向百合会论坛的非官方 Android 阅读客户端。Lite 版本围绕移动端阅读体验，整合论坛浏览、收藏管理、浏览历史、小说阅读和漫画阅读等功能。
 
-以下说明仅描述 YamiboReaderLite 当前实际提供的功能。
-
 ## 功能概览
 
 - 论坛浏览：登录账号浏览百合会论坛，支持自动签到、深色显示和简繁切换。
@@ -59,7 +57,7 @@ YamiboReaderLite 是面向百合会论坛的非官方 Android 阅读客户端。
 
 ### 安装使用
 
-从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 APK 后安装。
+从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 `300 Lite.apk` 后安装。
 
 ### 系统要求
 
@@ -75,7 +73,7 @@ Android 7.0（API 24）及以上。
 
 ## 数据与安全
 
-- 登录状态、收藏、历史和缓存等数据保存在设备本地或来自百合会论坛账号本身。
+- 登录状态、收藏、历史、阅读进度和缓存等数据保存在设备本地或来自百合会论坛账号本身。
 - 请只从本仓库 Releases 或可信来源安装 APK，避免使用来源不明的改包版本。
 - 清理应用数据、卸载应用或更换设备可能导致本地历史、缓存和设置丢失。
 
