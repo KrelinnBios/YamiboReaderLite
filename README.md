@@ -1,7 +1,7 @@
 # YamiboReaderLite
 
 <p align="center">
-  <img src="icon/logo.svg" width="128" alt="300 Lite logo">
+  <img src="icon/icon.svg" width="128" alt="300 Lite icon">
 </p>
 
 <p align="center">
