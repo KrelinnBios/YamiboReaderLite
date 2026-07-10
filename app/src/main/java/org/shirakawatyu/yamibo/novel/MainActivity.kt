@@ -555,7 +555,9 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
     var showClipboardHint by remember { mutableStateOf(false) }
     var detectedClipboardUrl by remember { mutableStateOf("") }
     var appUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
-    var hasCheckedAppUpdate by rememberSaveable { mutableStateOf(false) }
+    // 用 remember 而非 rememberSaveable：进程被杀后从最近任务恢复时应重新检查，
+    // 否则恢复的 true 会让这次冷启动跳过检查；频率控制交给 checkForUpdateAuto 的节流。
+    var hasCheckedAppUpdate by remember { mutableStateOf(false) }
 
     LaunchedEffect(
         isAppInitialized,
