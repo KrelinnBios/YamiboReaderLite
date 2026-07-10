@@ -706,8 +706,8 @@ fun FavoritePage(
                                     .padding(horizontal = 4.dp)
                             ) {
                                 Text(
-                                    text = currentCat.second + " " +
-                                        (categoryCounts[currentCat.first] ?: 0),
+                                    text = currentCat.second +
+                                        " (" + (categoryCounts[currentCat.first] ?: 0) + ")",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = topBarContentColor
@@ -744,9 +744,7 @@ fun FavoritePage(
                                         contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
                                         text = {
                                             Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(start = 16.dp),
+                                                modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
@@ -768,7 +766,7 @@ fun FavoritePage(
                                         },
                                         leadingIcon = {
                                             Box(
-                                                modifier = Modifier.size(32.dp),
+                                                modifier = Modifier.size(20.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 if (typeId == -1) {
