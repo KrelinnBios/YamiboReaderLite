@@ -751,7 +751,7 @@ fun FavoritePage(
                                                     text = name,
                                                     fontSize = 15.sp
                                                 )
-                                                Spacer(modifier = Modifier.weight(1f))
+                                                Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = (categoryCounts[typeId] ?: 0).toString(),
                                                     fontSize = 13.sp,
