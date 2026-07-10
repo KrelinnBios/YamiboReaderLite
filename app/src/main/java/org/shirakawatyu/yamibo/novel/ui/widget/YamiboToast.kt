@@ -36,11 +36,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -75,12 +77,39 @@ object YamiboToast {
             )
         )
     }
+
+    fun showPersistent(ownerKey: String, message: String) {
+        val cleanMessage = message.trim()
+        if (cleanMessage.isEmpty()) return
+        _events.tryEmit(
+            ToastEvent(
+                id = nextId.incrementAndGet(),
+                message = cleanMessage,
+                durationMillis = Long.MAX_VALUE,
+                ownerKey = ownerKey
+            )
+        )
+    }
+
+    fun dismiss(ownerKey: String) {
+        _events.tryEmit(
+            ToastEvent(
+                id = nextId.incrementAndGet(),
+                message = "",
+                durationMillis = 0L,
+                ownerKey = ownerKey,
+                isDismissal = true
+            )
+        )
+    }
 }
 
 data class ToastEvent(
     val id: Long,
     val message: String,
-    val durationMillis: Long
+    val durationMillis: Long,
+    val ownerKey: String? = null,
+    val isDismissal: Boolean = false
 )
 
 @Composable
@@ -127,14 +156,34 @@ fun YamiboToastHost(modifier: Modifier = Modifier) {
     var visible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        YamiboToast.events.collectLatest { event ->
-            displayedEvent = event
-            visible = true
-            delay(event.durationMillis)
-            visible = false
-            delay(180L)
-            if (displayedEvent?.id == event.id) {
-                displayedEvent = null
+        var hideJob: Job? = null
+        YamiboToast.events.collect { event ->
+            if (event.isDismissal) {
+                if (displayedEvent?.ownerKey == event.ownerKey) {
+                    val dismissedEventId = displayedEvent?.id
+                    hideJob?.cancel()
+                    visible = false
+                    launch {
+                        delay(180L)
+                        if (displayedEvent?.id == dismissedEventId) {
+                            displayedEvent = null
+                        }
+                    }
+                }
+            } else {
+                hideJob?.cancel()
+                displayedEvent = event
+                visible = true
+                hideJob = launch {
+                    delay(event.durationMillis)
+                    if (displayedEvent?.id == event.id) {
+                        visible = false
+                        delay(180L)
+                        if (displayedEvent?.id == event.id) {
+                            displayedEvent = null
+                        }
+                    }
+                }
             }
         }
     }

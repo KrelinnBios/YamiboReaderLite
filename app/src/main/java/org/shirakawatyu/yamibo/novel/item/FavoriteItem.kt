@@ -328,21 +328,6 @@ fun FavoriteItem(
     }
 }
 
-
-private enum class HandleStatus {
-    CHECKING,
-    UPDATED
-}
-
-/**
- * 卡片右侧状态把手：状态胶囊作为浮层坐在最右侧 40dp 图标区域上。
- *
- * 状态贴在右侧把手上，不占标题宽度，也不改变卡片高度。
- * 优先级：检查中 > 有更新。
- *
- * 退出动画期间冻结 lastVisibleStatus，防止 AnimatedVisibility fade-out 时
- * isCheckingUpdate 已变 false 但内容切到 else 分支，闪现"新"胶囊。
- */
 @Composable
 private fun UpdateStatusHandle(
     isCheckingUpdate: Boolean,
@@ -355,8 +340,7 @@ private fun UpdateStatusHandle(
     val updateAccent = MaterialTheme.colorScheme.primary
 
     Box(
-        modifier = modifier
-            .size(40.dp),
+        modifier = modifier.size(40.dp),
         contentAlignment = Alignment.Center
     ) {
         androidx.compose.animation.AnimatedVisibility(
@@ -371,131 +355,18 @@ private fun UpdateStatusHandle(
             )
         }
 
-        if ((hasUpdate || hasUpdateCheckFailure) && !isCheckingUpdate) {
-            if (onRefreshUpdate != null) {
-                IconButton(
-                    onClick = onRefreshUpdate,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = if (hasUpdateCheckFailure) "重新检查更新" else "刷新检查更新",
-                        tint = updateAccent,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            } else {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(140, easing = FastOutSlowInEasing)),
-                    exit = fadeOut(animationSpec = tween(120)),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = (-12).dp)
-                ) {
-                    HandleStatusCapsule(
-                        status = HandleStatus.UPDATED,
-                        accent = updateAccent
-                    )
-                }
+        if ((hasUpdate || hasUpdateCheckFailure) && !isCheckingUpdate && onRefreshUpdate != null) {
+            IconButton(
+                onClick = onRefreshUpdate,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = if (hasUpdateCheckFailure) "重新检查更新" else "刷新检查更新",
+                    tint = updateAccent,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
-    }
-}
-
-/** 贴在把手上的迷你胶囊：保留胶囊质感，但被限制在右侧图标区域内。 */
-@Composable
-private fun HandleStatusCapsule(
-    status: HandleStatus,
-    accent: Color
-) {
-    val isChecking = status == HandleStatus.CHECKING
-    val shape = RoundedCornerShape(50)
-    val containerAlpha = if (isChecking) 0.14f else 0.16f
-    val borderAlpha = if (isChecking) 0.34f else 0.40f
-    val textOffsetPx = with(androidx.compose.ui.platform.LocalDensity.current) { (-3).dp.toPx() }
-
-    Row(
-        modifier = Modifier
-            .width(38.dp)
-            .height(18.dp)
-            .clip(shape)
-            .background(accent.copy(alpha = containerAlpha))
-            .border(1.dp, accent.copy(alpha = borderAlpha), shape)
-            .padding(horizontal = 5.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (isChecking) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(10.dp),
-                strokeWidth = 1.45.dp,
-                color = accent
-            )
-            Spacer(Modifier.width(3.dp))
-            Text(
-                text = "查",
-                color = accent,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                modifier = Modifier.graphicsLayer { translationY = textOffsetPx }
-            )
-        } else {
-            UpdateCapsuleGlyph(accent = accent)
-            Spacer(Modifier.width(3.dp))
-            Text(
-                text = "新",
-                color = accent,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                modifier = Modifier.graphicsLayer { translationY = textOffsetPx }
-            )
-        }
-    }
-}
-
-/** 胶囊内的柔和脉冲点：让”有更新”有生命感，但不再是孤零零廉价红点。 */
-@Composable
-private fun UpdateCapsuleGlyph(accent: Color) {
-    val transition = rememberInfiniteTransition(label = "update_capsule_pulse")
-    val haloScale by transition.animateFloat(
-        initialValue = 0.72f,
-        targetValue = 1.45f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "update_capsule_halo_scale"
-    )
-    val haloAlpha by transition.animateFloat(
-        initialValue = 0.34f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "update_capsule_halo_alpha"
-    )
-
-    Box(modifier = Modifier.size(10.dp), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .size(7.dp)
-                .graphicsLayer {
-                    scaleX = haloScale
-                    scaleY = haloScale
-                    alpha = haloAlpha
-                }
-                .clip(CircleShape)
-                .background(accent)
-        )
-        Box(
-            Modifier
-                .size(5.dp)
-                .clip(CircleShape)
-                .background(accent)
-        )
     }
 }

@@ -113,7 +113,6 @@ import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
-import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToastPill
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
@@ -126,6 +125,7 @@ import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 // 非搜索场景下，确认"暂无收藏"前的等待时间。
 // 调大以覆盖冷启动时 DataStore/Flow 首次发射前的空窗，避免闪现"暂无收藏"。
 private const val EMPTY_STATE_CONFIRM_DELAY_MS = 1500L
+private const val FAVORITE_REFRESH_TOAST_KEY = "favorite_refresh"
 
 /**
  * 收藏页面，展示用户的收藏列表，支持刷新和拖拽排序。
@@ -154,6 +154,8 @@ fun FavoritePage(
     val otherCheckMap = remember(updateCheckOthers) { updateCheckOthers.associateBy { it.url } }
     var cacheInfoMap = uiState.cacheInfoMap
     var pendingBatchCheck by remember { mutableStateOf(false) }
+    var isManualRefreshSession by remember { mutableStateOf(false) }
+    var pendingNewFavoriteCount by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { favoriteVM.refreshCacheInfo() }
     LaunchedEffect(isRefreshing) {
         if (!isRefreshing && pendingBatchCheck) {
@@ -166,30 +168,36 @@ fun FavoritePage(
     // 链路进行中（列表同步 + 批量更新检查）用超长时长常驻「正在刷新…」，
     // 结束后结果文案顶替同一个胶囊短暂展示。
     val refreshChainActive = isRefreshing || pendingBatchCheck || uiState.isBatchChecking
-    val refreshProgressText = if (uiState.refreshTotalCount > 0) {
-        "正在刷新收藏 " + uiState.refreshLoadedCount + "/" + uiState.refreshTotalCount
-    } else {
-        "正在刷新收藏 0/…"
-    }
-    LaunchedEffect(
-        refreshChainActive,
-        uiState.refreshLoadedCount,
-        uiState.refreshTotalCount
-    ) {
+    LaunchedEffect(refreshChainActive) {
         if (refreshChainActive) {
-            YamiboToast.show(message = refreshProgressText, durationMillis = 10 * 60_000L)
+            YamiboToast.showPersistent(
+                ownerKey = FAVORITE_REFRESH_TOAST_KEY,
+                message = "正在刷新收藏"
+            )
+        } else {
+            YamiboToast.dismiss(FAVORITE_REFRESH_TOAST_KEY)
         }
     }
     LaunchedEffect(uiState.batchRefreshResult) {
         uiState.batchRefreshResult?.let { result ->
+            YamiboToast.dismiss(FAVORITE_REFRESH_TOAST_KEY)
             YamiboToast.show(message = result)
             favoriteVM.clearBatchRefreshResult()
+            if (isManualRefreshSession) {
+                delay(YamiboToast.LENGTH_SHORT)
+                if (pendingNewFavoriteCount > 0) {
+                    YamiboToast.show(message = "发现 " + pendingNewFavoriteCount + " 条新收藏")
+                }
+                pendingNewFavoriteCount = 0
+                isManualRefreshSession = false
+            }
         }
     }
     DisposableEffect(Unit) {
         favoriteVM.isFavoritePageVisible = true
         onDispose {
             favoriteVM.isFavoritePageVisible = false
+            YamiboToast.dismiss(FAVORITE_REFRESH_TOAST_KEY)
         }
     }
 
@@ -266,11 +274,8 @@ fun FavoritePage(
     }
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
-    var previousListSize by remember { mutableIntStateOf(favoriteList.size) }
-    var wasAtTop by remember { mutableStateOf(true) }
+    var previousFavoriteUrls by remember { mutableStateOf(favoriteList.map { it.url }.toSet()) }
     var keepTopAfterUnpin by remember { mutableStateOf(false) }
-    var showTopToast by remember { mutableStateOf(false) }
-    var newItemsCount by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     val openMangaFavorite: (Favorite) -> Unit =
         remember(context, navController, coroutineScope) {
@@ -389,47 +394,36 @@ fun FavoritePage(
     }
 
 
-    LaunchedEffect(lazyListState) {
-        androidx.compose.runtime.snapshotFlow {
-            lazyListState.firstVisibleItemIndex to lazyListState.firstVisibleItemScrollOffset
-        }.collect { (index, offset) ->
-            wasAtTop = (index == 0 && offset <= 50)
-        }
-    }
-
     var previousCategory by remember { mutableIntStateOf(favoriteVM.currentCategory) }
     var previousManageMode by remember { mutableStateOf(uiState.isInManageMode) }
 
 
-    LaunchedEffect(favoriteList, favoriteVM.currentCategory, uiState.isInManageMode) {
+    LaunchedEffect(
+        favoriteList,
+        favoriteVM.currentCategory,
+        uiState.isInManageMode,
+        refreshChainActive,
+        isManualRefreshSession
+    ) {
         if (keepTopAfterUnpin) {
             lazyListState.scrollToItem(0)
             keepTopAfterUnpin = false
         }
 
-        val addedCount = favoriteList.size - previousListSize
-
         val isSameCategory = favoriteVM.currentCategory == previousCategory
         val isSameManageMode = uiState.isInManageMode == previousManageMode
-        val isNotInitialLoad = previousListSize > 0
-
-        if (isSameCategory && isSameManageMode && isNotInitialLoad && addedCount > 0) {
-            if (wasAtTop) {
-                lazyListState.animateScrollToItem(0)
-            } else {
-                newItemsCount = addedCount
-                showTopToast = true
+        if (isSameCategory && isSameManageMode && isManualRefreshSession && refreshChainActive) {
+            val addedSupportedFavorites = favoriteList.count { favorite ->
+                favorite.url !in previousFavoriteUrls && favorite.type in 1..2
+            }
+            if (addedSupportedFavorites > 0) {
+                pendingNewFavoriteCount += addedSupportedFavorites
             }
         }
-        previousListSize = favoriteList.size
+
+        previousFavoriteUrls = favoriteList.map { it.url }.toSet()
         previousCategory = favoriteVM.currentCategory
         previousManageMode = uiState.isInManageMode
-    }
-    LaunchedEffect(showTopToast) {
-        if (showTopToast) {
-            delay(2500)
-            showTopToast = false
-        }
     }
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -861,6 +855,8 @@ fun FavoritePage(
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = {
+                isManualRefreshSession = true
+                pendingNewFavoriteCount = 0
                 favoriteVM.refreshList(showLoading = true, isSmartSync = false)
                 pendingBatchCheck = true
             },
@@ -1095,26 +1091,6 @@ fun FavoritePage(
                 }
             }
 
-            // 悬浮气泡
-            androidx.compose.animation.AnimatedVisibility(
-                visible = showTopToast && !isRefreshing,
-                enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) +
-                        androidx.compose.animation.slideInVertically(initialOffsetY = { 30 }),
-                exit = androidx.compose.animation.fadeOut(animationSpec = tween(500)),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 78.dp + lockedNavHeight)
-            ) {
-                YamiboToastPill(
-                    message = "发现了 " + newItemsCount + " 条新收藏（点击查看）",
-                    modifier = Modifier.clickable {
-                        showTopToast = false
-                        coroutineScope.launch {
-                            lazyListState.animateScrollToItem(0)
-                        }
-                    }
-                )
-            }
         }
 
         if (itemActionTarget != null) {
