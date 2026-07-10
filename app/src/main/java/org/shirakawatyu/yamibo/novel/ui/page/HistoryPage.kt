@@ -230,9 +230,6 @@ private fun HistoryHeatmapPickerDialog(
     var displayMonth0 by remember { mutableStateOf(initialCalendar.get(Calendar.MONTH)) }
     var draftStart by remember(selectedStart) { mutableStateOf(selectedStart) }
     var draftEnd by remember(selectedEnd) { mutableStateOf(selectedEnd) }
-    var isRangeMode by remember {
-        mutableStateOf(selectedEnd != null && selectedEnd != selectedStart)
-    }
 
     val monthCalendar = remember(displayYear, displayMonth0) {
         Calendar.getInstance().apply {
@@ -261,104 +258,81 @@ private fun HistoryHeatmapPickerDialog(
     val primary = MaterialTheme.colorScheme.primary
     val dayShape = RoundedCornerShape(8.dp)
 
+    // 点选交互：先点一天为单日；再点同一天取消；单日状态下点另一天自动成范围；
+    // 已是范围时再点任意日期则重新从该天开始选。
     fun selectDay(dayMillis: Long) {
-        if (!isRangeMode) {
-            draftStart = dayMillis
-            draftEnd = dayMillis
-        } else {
-            when {
-                draftStart == null || draftEnd != null -> {
-                    draftStart = dayMillis
+        val start = draftStart
+        val end = draftEnd ?: start
+        when {
+            start == null -> {
+                draftStart = dayMillis
+                draftEnd = dayMillis
+            }
+            start == end -> when {
+                dayMillis == start -> {
+                    draftStart = null
                     draftEnd = null
                 }
-                dayMillis >= draftStart!! -> draftEnd = dayMillis
+                dayMillis > start -> draftEnd = dayMillis
                 else -> {
                     draftStart = dayMillis
-                    draftEnd = null
+                    draftEnd = start
                 }
+            }
+            else -> {
+                draftStart = dayMillis
+                draftEnd = dayMillis
             }
         }
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(
+                    onClick = {
+                        if (displayMonth0 == 0) {
+                            displayYear--
+                            displayMonth0 = Calendar.DECEMBER
+                        } else {
+                            displayMonth0--
+                        }
+                    },
+                    enabled = canMovePrevious
                 ) {
-                    IconButton(
-                        onClick = {
-                            if (displayMonth0 == 0) {
-                                displayYear--
-                                displayMonth0 = Calendar.DECEMBER
-                            } else {
-                                displayMonth0--
-                            }
-                        },
-                        enabled = canMovePrevious
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "上个月"
-                        )
-                    }
-                    Text(
-                        text = displayYear.toString() + "年" + (displayMonth0 + 1) + "月",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "上个月"
                     )
-                    IconButton(
-                        onClick = {
-                            if (displayMonth0 == Calendar.DECEMBER) {
-                                displayYear++
-                                displayMonth0 = Calendar.JANUARY
-                            } else {
-                                displayMonth0++
-                            }
-                        },
-                        enabled = canMoveNext
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "下个月"
-                        )
-                    }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                Text(
+                    text = displayYear.toString() + "年" + (displayMonth0 + 1) + "月",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                IconButton(
+                    onClick = {
+                        if (displayMonth0 == Calendar.DECEMBER) {
+                            displayYear++
+                            displayMonth0 = Calendar.JANUARY
+                        } else {
+                            displayMonth0++
+                        }
+                    },
+                    enabled = canMoveNext
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
-                        color = if (!isRangeMode) primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { isRangeMode = false }
-                    ) {
-                        Text(
-                            text = "单日",
-                            color = if (!isRangeMode) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
-                        color = if (isRangeMode) primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.clickable { isRangeMode = true }
-                    ) {
-                        Text(
-                            text = "范围",
-                            color = if (isRangeMode) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "下个月"
+                    )
                 }
             }
         },
@@ -384,62 +358,78 @@ private fun HistoryHeatmapPickerDialog(
                             } else {
                                 val dayMillis = dateAtStartOfDay(displayYear, displayMonth0, day)
                                 val count = dailyCounts[historyDateKey(dayMillis)] ?: 0
-                                val selected = if (isRangeMode && draftStart != null) {
-                                    dayMillis in draftStart!!..(draftEnd ?: draftStart!!)
-                                } else {
-                                    dayMillis == draftStart
-                                }
+                                val selected = draftStart != null &&
+                                        dayMillis in draftStart!!..(draftEnd ?: draftStart!!)
                                 val intensity = if (count == 0) 0f
                                 else (0.28f + 0.72f * count / maxCount.coerceAtLeast(1).toFloat())
                                     .coerceIn(0f, 1f)
                                 val containerColor = when {
-                                    selected -> primary
                                     count > 0 -> primary.copy(alpha = intensity)
                                     else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                                 }
+                                // 选中标识用「描边 + 与填充留缝」而不是换填充色：
+                                // 热力最深的格子本身就是纯 primary，换色区分不出选中。
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(38.dp)
                                         .padding(2.dp)
                                         .clip(dayShape)
-                                        .background(containerColor)
                                         .then(
-                                            if (selected) Modifier.border(1.dp, primary, dayShape)
+                                            if (selected) Modifier.border(2.dp, primary, dayShape)
                                             else Modifier
                                         )
                                         .clickable(enabled = count > 0) { selectDay(dayMillis) },
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = day.toString(),
-                                        fontSize = 12.sp,
-                                        color = if (selected || intensity > 0.55f) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(if (selected) 4.dp else 0.dp)
+                                            .clip(dayShape)
+                                            .background(containerColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = day.toString(),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (selected) FontWeight.Bold else null,
+                                            color = if (intensity > 0.55f) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                val start = draftStart
+                val end = draftEnd ?: start
+                val selectionText = when {
+                    start == null -> "未选择日期"
+                    end == start -> "已选择 " + formatDateOnly(start)
+                    else -> "已选择 " + formatDateOnly(start) + " - " + formatDateOnly(end!!)
+                }
                 Text(
-                    text = "颜色越深表示当天浏览记录越多；仅可选择有记录的日期。",
+                    text = selectionText,
                     modifier = Modifier.padding(top = 8.dp),
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontWeight = if (start != null) FontWeight.Medium else null,
+                    color = if (start != null) primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         confirmButton = {
+            // 允许在未选任何日期时确定：取消全部选择后点确定即清除日期筛选。
             TextButton(
                 onClick = {
-                    onConfirm(draftStart, if (isRangeMode) draftEnd ?: draftStart else draftStart)
+                    onConfirm(draftStart, if (draftStart != null) draftEnd ?: draftStart else null)
                     onDismiss()
-                },
-                enabled = draftStart != null
+                }
             ) {
                 Text("确定")
             }
@@ -550,7 +540,7 @@ fun HistoryPage(navController: NavController) {
             ),
             OnboardingStep(
                 title = "浏览历史小提示",
-                description = "点击搜索框右侧的日历图标可以按日期或日期范围筛选；筛选生效后上方会出现日期标签，点击标签可以清除。"
+                description = "点击搜索框右侧的日历图标可以按日期筛选：日历中颜色越深表示当天浏览记录越多，只能点选有记录的日期。点一个日期筛选当天，再点另一个日期即为范围，重复点击已选日期可以取消。筛选生效后上方会出现日期标签，点击标签可以清除。"
             ),
             OnboardingStep(
                 title = "浏览历史小提示",
