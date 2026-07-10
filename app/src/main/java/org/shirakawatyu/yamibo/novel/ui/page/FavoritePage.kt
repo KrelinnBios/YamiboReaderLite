@@ -854,13 +854,13 @@ fun FavoritePage(
                 }
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isRefreshing,
-                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
                         androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
                         androidx.compose.animation.fadeOut(),
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 16.dp)
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 78.dp + lockedNavHeight)
                 ) {
                     Card(
                         shape = RoundedCornerShape(20.dp),
@@ -1106,13 +1106,13 @@ fun FavoritePage(
             // 悬浮气泡
             androidx.compose.animation.AnimatedVisibility(
                 visible = showTopToast && !isRefreshing,
-                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
+                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
                         androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +
+                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
                         androidx.compose.animation.fadeOut(),
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 78.dp + lockedNavHeight)
             ) {
                 Card(
                     shape = RoundedCornerShape(20.dp),

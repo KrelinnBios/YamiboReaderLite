@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
@@ -32,10 +35,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,8 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,11 +56,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -182,6 +181,277 @@ private fun formatDateOnly(millis: Long): String {
     return "${cal.get(Calendar.YEAR)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.DAY_OF_MONTH)}"
 }
 
+private const val HISTORY_HEATMAP_START_YEAR = 2026
+
+private fun historyDateKey(timestamp: Long): String {
+    val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
+    return "%04d-%02d-%02d".format(
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH) + 1,
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
+}
+
+private fun dateAtStartOfDay(year: Int, month0: Int, day: Int): Long =
+    Calendar.getInstance().apply {
+        clear()
+        set(year, month0, day)
+    }.timeInMillis
+
+@Composable
+private fun HistoryHeatmapPickerDialog(
+    historyEntries: List<HistoryEntry>,
+    selectedStart: Long?,
+    selectedEnd: Long?,
+    onConfirm: (Long?, Long?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dailyCounts = remember(historyEntries) {
+        historyEntries
+            .groupingBy { historyDateKey(it.timestamp) }
+            .eachCount()
+    }
+    val latestTimestamp = remember(historyEntries) {
+        historyEntries.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+    }
+    val initialCalendar = remember(latestTimestamp) {
+        Calendar.getInstance().apply {
+            timeInMillis = latestTimestamp
+            if (get(Calendar.YEAR) < HISTORY_HEATMAP_START_YEAR) {
+                clear()
+                set(HISTORY_HEATMAP_START_YEAR, Calendar.JANUARY, 1)
+            }
+        }
+    }
+    val now = Calendar.getInstance()
+    val currentYear = now.get(Calendar.YEAR)
+    val currentMonth0 = now.get(Calendar.MONTH)
+    var displayYear by remember { mutableStateOf(initialCalendar.get(Calendar.YEAR)) }
+    var displayMonth0 by remember { mutableStateOf(initialCalendar.get(Calendar.MONTH)) }
+    var draftStart by remember(selectedStart) { mutableStateOf(selectedStart) }
+    var draftEnd by remember(selectedEnd) { mutableStateOf(selectedEnd) }
+    var isRangeMode by remember {
+        mutableStateOf(selectedEnd != null && selectedEnd != selectedStart)
+    }
+
+    val monthCalendar = remember(displayYear, displayMonth0) {
+        Calendar.getInstance().apply {
+            clear()
+            set(displayYear, displayMonth0, 1)
+        }
+    }
+    val daysInMonth = monthCalendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val leadingEmptyCells = (monthCalendar.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    val dayCells = remember(displayYear, displayMonth0, daysInMonth, leadingEmptyCells) {
+        buildList<Int?> {
+            repeat(leadingEmptyCells) { add(null) }
+            for (day in 1..daysInMonth) add(day)
+            while (size % 7 != 0) add(null)
+        }
+    }
+    val currentMonthPrefix = "%04d-%02d".format(displayYear, displayMonth0 + 1)
+    val maxCount = dailyCounts
+        .filterKeys { it.startsWith(currentMonthPrefix) }
+        .values
+        .maxOrNull()
+        ?: 0
+    val canMovePrevious = displayYear > HISTORY_HEATMAP_START_YEAR || displayMonth0 > 0
+    val canMoveNext = displayYear < currentYear ||
+            (displayYear == currentYear && displayMonth0 < currentMonth0)
+    val primary = MaterialTheme.colorScheme.primary
+    val dayShape = RoundedCornerShape(8.dp)
+
+    fun selectDay(dayMillis: Long) {
+        if (!isRangeMode) {
+            draftStart = dayMillis
+            draftEnd = dayMillis
+        } else {
+            when {
+                draftStart == null || draftEnd != null -> {
+                    draftStart = dayMillis
+                    draftEnd = null
+                }
+                dayMillis >= draftStart!! -> draftEnd = dayMillis
+                else -> {
+                    draftStart = dayMillis
+                    draftEnd = null
+                }
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (displayMonth0 == 0) {
+                                displayYear--
+                                displayMonth0 = Calendar.DECEMBER
+                            } else {
+                                displayMonth0--
+                            }
+                        },
+                        enabled = canMovePrevious
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "上个月"
+                        )
+                    }
+                    Text(
+                        text = displayYear.toString() + "年" + (displayMonth0 + 1) + "月",
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    IconButton(
+                        onClick = {
+                            if (displayMonth0 == Calendar.DECEMBER) {
+                                displayYear++
+                                displayMonth0 = Calendar.JANUARY
+                            } else {
+                                displayMonth0++
+                            }
+                        },
+                        enabled = canMoveNext
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "下个月"
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
+                        color = if (!isRangeMode) primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.clickable { isRangeMode = false }
+                    ) {
+                        Text(
+                            text = "单日",
+                            color = if (!isRangeMode) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
+                        color = if (isRangeMode) primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.clickable { isRangeMode = true }
+                    ) {
+                        Text(
+                            text = "范围",
+                            color = if (isRangeMode) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            Column {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    listOf("一", "二", "三", "四", "五", "六", "日").forEach { weekday ->
+                        Text(
+                            text = weekday,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                dayCells.chunked(7).forEach { week ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        week.forEach { day ->
+                            if (day == null) {
+                                Spacer(modifier = Modifier.weight(1f).height(38.dp))
+                            } else {
+                                val dayMillis = dateAtStartOfDay(displayYear, displayMonth0, day)
+                                val count = dailyCounts[historyDateKey(dayMillis)] ?: 0
+                                val selected = if (isRangeMode && draftStart != null) {
+                                    dayMillis in draftStart!!..(draftEnd ?: draftStart!!)
+                                } else {
+                                    dayMillis == draftStart
+                                }
+                                val intensity = if (count == 0) 0f
+                                else (0.28f + 0.72f * count / maxCount.coerceAtLeast(1).toFloat())
+                                    .coerceIn(0f, 1f)
+                                val containerColor = when {
+                                    selected -> primary
+                                    count > 0 -> primary.copy(alpha = intensity)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp)
+                                        .padding(2.dp)
+                                        .clip(dayShape)
+                                        .background(containerColor)
+                                        .then(
+                                            if (selected) Modifier.border(1.dp, primary, dayShape)
+                                            else Modifier
+                                        )
+                                        .clickable(enabled = count > 0) { selectDay(dayMillis) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = day.toString(),
+                                        fontSize = 12.sp,
+                                        color = if (selected || intensity > 0.55f) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Text(
+                    text = "颜色越深表示当天浏览记录越多；仅可选择有记录的日期。",
+                    modifier = Modifier.padding(top = 8.dp),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(draftStart, if (isRangeMode) draftEnd ?: draftStart else draftStart)
+                    onDismiss()
+                },
+                enabled = draftStart != null
+            ) {
+                Text("确定")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryPage(navController: NavController) {
@@ -291,156 +561,18 @@ fun HistoryPage(navController: NavController) {
 
     // 组合式日期选择器 Dialog
     if (showDatePicker) {
-        var isRangeMode by remember {
-            mutableStateOf(selectedEndDateMillis != null && selectedEndDateMillis != selectedStartDateMillis)
-        }
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedStartDateMillis ?: System.currentTimeMillis()
-        )
-        val dateRangePickerState = rememberDateRangePickerState(
-            initialSelectedStartDateMillis = selectedStartDateMillis,
-            initialSelectedEndDateMillis = selectedEndDateMillis
-        )
-
-        val customTitle: @Composable () -> Unit = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "选择日期",
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row {
-                    Surface(
-                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp),
-                        color = if (!isRangeMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.5f
-                        ),
-                        modifier = Modifier.clickable { isRangeMode = false }
-                    ) {
-                        Text(
-                            "单日",
-                            fontSize = 12.sp,
-                            color = if (!isRangeMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp),
-                        color = if (isRangeMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.5f
-                        ),
-                        modifier = Modifier.clickable { isRangeMode = true }
-                    ) {
-                        Text(
-                            "范围",
-                            fontSize = 12.sp,
-                            color = if (isRangeMode) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        val pickerColors = DatePickerDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            headlineContentColor = MaterialTheme.colorScheme.primary,
-            weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            subheadContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            navigationContentColor = MaterialTheme.colorScheme.primary,
-            yearContentColor = MaterialTheme.colorScheme.onSurface,
-            currentYearContentColor = MaterialTheme.colorScheme.primary,
-            selectedYearContentColor = MaterialTheme.colorScheme.onPrimary,
-            selectedYearContainerColor = MaterialTheme.colorScheme.primary,
-            dayContentColor = MaterialTheme.colorScheme.onSurface,
-            selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
-            selectedDayContainerColor = MaterialTheme.colorScheme.primary,
-            todayContentColor = MaterialTheme.colorScheme.primary,
-            todayDateBorderColor = MaterialTheme.colorScheme.primary,
-            dayInSelectionRangeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            dayInSelectionRangeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-            dividerColor = MaterialTheme.colorScheme.outlineVariant
-        )
-
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (isRangeMode) {
-                        selectedStartDateMillis = dateRangePickerState.selectedStartDateMillis
-                        selectedEndDateMillis = dateRangePickerState.selectedEndDateMillis
-                            ?: dateRangePickerState.selectedStartDateMillis
-                    } else {
-                        selectedStartDateMillis = datePickerState.selectedDateMillis
-                        selectedEndDateMillis = datePickerState.selectedDateMillis
-                    }
-                    showDatePicker = false
-                }) {
-                    Text("确定")
-                }
+        HistoryHeatmapPickerDialog(
+            historyEntries = historyList,
+            selectedStart = selectedStartDateMillis,
+            selectedEnd = selectedEndDateMillis,
+            onConfirm = { start, end ->
+                selectedStartDateMillis = start
+                selectedEndDateMillis = end
             },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("取消")
-                }
-            },
-            colors = pickerColors
-        ) {
-            if (isRangeMode) {
-                DateRangePicker(
-                    state = dateRangePickerState,
-                    modifier = Modifier.weight(1f),
-                    colors = pickerColors,
-                    title = customTitle,
-                    headline = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val startText = dateRangePickerState.selectedStartDateMillis?.let { formatDateOnly(it) } ?: "开始日期"
-                            val endText = dateRangePickerState.selectedEndDateMillis?.let { formatDateOnly(it) } ?: "结束日期"
-                            Text(
-                                text = "$startText  至  $endText",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                )
-            } else {
-                DatePicker(
-                    state = datePickerState,
-                    modifier = Modifier.weight(1f),
-                    colors = pickerColors,
-                    title = customTitle,
-                    headline = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val dateText = datePickerState.selectedDateMillis?.let { formatDateOnly(it) } ?: "请选择日期"
-                            Text(
-                                text = dateText,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                )
-            }
-        }
+            onDismiss = { showDatePicker = false }
+        )
     }
 
-    // 清空确认 Dialog
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
