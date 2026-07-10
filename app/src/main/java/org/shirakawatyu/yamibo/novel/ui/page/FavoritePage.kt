@@ -140,6 +140,7 @@ fun FavoritePage(
 ) {
     val uiState by favoriteVM.uiState.collectAsState()
     val favoriteList = uiState.favoriteList
+    val categoryCounts = uiState.categoryCounts
     val isRefreshing = uiState.isRefreshing
     val isInManageMode = uiState.isInManageMode
     val selectedItems = uiState.selectedItems
@@ -705,7 +706,8 @@ fun FavoritePage(
                                     .padding(horizontal = 4.dp)
                             ) {
                                 Text(
-                                    text = currentCat.second,
+                                    text = currentCat.second + " " +
+                                        (categoryCounts[currentCat.first] ?: 0),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = topBarContentColor
@@ -741,11 +743,23 @@ fun FavoritePage(
                                     DropdownMenuItem(
                                         contentPadding = PaddingValues(start = 12.dp, end = 16.dp),
                                         text = {
-                                            Text(
-                                                text = name,
-                                                fontSize = 15.sp,
-                                                modifier = Modifier.padding(start = 16.dp)
-                                            )
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(start = 16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = name,
+                                                    fontSize = 15.sp
+                                                )
+                                                Spacer(modifier = Modifier.weight(1f))
+                                                Text(
+                                                    text = (categoryCounts[typeId] ?: 0).toString(),
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         },
                                         onClick = {
                                             currentCategoryId = typeId
@@ -829,13 +843,47 @@ fun FavoritePage(
             state = pullState,
             modifier = Modifier.weight(1f),
             indicator = {
-                PullToRefreshDefaults.Indicator(
-                    state = pullState,
-                    isRefreshing = isRefreshing,
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    containerColor = darkThemeColor(YellowLightLight) { surfaceVariant },
-                    color = darkThemeColor(YamiboColors.primary) { primary }
-                )
+                if (!isRefreshing) {
+                    PullToRefreshDefaults.Indicator(
+                        state = pullState,
+                        isRefreshing = false,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        containerColor = darkThemeColor(YellowLightLight) { surfaceVariant },
+                        color = darkThemeColor(YamiboColors.primary) { primary }
+                    )
+                }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isRefreshing,
+                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
+                        androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +
+                        androidx.compose.animation.fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    ) {
+                        Text(
+                            text = "正在刷新收藏 " + if (uiState.refreshTotalCount > 0) {
+                                uiState.refreshLoadedCount.toString() + "/" +
+                                    uiState.refreshTotalCount
+                            } else {
+                                "0/…"
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         ) {
 
@@ -1057,7 +1105,7 @@ fun FavoritePage(
 
             // 悬浮气泡
             androidx.compose.animation.AnimatedVisibility(
-                visible = showTopToast,
+                visible = showTopToast && !isRefreshing,
                 enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) +
                         androidx.compose.animation.fadeIn(),
                 exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) +

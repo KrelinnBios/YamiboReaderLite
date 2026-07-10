@@ -395,7 +395,18 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             supportedOnly.filter { it.type == currentCategory }
         }
 
-        _uiState.update { it.copy(favoriteList = filteredList) }
+        val categoryCounts = mapOf(
+            -1 to supportedOnly.size,
+            1 to supportedOnly.count { it.type == 1 },
+            2 to supportedOnly.count { it.type == 2 }
+        )
+
+        _uiState.update {
+            it.copy(
+                favoriteList = filteredList,
+                categoryCounts = categoryCounts
+            )
+        }
     }
 
     fun refreshList(showLoading: Boolean = true, isSmartSync: Boolean = false) {
@@ -449,7 +460,13 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         val currentGen = fetchGeneration.incrementAndGet()
 
         if (showLoading) {
-            _uiState.update { it.copy(isRefreshing = true) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = true,
+                    refreshLoadedCount = 0,
+                    refreshTotalCount = 0
+                )
+            }
         }
 
         CookieUtil.getCookie {
@@ -518,6 +535,9 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     }
                 }
 
+                val serverCount = variables.getString("count")?.toIntOrNull()
+                val perPage = variables.getString("perpage")?.toIntOrNull() ?: 20
+
                 if (pageList.isNotEmpty()) {
                     val pendingUrls = TombstoneQueueUtil.getPendingUrls()
                     val safePageList = stateMutex.withLock {
@@ -529,11 +549,21 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
                     if (generation != fetchGeneration.get()) break
 
+                    if (serverCount != null && serverCount >= 0) {
+                        val loadedCount = ((currentPage - 1) * perPage + pageList.size)
+                            .coerceAtMost(serverCount)
+                        _uiState.update {
+                            it.copy(
+                                refreshLoadedCount = loadedCount,
+                                refreshTotalCount = serverCount
+                            )
+                        }
+                    }
+
                     if (currentPage == 1) {
-                        val count = variables.getString("count")?.toIntOrNull() ?: 0
-                        val perpage = variables.getString("perpage")?.toIntOrNull() ?: 20
+                        val count = serverCount ?: 0
                         currentTotalPages = if (count > 0) {
-                            (count + perpage - 1) / perpage
+                            (count + perPage - 1) / perPage
                         } else 1
                         val hasNextPage = currentPage < currentTotalPages
 

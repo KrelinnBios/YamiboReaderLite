@@ -8,7 +8,10 @@ import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteVM
 
 data class FavoriteState(
     var favoriteList: List<Favorite> = listOf(),
+    var categoryCounts: Map<Int, Int> = mapOf(-1 to 0, 1 to 0, 2 to 0),
     var isRefreshing: Boolean = false,
+    var refreshLoadedCount: Int = 0,
+    var refreshTotalCount: Int = 0,
     var isInManageMode: Boolean = false,
     var selectedItems: Set<String> = emptySet(),
     var cacheInfoMap: Map<String, FavoriteVM.CacheInfo> = emptyMap(),
