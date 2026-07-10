@@ -20,5 +20,9 @@ data class FavoriteState(
     var updateCheckOthers: List<OtherUpdateCheckProfile> = listOf(),
     var checkingUpdateUrls: Set<String> = emptySet(),
     var failedUpdateUrls: Set<String> = emptySet(),
-    var probingTypeUrls: Set<String> = emptySet()
+    var probingTypeUrls: Set<String> = emptySet(),
+    // 下拉刷新后的批量更新检查是否仍在进行（收藏页底部“正在刷新”胶囊据此常驻）。
+    var isBatchChecking: Boolean = false,
+    // 批量检查结束后的结果文案，收藏页用同一个胶囊展示后清空。
+    var batchRefreshResult: String? = null
 )

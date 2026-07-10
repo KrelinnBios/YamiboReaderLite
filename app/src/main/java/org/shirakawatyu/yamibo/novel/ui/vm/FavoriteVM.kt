@@ -1165,40 +1165,78 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             }
         }
     }
-    fun checkAllFavoritesForUpdates() {
-        val items = allFavorites.filter { it.type in 1..2 }
+    /**
+     * 下拉刷新后的批量更新检查。
+     *
+     * @param categoryType 当前展示的分类：1 只查小说、2 只查漫画，其余值查全部（小说+漫画）。
+     * 结果不再走 YamiboToast，而是写入 [FavoriteState.batchRefreshResult]，
+     * 由收藏页底部同一个胶囊展示（与“正在刷新”同位置同样式，仅文字不同）。
+     */
+    fun checkAllFavoritesForUpdates(categoryType: Int = -1) {
+        val items = allFavorites.filter { favorite ->
+            favorite.type in 1..2 && (categoryType !in 1..2 || favorite.type == categoryType)
+        }
         val checkedUrls = items.map { it.url }.toSet()
+        val scopeLabel = when (categoryType) {
+            1 -> "小说"
+            2 -> "漫画"
+            else -> "收藏"
+        }
         UpdateCheckEngine.ensureInit(applicationContext)
         batchUpdateCheckJob?.cancel()
         if (items.isEmpty()) {
-            _uiState.update { it.copy(failedUpdateUrls = emptySet()) }
-            YamiboToast.show(context = applicationContext, message = "收藏刷新完成")
+            _uiState.update {
+                it.copy(
+                    failedUpdateUrls = it.failedUpdateUrls - checkedUrls,
+                    batchRefreshResult = "全部${scopeLabel}刷新完成"
+                )
+            }
             return
         }
 
-        _uiState.update { it.copy(failedUpdateUrls = it.failedUpdateUrls - checkedUrls) }
+        _uiState.update {
+            it.copy(
+                isBatchChecking = true,
+                batchRefreshResult = null,
+                failedUpdateUrls = it.failedUpdateUrls - checkedUrls
+            )
+        }
         batchUpdateCheckJob = viewModelScope.launch(Dispatchers.IO) {
-            val failedUrls = linkedSetOf<String>()
-            items.forEachIndexed { index, favorite ->
-                if (!isActive) return@launch
-                if (index > 0) delay(600)
-                val result = runUpdateCheckForFavorite(favorite, notify = false)
-                if (result == UpdateCheckResult.FAILURE) {
-                    failedUrls += favorite.url
+            val myJob = coroutineContext[Job]
+            try {
+                val failedUrls = linkedSetOf<String>()
+                items.forEachIndexed { index, favorite ->
+                    if (!isActive) return@launch
+                    if (index > 0) delay(600)
+                    val result = runUpdateCheckForFavorite(favorite, notify = false)
+                    if (result == UpdateCheckResult.FAILURE) {
+                        failedUrls += favorite.url
+                    }
                 }
-            }
-            _uiState.update { it.copy(failedUpdateUrls = failedUrls) }
-            withContext(Dispatchers.Main) {
-                if (failedUrls.isEmpty()) {
-                    YamiboToast.show(context = applicationContext, message = "全部收藏更新完成")
-                } else {
-                    YamiboToast.show(
-                        context = applicationContext,
-                        message = "${failedUrls.size} 个收藏更新失败，请点刷新图标重试"
+                _uiState.update {
+                    it.copy(
+                        // 只按本轮实际检查过的条目增量更新失败集合，
+                        // 分类刷新时不能把其它分类先前的失败记录抹掉。
+                        failedUpdateUrls = (it.failedUpdateUrls - checkedUrls) + failedUrls,
+                        batchRefreshResult = if (failedUrls.isEmpty()) {
+                            "全部${scopeLabel}刷新完成"
+                        } else {
+                            "${failedUrls.size} 个${scopeLabel}更新失败，请点刷新图标重试"
+                        }
                     )
+                }
+            } finally {
+                // 只有自己仍是当前批量任务时才收起“正在刷新”，
+                // 避免被新一轮批量检查取消后误清新任务的进行中状态。
+                if (batchUpdateCheckJob === myJob) {
+                    _uiState.update { it.copy(isBatchChecking = false) }
                 }
             }
         }
+    }
+
+    fun clearBatchRefreshResult() {
+        _uiState.update { it.copy(batchRefreshResult = null) }
     }
 
     fun retryFailedUpdateChecks() {

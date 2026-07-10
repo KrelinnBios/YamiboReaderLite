@@ -157,7 +157,15 @@ fun FavoritePage(
     LaunchedEffect(isRefreshing) {
         if (!isRefreshing && pendingBatchCheck) {
             pendingBatchCheck = false
-            favoriteVM.checkAllFavoritesForUpdates()
+            // 小说/漫画分类下下拉刷新只检查当前分类的收藏。
+            favoriteVM.checkAllFavoritesForUpdates(favoriteVM.currentCategory)
+        }
+    }
+    // 结果胶囊展示一段时间后自动收起。
+    LaunchedEffect(uiState.batchRefreshResult) {
+        if (uiState.batchRefreshResult != null) {
+            delay(2500)
+            favoriteVM.clearBatchRefreshResult()
         }
     }
     DisposableEffect(Unit) {
@@ -735,7 +743,7 @@ fun FavoritePage(
                                 onDismissRequest = { categoryMenuExpanded = false },
                                 offset = DpOffset(x = 0.dp, y = 16.dp),
                                 modifier = Modifier
-                                    .width(140.dp)
+                                    .width(120.dp)
                                     .background(MaterialTheme.colorScheme.surface)
                                     .clip(RoundedCornerShape(12.dp))
                             ) {
@@ -850,8 +858,19 @@ fun FavoritePage(
                         color = darkThemeColor(YamiboColors.primary) { primary }
                     )
                 }
+                // “正在刷新”胶囊贯穿整个刷新链路（列表同步 + 批量更新检查），
+                // 结束后同一个胶囊原位切换成结果文案，展示片刻自动收起。
+                val refreshCapsuleActive =
+                    isRefreshing || pendingBatchCheck || uiState.isBatchChecking
+                val refreshCapsuleResult = uiState.batchRefreshResult
+                val capsuleVisible = refreshCapsuleActive || refreshCapsuleResult != null
+                var capsuleText by remember { mutableStateOf("") }
+                if (capsuleVisible) {
+                    capsuleText = if (refreshCapsuleActive) "正在刷新…"
+                    else refreshCapsuleResult.orEmpty()
+                }
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = isRefreshing,
+                    visible = capsuleVisible,
                     enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
                         androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
@@ -869,12 +888,7 @@ fun FavoritePage(
                         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                     ) {
                         Text(
-                            text = "正在刷新收藏 " + if (uiState.refreshTotalCount > 0) {
-                                uiState.refreshLoadedCount.toString() + "/" +
-                                    uiState.refreshTotalCount
-                            } else {
-                                "0/…"
-                            },
+                            text = capsuleText,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontSize = 15.sp,
