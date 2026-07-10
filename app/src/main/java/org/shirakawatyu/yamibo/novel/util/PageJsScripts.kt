@@ -294,6 +294,38 @@ object PageJsScripts {
         })();
     """.trimIndent()
 
+    val BBS_THREAD_NAVIGATION_JS = """
+        (function() {
+            if (window.__yamiboBbsThreadNavigationV1) return;
+            window.__yamiboBbsThreadNavigationV1 = true;
+            function isThread(link) {
+                if (!link || !link.href) return false;
+                try {
+                    var url = new URL(link.href, document.baseURI);
+                    var path = url.pathname.replace(/^\/+/, '').toLowerCase();
+                    return url.hostname === 'bbs.yamibo.com' &&
+                        (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
+                         (path === 'forum.php' && url.searchParams.get('mod') === 'viewthread' && /^\d+${'$'}/.test(url.searchParams.get('tid') || '')));
+                } catch (e) { return false; }
+            }
+            document.addEventListener('click', function(event) {
+                if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
+                var link = event.target.closest ? event.target.closest('a[href]') : null;
+                if (link && !isThread(link)) return;
+                var item = event.target.closest ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]') : null;
+                if (!item) return;
+                if (!link && item) {
+                    var links = item.querySelectorAll('a[href]');
+                    for (var i = 0; i < links.length && !link; i++) if (isThread(links[i])) link = links[i];
+                }
+                if (!isThread(link)) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                window.AndroidSearchNav.navigateToPost(link.href);
+            }, true);
+        })();
+    """.trimIndent()
+
     val REMOVE_TRANSITION_STYLE_JS = """
         var style = document.getElementById('manga-transition-style');
         if (style) style.remove();
@@ -2196,6 +2228,7 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
@@ -2208,6 +2241,7 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
