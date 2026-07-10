@@ -113,6 +113,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.ui.widget.TopBar
 import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
+import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToastPill
 import org.shirakawatyu.yamibo.novel.ui.widget.favorite.FavoriteTopSearchField
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.darkModeColor
@@ -161,10 +162,27 @@ fun FavoritePage(
             favoriteVM.checkAllFavoritesForUpdates(favoriteVM.currentCategory)
         }
     }
-    // 结果胶囊展示一段时间后自动收起。
+    // 刷新提示统一走全局 YamiboToast 胶囊（与设置页检查版本更新同样式同位置）：
+    // 链路进行中（列表同步 + 批量更新检查）用超长时长常驻「正在刷新…」，
+    // 结束后结果文案顶替同一个胶囊短暂展示。
+    val refreshChainActive = isRefreshing || pendingBatchCheck || uiState.isBatchChecking
+    val refreshProgressText = if (uiState.refreshTotalCount > 0) {
+        "正在刷新收藏 " + uiState.refreshLoadedCount + "/" + uiState.refreshTotalCount
+    } else {
+        "正在刷新收藏 0/…"
+    }
+    LaunchedEffect(
+        refreshChainActive,
+        uiState.refreshLoadedCount,
+        uiState.refreshTotalCount
+    ) {
+        if (refreshChainActive) {
+            YamiboToast.show(message = refreshProgressText, durationMillis = 10 * 60_000L)
+        }
+    }
     LaunchedEffect(uiState.batchRefreshResult) {
-        if (uiState.batchRefreshResult != null) {
-            delay(2500)
+        uiState.batchRefreshResult?.let { result ->
+            YamiboToast.show(message = result)
             favoriteVM.clearBatchRefreshResult()
         }
     }
@@ -858,44 +876,6 @@ fun FavoritePage(
                         color = darkThemeColor(YamiboColors.primary) { primary }
                     )
                 }
-                // “正在刷新”胶囊贯穿整个刷新链路（列表同步 + 批量更新检查），
-                // 结束后同一个胶囊原位切换成结果文案，展示片刻自动收起。
-                val refreshCapsuleActive =
-                    isRefreshing || pendingBatchCheck || uiState.isBatchChecking
-                val refreshCapsuleResult = uiState.batchRefreshResult
-                val capsuleVisible = refreshCapsuleActive || refreshCapsuleResult != null
-                var capsuleText by remember { mutableStateOf("") }
-                if (capsuleVisible) {
-                    capsuleText = if (refreshCapsuleActive) "正在刷新…"
-                    else refreshCapsuleResult.orEmpty()
-                }
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = capsuleVisible,
-                    enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
-                        androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
-                        androidx.compose.animation.fadeOut(),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 78.dp + lockedNavHeight)
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Text(
-                            text = capsuleText,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
             }
         ) {
 
@@ -1118,35 +1098,22 @@ fun FavoritePage(
             // 悬浮气泡
             androidx.compose.animation.AnimatedVisibility(
                 visible = showTopToast && !isRefreshing,
-                enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
-                        androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
-                        androidx.compose.animation.fadeOut(),
+                enter = androidx.compose.animation.fadeIn(animationSpec = tween(200)) +
+                        androidx.compose.animation.slideInVertically(initialOffsetY = { 30 }),
+                exit = androidx.compose.animation.fadeOut(animationSpec = tween(500)),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 78.dp + lockedNavHeight)
             ) {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                YamiboToastPill(
+                    message = "发现了 " + newItemsCount + " 条新收藏（点击查看）",
                     modifier = Modifier.clickable {
                         showTopToast = false
                         coroutineScope.launch {
                             lazyListState.animateScrollToItem(0)
                         }
                     }
-                ) {
-                    Text(
-                        text = "发现了 $newItemsCount 条新收藏 (点击查看)",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                )
             }
         }
 

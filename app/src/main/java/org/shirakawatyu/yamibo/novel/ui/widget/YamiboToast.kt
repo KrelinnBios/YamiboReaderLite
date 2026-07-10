@@ -84,6 +84,44 @@ data class ToastEvent(
 )
 
 @Composable
+fun YamiboToastPill(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 0.dp,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary)
+    ) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Text(
+                text = message,
+                modifier = Modifier.padding(start = 10.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 fun YamiboToastHost(modifier: Modifier = Modifier) {
     var displayedEvent by remember { mutableStateOf<ToastEvent?>(null) }
     var visible by remember { mutableStateOf(false) }
@@ -118,36 +156,7 @@ fun YamiboToastHost(modifier: Modifier = Modifier) {
                 .padding(start = 24.dp, end = 24.dp, bottom = 28.dp)
         ) {
             event?.let { toast ->
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 0.dp,
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .widthIn(max = 320.dp)
-                            .padding(horizontal = 18.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                        Text(
-                            text = toast.message,
-                            modifier = Modifier.padding(start = 10.dp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+                YamiboToastPill(message = toast.message)
             }
         }
     }
