@@ -88,7 +88,7 @@ Android 7.0（API 24）及以上。
 
 本项目依据 [GNU AGPL-3.0](./LICENSE) 发布。
 
-第三方资源以其原作者或原项目的许可证声明为准。
+上游代码归属及本项目修改说明见 [NOTICE](./NOTICE)。第三方软件、内容和外部服务不因被本项目引用、访问、编译或展示而自动纳入 AGPL-3.0，具体见 [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。
 
 相关项目：
 
