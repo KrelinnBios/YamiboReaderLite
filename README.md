@@ -16,7 +16,7 @@
 </p>
 
 > [!IMPORTANT]
-> YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，并非从零开发的独立项目。感谢原作者及所有上游贡献者。
+> YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，同时延续 [flben233/YamiboReader](https://github.com/flben233/YamiboReader) 的上游代码，并非从零开发的独立项目。完整上游归属见 [NOTICE](./NOTICE)。感谢原作者及所有上游贡献者。
 
 ## 项目简介
 
@@ -81,7 +81,7 @@ Android 7.0（API 24）及以上。
 
 - 本项目为非官方客户端，与百合会论坛运营方无隶属关系。
 - 请遵守目标论坛规则、版权要求以及所在地法律法规。
-- 论坛内容、图片和用户发表的信息来自原站点，其版权与内容责任归原始来源所有。
+- 论坛内容、图片和用户发表的信息来自原站点或相应内容发布者，分别适用论坛规则及相关权利人的权利声明。
 - 本项目基于上游项目继续开发，相关来源与许可证信息请同时参考本仓库的 [LICENSE](./LICENSE) 和 [NOTICE](./NOTICE)。
 
 ## 许可协议
