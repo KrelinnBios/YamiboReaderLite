@@ -277,6 +277,9 @@ fun ForumBlocklistDialog(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("清空黑名单") },
             text = { Text("确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。") },
             confirmButton = {
