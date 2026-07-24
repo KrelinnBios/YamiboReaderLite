@@ -333,12 +333,18 @@ class MangaSearchParsingTest {
             </div>
         """.trimIndent()
         val desktopHtml = """
-            <td class="t_f" id="postmessage_41588349">
-                <font>本作目錄</font>
-                <a href="thread-561605-1-1.html">1卷彩页</a>
-                <a href="thread-561650-1-1.html">1话</a>
-                <a href="thread-561651-1-1.html">2话</a>
-            </td>
+            <table>
+                <tbody>
+                    <tr>
+                        <td class="t_f" id="postmessage_41588349">
+                            <font>本作目錄</font>
+                            <a href="thread-561605-1-1.html">1卷彩页</a>
+                            <a href="thread-561650-1-1.html">1话</a>
+                            <a href="thread-561651-1-1.html">2话</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         """.trimIndent()
 
         assertTrue(MangaHtmlParser.hasExplicitMangaDirectoryMarker(mobileHtml))
