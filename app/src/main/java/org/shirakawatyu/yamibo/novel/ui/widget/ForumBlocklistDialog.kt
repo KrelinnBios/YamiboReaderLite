@@ -103,7 +103,7 @@ fun ForumBlocklistDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         titleContentColor = MaterialTheme.colorScheme.onSurface,
         textContentColor = MaterialTheme.colorScheme.onSurface,
-        title = { Text("黑名单", fontSize = 18.sp) },
+        title = { Text("黑名单", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface) },
         text = {
             val controlHeight = 42.dp
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -225,7 +225,8 @@ fun ForumBlocklistDialog(
                                     Text(
                                         text = item.title.ifBlank { item.id },
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = authorLine,
@@ -280,8 +281,8 @@ fun ForumBlocklistDialog(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             textContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("清空黑名单") },
-            text = { Text("确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。") },
+            title = { Text("清空黑名单", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。", color = MaterialTheme.colorScheme.onSurface) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -294,7 +295,7 @@ fun ForumBlocklistDialog(
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("取消")
+                    Text("取消", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         )
