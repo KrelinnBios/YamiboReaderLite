@@ -323,6 +323,41 @@ class MangaSearchParsingTest {
     }
 
     @Test
+    fun explicitMangaDirectoryMarkerIsDetectedOnMobileAndDesktopPages() {
+        val mobileHtml = """
+            <div class="message">
+                <a href="misc.php?mod=tag&id=21146">本作目录</a>
+                <a href="thread-561605-1-1.html">1卷彩页</a>
+                <a href="thread-561650-1-1.html">1话</a>
+                <a href="thread-561651-1-1.html">2话</a>
+            </div>
+        """.trimIndent()
+        val desktopHtml = """
+            <td class="t_f" id="postmessage_41588349">
+                <font>本作目錄</font>
+                <a href="thread-561605-1-1.html">1卷彩页</a>
+                <a href="thread-561650-1-1.html">1话</a>
+                <a href="thread-561651-1-1.html">2话</a>
+            </td>
+        """.trimIndent()
+
+        assertTrue(MangaHtmlParser.hasExplicitMangaDirectoryMarker(mobileHtml))
+        assertTrue(MangaHtmlParser.hasExplicitMangaDirectoryMarker(desktopHtml))
+    }
+
+    @Test
+    fun plainDirectoryNavigationIsNotAnExplicitMangaDirectoryMarker() {
+        val html = """
+            <div class="message">
+                <a href="thread-1-1-1.html">返回目录</a>
+                <a href="thread-2-1-1.html">下一话</a>
+            </div>
+        """.trimIndent()
+
+        assertFalse(MangaHtmlParser.hasExplicitMangaDirectoryMarker(html))
+    }
+
+    @Test
     fun administrativeThreadsAreExcluded() {
         assertTrue(MangaTitleCleaner.isAdministrativeThread("百合会新人须知/论坛规则"))
         assertFalse(MangaTitleCleaner.isAdministrativeThread(fullTitle))

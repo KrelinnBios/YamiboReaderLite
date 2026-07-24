@@ -176,4 +176,42 @@ class DirectoryChapterFilterTest {
             )
         )
     }
+
+    @Test
+    fun explicitPageDirectoryRestoresSourceOrderAndKeepsNewerCachedChapter() {
+        val gatheredFromPage = listOf(
+            chapter("561605", "1卷彩页", 0f),
+            chapter("561650", "1话", 1f),
+            chapter("566000", "20话", 20f),
+            chapter("572043", "29话", 29f),
+            chapter("573457", "3卷彩页", 0f),
+            chapter("573500", "31话", 31f),
+            chapter("574097", "55话", 55f)
+        )
+        val cachedWrongTidOrder = listOf(
+            chapter("573500", "31话", 31f),
+            chapter("561605", "1卷彩页", 0f),
+            chapter("561650", "1话", 1f),
+            chapter("566000", "20话", 20f),
+            chapter("570000", "21话", 0f),
+            chapter("572043", "29话", 29f),
+            chapter("573457", "3卷彩页", 0f),
+            chapter("573490", "30话", 0f),
+            chapter("574097", "55话", 55f),
+            chapter("574098", "56话", 56f)
+        )
+
+        val merged = DirectoryRepository.mergeExplicitOrderedPageLinks(
+            gatheredFromPage = gatheredFromPage,
+            cachedChapters = cachedWrongTidOrder
+        )
+
+        assertEquals(
+            listOf(
+                "1卷彩页", "1话", "20话", "21话", "29话", "3卷彩页",
+                "30话", "31话", "55话", "56话"
+            ),
+            merged.map { it.rawTitle }
+        )
+    }
 }

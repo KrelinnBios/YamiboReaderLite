@@ -75,6 +75,23 @@ class MangaHtmlParser {
         }
 
         /**
+         * 首楼是否明确声明了作品目录。
+         *
+         * 这类目录的链接顺序由发布者手工编排，不能再按帖子 TID 推测章节顺序。
+         * 只认带“本作/作品/漫画/章节”等限定词的目录标题，避免把普通“返回目录”
+         * 导航误当成权威章节表。
+         */
+        fun hasExplicitMangaDirectoryMarker(html: String): Boolean {
+            val doc = Jsoup.parse(html)
+            val firstPostContent = doc.select(
+                ".message, .t_f[id^=postmessage_], [id^=postmessage_]"
+            ).firstOrNull() ?: return false
+            val compactText = firstPostContent.text().replace(Regex("\\s+"), "")
+            return Regex("(?:本作|本帖|作品|漫画|漫畫|章节|章節)目[录錄]")
+                .containsMatchIn(compactText)
+        }
+
+        /**
          * 提取 #threadindex .tindex 目录（Discuz! 插件生成的页内目录）
          * 这些链接的 href 为 javascript:;，通过 onclick 中的 viewpid 定位楼层。
          * 章节标题可能在 <a> 内或直接为 <li> 文本，两者皆处理。

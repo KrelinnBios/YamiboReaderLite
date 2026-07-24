@@ -155,6 +155,42 @@ class DirectoryRepository private constructor(private val context: Context) {
                         )
             }
         }
+
+        internal fun mergeExplicitOrderedPageLinks(
+            gatheredFromPage: List<MangaChapterItem>,
+            cachedChapters: List<MangaChapterItem>
+        ): List<MangaChapterItem> {
+            val gatheredKeys = gatheredFromPage.map { chapterUniqueKey(it) }.toSet()
+            val result = gatheredFromPage.toMutableList()
+            val cachedExtras = cachedChapters
+                .filter { chapterUniqueKey(it) !in gatheredKeys }
+                .map { chapter ->
+                    chapter.copy(
+                        chapterNum = MangaTitleCleaner.extractChapterNum(chapter.rawTitle)
+                    )
+                }
+                .sortedBy { chapter ->
+                    chapter.chapterNum.takeIf { it > 0f && it < 999f } ?: Float.MAX_VALUE
+                }
+
+            cachedExtras.forEach { chapter ->
+                val chapterNum = chapter.chapterNum
+                val insertionIndex = if (chapterNum > 0f && chapterNum < 999f) {
+                    result.indexOfFirst { existing ->
+                        val existingNum = MangaTitleCleaner.extractChapterNum(existing.rawTitle)
+                        existingNum > chapterNum && existingNum < 999f
+                    }
+                } else {
+                    -1
+                }
+                if (insertionIndex >= 0) {
+                    result.add(insertionIndex, chapter)
+                } else {
+                    result.add(chapter)
+                }
+            }
+            return result
+        }
     }
 
     private fun getDirectoryFile(cleanName: String): File {
@@ -488,11 +524,16 @@ class DirectoryRepository private constructor(private val context: Context) {
                 }
             }
 
-            val hasAuthoritativePageLinks = hasAuthoritativeCrossWorkPageLinks(
+            val hasAuthoritativeCrossWorkLinks = hasAuthoritativeCrossWorkPageLinks(
                 currentTid = tid,
                 cleanBookName = cleanName,
                 pageLinks = rawSamePageLinks
             )
+            val hasExplicitOrderedPageLinks =
+                rawSamePageLinks.size >= 3 &&
+                        MangaHtmlParser.hasExplicitMangaDirectoryMarker(mobileHtml)
+            val hasAuthoritativePageLinks =
+                hasAuthoritativeCrossWorkLinks || hasExplicitOrderedPageLinks
 
             // ===== 补充：PC HTML 也未获目录时，走 API 逐页扫描楼主发帖 =====
             val supplementaryLinks = mutableListOf<MangaChapterItem>()
@@ -579,7 +620,12 @@ class DirectoryRepository private constructor(private val context: Context) {
             Log.d(LOG_TAG, "rawSamePageLinks=${rawSamePageLinks.size} threadindex=${threadindexLinks.size} pcHtmlThreadindex=${pcHtmlThreadindexLinks.size} apiSupplementary=${supplementaryLinks.size}")
             rawSamePageLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  raw[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
             supplementaryLinks.forEachIndexed { i, ch -> Log.d(LOG_TAG, "  supp[$i]: pid=${ch.pid} title=${ch.rawTitle}") }
-            Log.d(LOG_TAG, "authoritativePageLinks=$hasAuthoritativePageLinks")
+            Log.d(
+                LOG_TAG,
+                "authoritativePageLinks=$hasAuthoritativePageLinks " +
+                        "crossWork=$hasAuthoritativeCrossWorkLinks " +
+                        "explicitOrdered=$hasExplicitOrderedPageLinks"
+            )
 
             val gatheredFromPage = if (hasAuthoritativePageLinks) {
                 (allLinks + currentChapter).distinctBy { chapterUniqueKey(it) }
@@ -646,8 +692,14 @@ class DirectoryRepository private constructor(private val context: Context) {
                     cachedDir.chapters
                 }
                 val mergedAll = when {
-                    // 本次打开解析出了权威列表：整体以列表为准（顺序、标题、编号都跟列表走）
-                    hasAuthoritativePageLinks -> gatheredFromPage
+                    // 跨作品编号列表整体以首楼为准，不混入未列出的旧条目。
+                    hasAuthoritativeCrossWorkLinks -> gatheredFromPage
+                    // 同一作品的“本作目录”采用正文顺序；正文漏列但旧目录已识别出的普通
+                    // 话数按章节号插回相邻位置，较新的章节追加到末尾，避免倒退丢章。
+                    hasExplicitOrderedPageLinks -> mergeExplicitOrderedPageLinks(
+                        gatheredFromPage = gatheredFromPage,
+                        cachedChapters = cachedChapters
+                    )
                     // 目录是权威列表但本次页面没解析出链接：保持已存列表原样（含顺序），
                     // 只补充列表里没有的新条目，绝不能让 currentChapter 的原始帖子标题
                     // 覆盖列表里带编号的条目（如"2、去你家/君の家まで"）
