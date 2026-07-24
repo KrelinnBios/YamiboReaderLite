@@ -39,6 +39,12 @@ data class ForumBlockedItem @JSONCreator constructor(
     }
 }
 
+data class ForumBlocklistSyncState(
+    val isSyncing: Boolean = false,
+    val message: String = "用户项会与论坛黑名单同步",
+    val isError: Boolean = false
+)
+
 private data class PendingUserAction @JSONCreator constructor(
     @JSONField(name = "action")
     val action: String,
@@ -74,6 +80,9 @@ object ForumBlocklistManager {
     val items = _items.asStateFlow()
 
     private val pendingUserActions = MutableStateFlow<List<PendingUserAction>>(emptyList())
+
+    private val _syncState = MutableStateFlow(ForumBlocklistSyncState())
+    val syncState = _syncState.asStateFlow()
 
     fun initialize() {
         if (!initialized.compareAndSet(false, true)) return
@@ -177,7 +186,17 @@ object ForumBlocklistManager {
         initialize()
         scope.launch {
             initialization.await()
-            syncRemoteInternal(force)
+            _syncState.value = ForumBlocklistSyncState(
+                isSyncing = true,
+                message = "正在同步论坛黑名单…"
+            )
+            _syncState.value = runCatching { syncRemoteInternal(force) }
+                .getOrElse {
+                    ForumBlocklistSyncState(
+                        message = "同步失败，操作已保留待重试",
+                        isError = true
+                    )
+                }
         }
     }
 
@@ -193,6 +212,10 @@ object ForumBlocklistManager {
             }
             lastRemoteSyncAt = 0L
             lastRemoteAuthHash = null
+            _syncState.value = ForumBlocklistSyncState(
+                message = "请先登录论坛后再同步",
+                isError = true
+            )
         }
     }
 
@@ -294,23 +317,23 @@ object ForumBlocklistManager {
         }
     }
 
-    private suspend fun syncRemoteInternal(force: Boolean) {
+    private suspend fun syncRemoteInternal(force: Boolean): ForumBlocklistSyncState {
         val cookie = YamiboSession.cookieFor("https://bbs.yamibo.com/")
         val auth = Regex("EeqY_2132_auth=([^;]+)").find(cookie)?.groupValues?.getOrNull(1)
-            ?: return
+            ?: return syncFailure("请先登录论坛后再同步")
         val authHash = auth.hashCode()
         val now = System.currentTimeMillis()
         if (!force && authHash == lastRemoteAuthHash && now - lastRemoteSyncAt < 5 * 60_000L) {
-            return
+            return syncSuccess()
         }
 
-        remoteSyncMutex.withLock {
+        return remoteSyncMutex.withLock {
             val refreshedCookie = YamiboSession.cookieFor("https://bbs.yamibo.com/")
             val refreshedAuth = Regex("EeqY_2132_auth=([^;]+)")
                 .find(refreshedCookie)
                 ?.groupValues
                 ?.getOrNull(1)
-                ?: return@withLock
+                ?: return@withLock syncFailure("请先登录论坛后再同步")
             val refreshedHash = refreshedAuth.hashCode()
             val refreshedNow = System.currentTimeMillis()
             if (
@@ -318,12 +341,15 @@ object ForumBlocklistManager {
                 refreshedHash == lastRemoteAuthHash &&
                 refreshedNow - lastRemoteSyncAt < 5 * 60_000L
             ) {
-                return@withLock
+                return@withLock syncSuccess()
             }
 
-            var snapshot = runCatching { ForumBlacklistRemoteClient.fetchSnapshot() }
-                .getOrNull()
-                ?: return@withLock
+            val initialSnapshotResult = runCatching { ForumBlacklistRemoteClient.fetchSnapshot() }
+            if (initialSnapshotResult.isFailure) {
+                return@withLock syncFailure("无法读取论坛黑名单，请稍后重试")
+            }
+            var snapshot = initialSnapshotResult.getOrNull()
+                ?: return@withLock syncFailure("论坛黑名单页面格式已变化")
             if (snapshot.currentUid.isNotBlank()) CurrentUserUtil.save(snapshot.currentUid)
             val accountChanged =
                 remoteUid.isNotBlank() &&
@@ -340,7 +366,7 @@ object ForumBlocklistManager {
             while (true) {
                 val action = writeMutex.withLock { pendingUserActions.value.firstOrNull() }
                     ?: break
-                val updatedSnapshot = runCatching {
+                val updateResult = runCatching {
                     when (action.action) {
                         PendingUserAction.ACTION_ADD ->
                             ForumBlacklistRemoteClient.addUser(action.username)
@@ -350,7 +376,12 @@ object ForumBlocklistManager {
 
                         else -> snapshot
                     }
-                }.getOrNull() ?: break
+                }
+                if (updateResult.isFailure) {
+                    return@withLock syncFailure("同步失败，操作已保留待重试")
+                }
+                val updatedSnapshot = updateResult.getOrNull()
+                    ?: return@withLock syncFailure("论坛未确认操作，已保留待重试")
                 snapshot = updatedSnapshot
                 val actionApplied = when (action.action) {
                     PendingUserAction.ACTION_ADD ->
@@ -363,7 +394,7 @@ object ForumBlocklistManager {
                 }
                 if (!actionApplied) {
                     applyRemoteSnapshot(snapshot)
-                    break
+                    return@withLock syncFailure("论坛未确认操作，已保留待重试")
                 }
                 writeMutex.withLock {
                     val nextPending = pendingUserActions.value.filterNot { it == action }
@@ -377,10 +408,21 @@ object ForumBlocklistManager {
             if (finalSnapshot.currentUid.isNotBlank()) CurrentUserUtil.save(finalSnapshot.currentUid)
             applyRemoteSnapshot(finalSnapshot)
             lastRemoteAuthHash = refreshedHash
-            lastRemoteSyncAt =
-                if (pendingUserActions.value.isEmpty()) System.currentTimeMillis() else 0L
+            val hasPending = pendingUserActions.value.isNotEmpty()
+            lastRemoteSyncAt = if (hasPending) 0L else System.currentTimeMillis()
+            if (hasPending) {
+                syncFailure("部分操作仍待同步，请稍后重试")
+            } else {
+                syncSuccess()
+            }
         }
     }
+
+    private fun syncSuccess(): ForumBlocklistSyncState =
+        ForumBlocklistSyncState(message = "已与论坛黑名单同步")
+
+    private fun syncFailure(message: String): ForumBlocklistSyncState =
+        ForumBlocklistSyncState(message = message, isError = true)
 
     private suspend fun applyRemoteSnapshot(snapshot: ForumBlacklistSnapshot) {
         writeMutex.withLock {

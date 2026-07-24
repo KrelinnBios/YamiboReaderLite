@@ -81,8 +81,10 @@ fun ForumBlocklistDialog(
     onOpenPost: (url: String) -> Unit = {}
 ) {
     val blockedItems by ForumBlocklistManager.items.collectAsState()
+    val syncState by ForumBlocklistManager.syncState.collectAsState()
     var search by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("all") }
+    var showClearConfirmation by remember { mutableStateOf(false) }
 
     val visibleItems = remember(blockedItems, search, filter) {
         val keyword = search.trim()
@@ -159,6 +161,16 @@ fun ForumBlocklistDialog(
                     selected = filter,
                     onSelect = { filter = it },
                     height = controlHeight
+                )
+
+                Text(
+                    text = syncState.message,
+                    color = if (syncState.isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    fontSize = 12.sp
                 )
 
                 LazyColumn(
@@ -245,13 +257,45 @@ fun ForumBlocklistDialog(
             }
         },
         dismissButton = {
-            if (blockedItems.isNotEmpty()) {
-                TextButton(onClick = ForumBlocklistManager::clear) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = { ForumBlocklistManager.syncRemote(force = true) },
+                    enabled = !syncState.isSyncing
+                ) {
+                    Text(if (syncState.isSyncing) "同步中…" else "同步")
+                }
+                TextButton(
+                    onClick = { showClearConfirmation = true },
+                    enabled = blockedItems.isNotEmpty()
+                ) {
                     Text("清空", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
     )
+
+    if (showClearConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmation = false },
+            title = { Text("清空黑名单") },
+            text = { Text("确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirmation = false
+                        ForumBlocklistManager.clear()
+                    }
+                ) {
+                    Text("清空", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmation = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 }
 
 /** 全部 / 主题 / 楼层 / 用户胶囊分段选择器，配色与漫画首页版区切换一致。 */

@@ -113,18 +113,24 @@ internal object ForumBlacklistRemoteClient {
         if (formHash.isBlank()) return null
 
         val users = document.select("#friend_ul li").mapNotNull { item ->
-            val profileLink = item.selectFirst(
-                "h4 a[href*=\"space-uid-\"], h4 a[href*=\"mod=space\"][href*=\"uid=\"]"
-            ) ?: item.selectFirst(
+            val profileLinks = item.select(
                 "a[href*=\"space-uid-\"], a[href*=\"mod=space\"][href*=\"uid=\"]"
-            )
-            val href = profileLink?.attr("href").orEmpty()
-            val uid = extractUid(href) ?: item.id()
-                .removePrefix("friend_")
-                .removeSuffix("_li")
-                .takeIf { it.matches(Regex("[1-9]\\d*")) }
+            ).filter { link -> isUserProfileHref(link.attr("href")) }
+            val uid = profileLinks.asSequence()
+                .mapNotNull { link -> extractUid(link.attr("href")) }
+                .firstOrNull()
+                ?: item.id()
+                    .removePrefix("friend_")
+                    .removeSuffix("_li")
+                    .takeIf { it.matches(Regex("[1-9]\\d*")) }
                 ?: return@mapNotNull null
-            val username = profileLink?.text()?.trim().orEmpty().ifBlank { "UID $uid" }
+            val username = profileLinks.asSequence()
+                .map { link -> link.text().trim() }
+                .firstOrNull { name -> name.isNotBlank() && !isActionLabel(name) }
+                ?: profileLinks.asSequence()
+                    .map { link -> link.selectFirst("img[alt]")?.attr("alt")?.trim().orEmpty() }
+                    .firstOrNull { name -> name.isNotBlank() && !isActionLabel(name) }
+                ?: "UID $uid"
             ForumBlockedItem(
                 type = ForumBlockedItem.TYPE_USER,
                 id = uid,
@@ -145,6 +151,16 @@ internal object ForumBlacklistRemoteClient {
             currentUid = currentUid
         )
     }
+
+    private fun isUserProfileHref(href: String): Boolean =
+        Regex("space-uid-[1-9]\\d*", RegexOption.IGNORE_CASE).containsMatchIn(href) ||
+            (
+                Regex("[?&]mod=space(?:&|$)", RegexOption.IGNORE_CASE).containsMatchIn(href) &&
+                    extractUid(href) != null
+            )
+
+    private fun isActionLabel(value: String): Boolean =
+        value in setOf("黑名单除名", "移出黑名单", "解除黑名单", "删除")
 
     private fun extractUid(href: String): String? {
         return Regex("space-uid-([1-9]\\d*)", RegexOption.IGNORE_CASE)

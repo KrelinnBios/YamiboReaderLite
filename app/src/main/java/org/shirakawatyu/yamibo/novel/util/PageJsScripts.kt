@@ -1445,7 +1445,8 @@ $styleString
                         items: [],
                         syncing: false,
                         timer: null,
-                        currentUid: null
+                        currentUid: null,
+                        nextAuxInstance: 1
                     };
 
                     function itemKey(type, id) {
@@ -1467,6 +1468,8 @@ $styleString
                         element.style.display = oldDisplay || '';
                         element.removeAttribute('data-yamibo-old-display');
                         element.removeAttribute('data-yamibo-block-hidden');
+                        element.removeAttribute('data-yamibo-block-kind');
+                        element.removeAttribute('data-yamibo-block-aux-instance');
                     }
 
                     function hideElement(element) {
@@ -1479,7 +1482,7 @@ $styleString
                     function cleanup() {
                         var hidden = document.querySelectorAll('[data-yamibo-block-hidden="1"]');
                         for (var i = 0; i < hidden.length; i++) restoreElement(hidden[i]);
-                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-block-li, .yamibo-blocked-message, .yamibo-block-choice-backdrop');
+                        var generated = document.querySelectorAll('.yamibo-block-action, .yamibo-block-li, .yamibo-blocked-message, .yamibo-block-choice-backdrop, .yamibo-blocked-inline, [data-yamibo-block-aux]');
                         for (var j = 0; j < generated.length; j++) generated[j].remove();
                     }
 
@@ -1515,6 +1518,9 @@ $styleString
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + '!important;border:1px solid ' + border + '!important;color:' + text + '!important;font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
                             '.yamibo-blocked-message a.yamibo-unblock-action{font-size:12px!important;color:' + linkColor + '!important;}' +
+                            '.yamibo-blocked-aux-row>td{padding:0!important;border:0!important;background:transparent!important;}' +
+                            '.yamibo-blocked-aux-row .yamibo-blocked-message{margin:6px 0!important;}' +
+                            '.yamibo-blocked-inline{color:' + text + '!important;font-size:inherit!important;font-weight:normal!important;}' +
                             '.yamibo-block-choice-backdrop{position:fixed!important;inset:0!important;z-index:2147483646!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:16px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-menu{width:min(420px,100%)!important;background:' + menuBackground + '!important;color:' + menuText + '!important;border:1px solid ' + border + '!important;border-radius:8px!important;box-shadow:0 10px 32px rgba(0,0,0,.28)!important;padding:14px!important;box-sizing:border-box!important;}' +
                             '.yamibo-block-choice-title{font-size:16px!important;font-weight:600!important;line-height:24px!important;margin:0 0 4px!important;color:' + menuText + '!important;}' +
@@ -1578,9 +1584,34 @@ $styleString
                         return !!uid && !!state.currentUid && String(uid) === String(state.currentUid);
                     }
 
-                    function getBlockedUser(map, uid) {
-                        if (!uid) return null;
-                        return map[itemKey('user', uid)] || null;
+                    function normalizeUserName(value) {
+                        return String(value || '').replace(/\u00a0/g, ' ').trim();
+                    }
+
+                    function getBlockedUser(map, uid, name) {
+                        if (uid) {
+                            var uidMatch = map[itemKey('user', uid)] || null;
+                            if (uidMatch) return uidMatch;
+                        }
+                        var normalizedName = normalizeUserName(name);
+                        if (!normalizedName) return null;
+                        for (var i = 0; i < state.items.length; i++) {
+                            var item = state.items[i] || {};
+                            if (item.type !== 'user') continue;
+                            var itemName = normalizeUserName(item.authorName || item.title);
+                            if (itemName && itemName === normalizedName) return item;
+                        }
+                        return null;
+                    }
+
+                    function getBlockedUserFromLink(map, link, explicitName) {
+                        if (!link) return null;
+                        var anchor = link.closest ? link.closest('a') : null;
+                        var uid = anchor
+                            ? getUidFromHref(anchor.getAttribute('href') || anchor.href)
+                            : null;
+                        var name = explicitName || link.textContent || '';
+                        return getBlockedUser(map, uid, name);
                     }
 
                     // 当前是不是“我自己”的空间列表页（我的主题/回复/收藏）。这类页面整页都是自己的内容，
@@ -1642,6 +1673,76 @@ $styleString
                         if (message) message.remove();
                     }
 
+                    function appendUnblockAction(container, blockedUser, label) {
+                        container.appendChild(document.createTextNode(label + '已被屏蔽 '));
+                        var undo = document.createElement('a');
+                        undo.href = 'javascript:;';
+                        undo.className = 'xi2 yamibo-unblock-action';
+                        undo.setAttribute('data-type', 'user');
+                        undo.setAttribute('data-id', blockedUser.id);
+                        undo.textContent = '取消屏蔽';
+                        container.appendChild(undo);
+                    }
+
+                    function hideAuxiliaryContent(target, blockedUser, label) {
+                        if (!target || !target.parentNode || !blockedUser || isOwnUid(blockedUser.id)) return;
+                        if (target.getAttribute('data-yamibo-block-hidden') === '1') return;
+                        hideElement(target);
+                        target.setAttribute('data-yamibo-block-kind', 'aux');
+                        var instance = 'aux-' + String(state.nextAuxInstance++);
+                        target.setAttribute('data-yamibo-block-aux-instance', instance);
+
+                        var wrapper;
+                        var content;
+                        if (target.tagName === 'TR') {
+                            wrapper = document.createElement('tr');
+                            wrapper.className = 'yamibo-blocked-aux-row';
+                            var cell = document.createElement('td');
+                            cell.colSpan = Math.max(target.children.length, 1);
+                            content = document.createElement('div');
+                            content.className = 'yamibo-blocked-message';
+                            cell.appendChild(content);
+                            wrapper.appendChild(cell);
+                        } else {
+                            wrapper = document.createElement(
+                                target.parentNode.tagName === 'UL' ? 'li' : 'div'
+                            );
+                            wrapper.className = 'yamibo-blocked-message';
+                            content = wrapper;
+                        }
+                        wrapper.setAttribute('data-yamibo-block-aux', '1');
+                        wrapper.setAttribute('data-instance', instance);
+                        appendUnblockAction(content, blockedUser, label);
+                        target.parentNode.insertBefore(wrapper, target);
+                    }
+
+                    function hideBlockedUserName(target, blockedUser) {
+                        if (!target || !target.parentNode || !blockedUser || isOwnUid(blockedUser.id)) return;
+                        if (target.getAttribute('data-yamibo-block-hidden') === '1') return;
+                        hideElement(target);
+                        target.setAttribute('data-yamibo-block-kind', 'aux');
+                        var instance = 'aux-' + String(state.nextAuxInstance++);
+                        target.setAttribute('data-yamibo-block-aux-instance', instance);
+                        var replacement = document.createElement('span');
+                        replacement.className = 'yamibo-blocked-inline';
+                        replacement.setAttribute('data-yamibo-block-aux', '1');
+                        replacement.setAttribute('data-instance', instance);
+                        replacement.textContent = '已屏蔽用户';
+                        target.parentNode.insertBefore(replacement, target);
+                    }
+
+                    function restoreAuxiliaryContent(target) {
+                        if (!target || target.getAttribute('data-yamibo-block-kind') !== 'aux') return;
+                        var instance = target.getAttribute('data-yamibo-block-aux-instance');
+                        var parent = target.parentNode;
+                        restoreElement(target);
+                        if (!instance || !parent) return;
+                        var generated = parent.querySelector(
+                            '[data-yamibo-block-aux][data-instance=' + instance + ']'
+                        );
+                        if (generated) generated.remove();
+                    }
+
                     function makeAction(type, id, title, blocked, authorUid, authorName) {
                         var action = document.createElement('a');
                         action.href = 'javascript:;';
@@ -1698,7 +1799,7 @@ $styleString
                             }
                             var key = itemKey('thread', tid);
                             var isBlocked = !!map[key];
-                            var blockedUser = getBlockedUser(map, authorUid);
+                            var blockedUser = getBlockedUser(map, authorUid, authorName);
                             var action = row.querySelector('.yamibo-block-action[data-type="thread"]');
                             if (!action) {
                                 var foot = row.querySelector('.threadlist_foot ul');
@@ -1731,7 +1832,7 @@ $styleString
                             } else if (blockedUser) {
                                 removePlaceholder(row, 'thread', tid);
                                 hideElement(row);
-                                ensurePlaceholder(row, 'user', authorUid, '该用户的主题', 'thread-' + tid);
+                                ensurePlaceholder(row, 'user', blockedUser.id, '该用户的主题', 'thread-' + tid);
                             } else {
                                 restoreElement(row);
                                 removePlaceholder(row, 'thread', tid);
@@ -1747,16 +1848,17 @@ $styleString
                     function syncPcListPage(map) {
                         if (isOwnSpaceListPage()) return;
                         var rows = document.querySelectorAll(
-                            'tbody[id^="normalthread_"], tbody[id^="stickthread_"], body.pg_tag .tl table tr'
+                            'tbody[id^="normalthread_"], tbody[id^="stickthread_"], #threadlist tbody[id], .tl tbody[id], body.pg_tag .tl table tr'
                         );
                         for (var i = 0; i < rows.length; i++) {
                             var row = rows[i];
                             var tid = getRowTid(row);
                             if (!tid) continue;
                             var authorUid = getRowAuthorUid(row);
+                            var authorName = getAuthorName(row);
                             if (isOwnUid(authorUid)) continue;
                             var blocked = !!map[itemKey('thread', tid)] ||
-                                !!getBlockedUser(map, authorUid);
+                                !!getBlockedUser(map, authorUid, authorName);
                             if (blocked) {
                                 hideElement(row);
                             } else {
@@ -1793,7 +1895,7 @@ $styleString
                                 continue;
                             }
                             var isBlocked = !!map[itemKey('post', pid)];
-                            var blockedUser = getBlockedUser(map, authorUid);
+                            var blockedUser = getBlockedUser(map, authorUid, authorName);
                             var action = post.querySelector('.yamibo-block-action[data-type="post"]');
                             if (!action) {
                                 var auth = post.querySelector('.authi');
@@ -1823,11 +1925,96 @@ $styleString
                             } else if (blockedUser) {
                                 removePlaceholder(post, 'post', pid);
                                 hideElement(post);
-                                ensurePlaceholder(post, 'user', authorUid, '该用户的楼层', 'post-' + pid);
+                                ensurePlaceholder(post, 'user', blockedUser.id, '该用户的楼层', 'post-' + pid);
                             } else {
                                 restoreElement(post);
                                 removePlaceholder(post, 'post', pid);
                                 if (authorUid) removePlaceholder(post, 'user', authorUid, 'post-' + pid);
+                            }
+                        }
+                    }
+
+                    function syncAuxiliaryUserContent(map) {
+                        var blockRules = [];
+                        if (/thread-\d+|[?&]mod=viewthread/i.test(location.href)) {
+                            blockRules.push({
+                                selector: 'div.pstl.xs1.cl a.xi2.xw1',
+                                container: 'div.pstl.xs1.cl',
+                                label: '该用户的点评'
+                            });
+                            blockRules.push({
+                                selector: 'tr[id] td > a[target=_blank]',
+                                container: 'tr',
+                                label: '该用户的评分'
+                            });
+                        }
+                        if (/home\.php/i.test(location.href)) {
+                            blockRules.push({
+                                selector: 'div.cl > a[target=_blank]',
+                                container: 'div.cl',
+                                label: '该用户的 BLOG'
+                            });
+                        }
+                        for (var ruleIndex = 0; ruleIndex < blockRules.length; ruleIndex++) {
+                            var rule = blockRules[ruleIndex];
+                            var links = document.querySelectorAll(rule.selector);
+                            for (var linkIndex = 0; linkIndex < links.length; linkIndex++) {
+                                var link = links[linkIndex];
+                                var blockedUser = getBlockedUserFromLink(map, link);
+                                var container = link.closest(rule.container);
+                                if (blockedUser) {
+                                    hideAuxiliaryContent(container, blockedUser, rule.label);
+                                } else {
+                                    restoreAuxiliaryContent(container);
+                                }
+                            }
+                        }
+
+                        var quoteNames = document.querySelectorAll(
+                            'div.quote > blockquote > font > a[target=_blank] > font'
+                        );
+                        for (var quoteIndex = 0; quoteIndex < quoteNames.length; quoteIndex++) {
+                            var quoteName = quoteNames[quoteIndex];
+                            var displayedName = normalizeUserName(quoteName.textContent).split(/\s+/)[0];
+                            var quoteUser = getBlockedUserFromLink(map, quoteName, displayedName);
+                            var quote = quoteName.closest('blockquote');
+                            if (quoteUser) {
+                                hideAuxiliaryContent(quote, quoteUser, '该用户被引用的回复');
+                            } else {
+                                restoreAuxiliaryContent(quote);
+                            }
+                        }
+
+                        var isForumHome = /^\/(?:forum\.php|index\.php)?$/i.test(location.pathname) &&
+                            !/[?&](?:mod|id)=/i.test(location.search);
+                        var recentReplyLinks = document.querySelectorAll(
+                            isForumHome ? 'cite > a' : 'td.by > cite > a[c]'
+                        );
+                        for (var replyIndex = 0; replyIndex < recentReplyLinks.length; replyIndex++) {
+                            var replyLink = recentReplyLinks[replyIndex];
+                            if (replyLink.hasAttribute('c') && replyLink.getAttribute('c') !== '1') continue;
+                            var replyUser = getBlockedUserFromLink(map, replyLink);
+                            if (replyUser) {
+                                hideBlockedUserName(replyLink, replyUser);
+                            } else {
+                                restoreAuxiliaryContent(replyLink);
+                            }
+                        }
+
+                        var recentReplyNames = isForumHome
+                            ? document.querySelectorAll('p > em')
+                            : [];
+                        for (var nameIndex = 0; nameIndex < recentReplyNames.length; nameIndex++) {
+                            var nameNode = recentReplyNames[nameIndex];
+                            var nameUser = getBlockedUser(
+                                map,
+                                null,
+                                normalizeUserName(nameNode.textContent)
+                            );
+                            if (nameUser) {
+                                hideBlockedUserName(nameNode, nameUser);
+                            } else {
+                                restoreAuxiliaryContent(nameNode);
                             }
                         }
                     }
@@ -1855,6 +2042,7 @@ $styleString
                             syncListPage(map);
                             syncPcListPage(map);
                             syncPostPage(map);
+                            syncAuxiliaryUserContent(map);
                         } finally {
                             state.syncing = false;
                         }

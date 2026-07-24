@@ -27,4 +27,22 @@ class PageJsScriptsTest {
         assertFalse(PageJsScripts.OTHER_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertFalse(PageJsScripts.MANGA_BOOTSTRAP_JS.contains(marker))
     }
+
+    @Test
+    fun forumBlockerCoversAuxiliaryUserContent() {
+        val script = PageJsScripts.getForumBlockerJs(
+            enabled = true,
+            itemsJson = "[]",
+            isDark = false
+        )
+
+        assertTrue(script.contains("syncAuxiliaryUserContent(map)"))
+        assertTrue(script.contains("div.pstl.xs1.cl a.xi2.xw1"))
+        assertTrue(script.contains("tr[id] td > a[target=_blank]"))
+        assertTrue(script.contains("div.quote > blockquote > font > a[target=_blank] > font"))
+        assertTrue(script.contains("div.cl > a[target=_blank]"))
+        assertTrue(script.contains("td.by > cite > a[c]"))
+        assertTrue(script.contains("document.querySelectorAll('p > em')"))
+        assertTrue(script.contains("getBlockedUser(map, authorUid, authorName)"))
+    }
 }

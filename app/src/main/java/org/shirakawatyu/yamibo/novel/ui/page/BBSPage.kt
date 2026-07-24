@@ -158,11 +158,6 @@ class NativeMangaJSInterface {
 
 class ForumBlocklistJSInterface {
     @JavascriptInterface
-    fun block(type: String, id: String, title: String) {
-        ForumBlocklistManager.add(type, id, title)
-    }
-
-    @JavascriptInterface
     fun block(type: String, id: String, title: String, authorUid: String, authorName: String) {
         ForumBlocklistManager.add(type, id, title, authorUid, authorName)
     }
