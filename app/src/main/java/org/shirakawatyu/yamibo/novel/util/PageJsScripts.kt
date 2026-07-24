@@ -1948,13 +1948,6 @@ $styleString
                                 label: '该用户的评分'
                             });
                         }
-                        if (/home\.php/i.test(location.href)) {
-                            blockRules.push({
-                                selector: 'div.cl > a[target=_blank]',
-                                container: 'div.cl',
-                                label: '该用户的 BLOG'
-                            });
-                        }
                         for (var ruleIndex = 0; ruleIndex < blockRules.length; ruleIndex++) {
                             var rule = blockRules[ruleIndex];
                             var links = document.querySelectorAll(rule.selector);
@@ -1968,6 +1961,10 @@ $styleString
                                     restoreAuxiliaryContent(container);
                                 }
                             }
+                        }
+
+                        if (/home\.php/i.test(location.href)) {
+                            syncBlogUserContent(map);
                         }
 
                         var quoteNames = document.querySelectorAll(
@@ -2015,6 +2012,47 @@ $styleString
                                 hideBlockedUserName(nameNode, nameUser);
                             } else {
                                 restoreAuxiliaryContent(nameNode);
+                            }
+                        }
+                    }
+
+                    function syncBlogUserContent(map) {
+                        var legacyTargets = document.querySelectorAll(
+                            '#feed_div li[id^="feed_"] > div.cl[data-yamibo-block-kind="aux"]'
+                        );
+                        for (var legacyIndex = 0; legacyIndex < legacyTargets.length; legacyIndex++) {
+                            restoreAuxiliaryContent(legacyTargets[legacyIndex]);
+                        }
+
+                        var groups = document.querySelectorAll('#feed_div dl.bbda.cl');
+                        for (var groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+                            var group = groups[groupIndex];
+                            var groupActor = group.querySelector(
+                                'dd.m.avt > a[target="_blank"][href*="space-uid-"], ' +
+                                'dd.m.avt > a[target="_blank"][href*="mod=space"][href*="uid="]'
+                            );
+                            var groupUser = getBlockedUserFromLink(map, groupActor);
+                            if (groupUser) {
+                                hideAuxiliaryContent(group, groupUser, '该用户的 BLOG ');
+                            } else {
+                                restoreAuxiliaryContent(group);
+                            }
+                        }
+
+                        var standaloneItems = document.querySelectorAll(
+                            '#feed_div > ul.el > li[id^="feed_"]'
+                        );
+                        for (var itemIndex = 0; itemIndex < standaloneItems.length; itemIndex++) {
+                            var item = standaloneItems[itemIndex];
+                            var itemActor = item.querySelector(
+                                'div.cl > a[target="_blank"][href*="space-uid-"], ' +
+                                'div.cl > a[target="_blank"][href*="mod=space"][href*="uid="]'
+                            );
+                            var itemUser = getBlockedUserFromLink(map, itemActor);
+                            if (itemUser) {
+                                hideAuxiliaryContent(item, itemUser, '该用户的 BLOG ');
+                            } else {
+                                restoreAuxiliaryContent(item);
                             }
                         }
                     }
