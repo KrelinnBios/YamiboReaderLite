@@ -1517,7 +1517,7 @@ $styleString
                             '.authi>.yamibo-block-action{display:inline!important;margin-left:0!important;padding-left:0!important;font-size:12px!important;font-weight:normal!important;}' +
                             '.yamibo-blocked-message{box-sizing:border-box;margin:8px 0;padding:10px 12px;text-align:center;border-radius:4px;background:' + background + '!important;border:1px solid ' + border + '!important;color:' + text + '!important;font-size:12px;line-height:1.7;}' +
                             '.threadlist>.yamibo-blocked-message{list-style:none;margin:8px 10px;}' +
-                            '.yamibo-blocked-message a.yamibo-unblock-action{font-size:12px!important;color:' + linkColor + '!important;}' +
+                            '.yamibo-blocked-message a.yamibo-unblock-action,#ct .yamibo-blocked-message a.yamibo-unblock-action{font-size:12px!important;color:' + linkColor + '!important;}' +
                             '.yamibo-blocked-aux-row>td{padding:0!important;border:0!important;background:transparent!important;}' +
                             '.yamibo-blocked-aux-row .yamibo-blocked-message{margin:6px 0!important;}' +
                             '.yamibo-blocked-inline{color:' + text + '!important;font-size:inherit!important;font-weight:normal!important;}' +
@@ -1963,9 +1963,7 @@ $styleString
                             }
                         }
 
-                        if (/home\.php/i.test(location.href)) {
-                            syncBlogUserContent(map);
-                        }
+                        syncBlogUserContent(map);
 
                         var quoteNames = document.querySelectorAll(
                             'div.quote > blockquote > font > a[target=_blank] > font'
@@ -2017,6 +2015,26 @@ $styleString
                     }
 
                     function syncBlogUserContent(map) {
+                        var comments = document.querySelectorAll(
+                            '#comment_ul > dl[id^="comment_"], ' +
+                            '.doing_list_box.threadlist > ul > li[id^="comment_"]'
+                        );
+                        for (var commentIndex = 0; commentIndex < comments.length; commentIndex++) {
+                            var comment = comments[commentIndex];
+                            var commentAuthor = comment.querySelector(
+                                'a[id^="author_"][href*="space-uid-"], ' +
+                                'a[id^="author_"][href*="mod=space"][href*="uid="], ' +
+                                'dd.m.avt > a[href*="space-uid-"], ' +
+                                'dd.m.avt > a[href*="mod=space"][href*="uid="]'
+                            );
+                            var commentUser = getBlockedUserFromLink(map, commentAuthor);
+                            if (commentUser) {
+                                hideAuxiliaryContent(comment, commentUser, '该用户的评论');
+                            } else {
+                                restoreAuxiliaryContent(comment);
+                            }
+                        }
+
                         var legacyTargets = document.querySelectorAll(
                             '#feed_div li[id^="feed_"] > div.cl[data-yamibo-block-kind="aux"]'
                         );
