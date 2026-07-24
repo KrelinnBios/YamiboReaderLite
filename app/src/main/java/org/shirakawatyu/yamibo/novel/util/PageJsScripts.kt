@@ -1943,8 +1943,20 @@ $styleString
                                 label: '该用户的点评'
                             });
                             blockRules.push({
+                                selector: '[id^="comment_"] > [id^="commentdetail_"] .authi a[href*="space-uid-"], ' +
+                                    '[id^="comment_"] > [id^="commentdetail_"] .authi a[href*="mod=space"][href*="uid="]',
+                                container: '[id^="commentdetail_"]',
+                                label: '该用户的点评'
+                            });
+                            blockRules.push({
                                 selector: 'tr[id] td > a[target=_blank]',
                                 container: 'tr',
+                                label: '该用户的评分'
+                            });
+                            blockRules.push({
+                                selector: '[id^="ratelog_"] .post_box > li a[href*="mod=space"][href*="uid="], ' +
+                                    '#floatlayout_topicadmin #return_rate ~ .post_box > li a[href*="mod=space"][href*="uid="]',
+                                container: 'li',
                                 label: '该用户的评分'
                             });
                         }
@@ -1965,14 +1977,15 @@ $styleString
 
                         syncBlogUserContent(map);
 
-                        var quoteNames = document.querySelectorAll(
-                            'div.quote > blockquote > font > a[target=_blank] > font'
+                        var quoteHeaders = document.querySelectorAll(
+                            'div.quote > blockquote > font:first-child'
                         );
-                        for (var quoteIndex = 0; quoteIndex < quoteNames.length; quoteIndex++) {
-                            var quoteName = quoteNames[quoteIndex];
+                        for (var quoteIndex = 0; quoteIndex < quoteHeaders.length; quoteIndex++) {
+                            var quoteHeader = quoteHeaders[quoteIndex];
+                            var quoteName = quoteHeader.querySelector('a[target=_blank]') || quoteHeader;
                             var displayedName = normalizeUserName(quoteName.textContent).split(/\s+/)[0];
                             var quoteUser = getBlockedUserFromLink(map, quoteName, displayedName);
-                            var quote = quoteName.closest('blockquote');
+                            var quote = quoteHeader.closest('blockquote');
                             if (quoteUser) {
                                 hideAuxiliaryContent(quote, quoteUser, '该用户被引用的回复');
                             } else {
