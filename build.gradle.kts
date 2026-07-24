@@ -21,7 +21,7 @@ buildscript {
                 "io.netty:netty-handler-proxy",
                 "io.netty:netty-resolver",
                 "io.netty:netty-transport",
-                "io.netty:netty-transport-native-unix-common" -> useVersion("4.1.135.Final")
+                "io.netty:netty-transport-native-unix-common" -> useVersion("4.1.136.Final")
             }
         }
     }
