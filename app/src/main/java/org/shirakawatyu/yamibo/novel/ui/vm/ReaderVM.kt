@@ -1351,30 +1351,6 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
-    // 带完整日期的小标题，如「现在 - 2044 年 1 月」「三年前 - 2041 年 5 月」。
-    // 有些小说（如《愿在沉船中安眠》）按月份分章，每个故事楼层顶部都有这样一行，
-    // 作者据此分章；它比同楼层居中的「年」标题更具体，应优先作为章节标题。
-    private val chapterDateHeadingRegex = Regex("""\d{3,4}\s*年\s*\d{1,2}\s*月""")
-    private val headingSkipAncestors = setOf("li", "a", "ul", "ol", "table")
-
-    /** 提取楼层顶部「日期式小标题」：短文本且含完整年月，且不在目录列表/链接里。 */
-    private fun extractDateSubHeading(node: org.jsoup.nodes.Element): String? {
-        return node.select("p, div, center, h1, h2, h3, h4, strong, b, font")
-            .firstNotNullOfOrNull { el ->
-                if (el.parents().any { it.tagName() in headingSkipAncestors }) {
-                    return@firstNotNullOfOrNull null
-                }
-                el.text()
-                    .replace(' ', ' ')
-                    .replace(Regex("\\s+"), " ")
-                    .trim()
-                    .takeIf {
-                        it.isNotBlank() && it.length <= 24 &&
-                            chapterDateHeadingRegex.containsMatchIn(it)
-                    }
-            }
-    }
-
     private fun parseHtmlToContentList(
         html: String,
         translationMode: Int,
@@ -1428,7 +1404,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     normalizedFirst.take(30) to true
                 // 2) 「现在 - 2044 年 1 月」这类带完整日期的小标题：作者按此分章，硬分章
                 else -> {
-                    val dateHeading = extractDateSubHeading(messageNodes[i])
+                    val dateHeading = extractReaderDateSubHeading(messageNodes[i])
                     if (dateHeading != null) {
                         convertChineseIfNeeded(dateHeading, translationMode) to true
                     } else {

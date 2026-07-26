@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -107,6 +107,13 @@ fun ForumBlocklistDialog(
         text = {
             val controlHeight = 42.dp
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // 全部 / 主题 / 楼层 / 用户：筛选优先，保持与参考布局一致。
+                SectionSegmentedTabs(
+                    selected = filter,
+                    onSelect = { filter = it },
+                    height = controlHeight
+                )
+
                 // 紧凑搜索框：用 DecorationBox 自定义更小的内边距，整体比默认输入框矮一截。
                 val searchInteraction = remember { MutableInteractionSource() }
                 BasicTextField(
@@ -131,7 +138,7 @@ fun ForumBlocklistDialog(
                             interactionSource = searchInteraction,
                             placeholder = {
                                 Text(
-                                    "输入帖子标题、用户名或用户 ID",
+                                    "搜索标题、用户名或 ID",
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -156,13 +163,6 @@ fun ForumBlocklistDialog(
                     }
                 )
 
-                // 全部 / 主题 / 楼层 / 用户：与漫画首页一致的胶囊分段选择器。
-                SectionSegmentedTabs(
-                    selected = filter,
-                    onSelect = { filter = it },
-                    height = controlHeight
-                )
-
                 Text(
                     text = syncState.message,
                     color = if (syncState.isError) {
@@ -173,79 +173,120 @@ fun ForumBlocklistDialog(
                     fontSize = 12.sp
                 )
 
-                LazyColumn(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 250.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.16f),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)
+                    )
                 ) {
-                    if (visibleItems.isEmpty()) {
-                        item {
-                            Text(
-                                text = if (search.isBlank()) "暂无屏蔽项" else "未找到匹配项",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    } else {
-                        items(
-                            items = visibleItems,
-                            key = { "${it.type}:${it.id}" }
-                        ) { item ->
-                            val authorLine = when {
-                                item.type == ForumBlockedItem.TYPE_USER -> "UID ${item.id}"
-                                item.authorName.isNotBlank() && item.authorUid.isNotBlank() ->
-                                    "${item.authorName}（UID ${item.authorUid}）"
-                                item.authorName.isNotBlank() -> item.authorName
-                                item.authorUid.isNotBlank() -> "UID ${item.authorUid}"
-                                else -> "ID ${item.id}"
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        blockedItemPostUrl(item)?.let(onOpenPost)
-                                    }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 250.dp)
+                    ) {
+                        if (visibleItems.isEmpty()) {
+                            item {
                                 Text(
-                                    text = when (item.type) {
-                                        ForumBlockedItem.TYPE_THREAD -> "主题"
-                                        ForumBlockedItem.TYPE_POST -> "楼层"
-                                        ForumBlockedItem.TYPE_USER -> "用户"
-                                        else -> ""
-                                    },
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.primary
+                                    text = if (search.isBlank()) "暂无屏蔽项" else "未找到匹配项",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 24.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.title.ifBlank { item.id },
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = authorLine,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            }
+                        } else {
+                            itemsIndexed(
+                                items = visibleItems,
+                                key = { _, item -> "${item.type}:${item.id}" }
+                            ) { index, item ->
+                                if (index > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)
+                                            )
                                     )
                                 }
-                                Text(
-                                    text = "移除",
+                                val authorLine = when {
+                                    item.type == ForumBlockedItem.TYPE_USER -> "UID ${item.id}"
+                                    item.authorName.isNotBlank() && item.authorUid.isNotBlank() ->
+                                        "${item.authorName}（UID ${item.authorUid}）"
+                                    item.authorName.isNotBlank() -> item.authorName
+                                    item.authorUid.isNotBlank() -> "UID ${item.authorUid}"
+                                    else -> "ID ${item.id}"
+                                }
+                                Row(
                                     modifier = Modifier
+                                        .fillMaxWidth()
                                         .clickable {
-                                            ForumBlocklistManager.remove(item.type, item.id)
+                                            blockedItemPostUrl(item)?.let(onOpenPost)
                                         }
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontSize = 13.sp
-                                )
+                                        .padding(
+                                            start = 10.dp,
+                                            end = 6.dp,
+                                            top = 8.dp,
+                                            bottom = 8.dp
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(50),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                            alpha = 0.72f
+                                        )
+                                    ) {
+                                        Text(
+                                            text = when (item.type) {
+                                                ForumBlockedItem.TYPE_THREAD -> "主题"
+                                                ForumBlockedItem.TYPE_POST -> "楼层"
+                                                ForumBlockedItem.TYPE_USER -> "用户"
+                                                else -> ""
+                                            },
+                                            modifier = Modifier.padding(
+                                                horizontal = 7.dp,
+                                                vertical = 3.dp
+                                            ),
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(Modifier.width(9.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.title.ifBlank { item.id },
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = authorLine,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Text(
+                                        text = "移除",
+                                        modifier = Modifier
+                                            .clickable {
+                                                ForumBlocklistManager.remove(item.type, item.id)
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontSize = 13.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -279,10 +320,16 @@ fun ForumBlocklistDialog(
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
             containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            titleContentColor = MaterialTheme.colorScheme.primary,
             textContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("清空黑名单", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。", color = MaterialTheme.colorScheme.onSurface) },
+            title = { Text("清空黑名单", fontSize = 18.sp) },
+            text = {
+                Text(
+                    "确定清空全部黑名单吗？用户项也会从论坛黑名单中移除。",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -290,12 +337,16 @@ fun ForumBlocklistDialog(
                         ForumBlocklistManager.clear()
                     }
                 ) {
-                    Text("清空", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        "清空",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 15.sp
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurface)
+                    Text("取消", fontSize = 15.sp)
                 }
             }
         )

@@ -107,8 +107,6 @@ class FavoriteUtil {
                 val oldMap = getFavoriteMapSuspend()
                 var hasNewItems = false
                 var hasUpdatedFavIds = false
-                val newMap = LinkedHashMap<String, Favorite>()
-
                 val pureNewItems = mutableListOf<Favorite>()
 
                 for (netFav in pageList) {
@@ -125,13 +123,7 @@ class FavoriteUtil {
                     }
                 }
 
-                for (item in pureNewItems) {
-                    newMap[item.url] = item
-                }
-
-                for ((url, oldFav) in oldMap) {
-                    newMap[url] = oldFav
-                }
+                val newMap = mergeNewFavoritesPreservingPins(oldMap, pureNewItems)
 
                 if (hasNewItems || hasUpdatedFavIds) {
                     pendingFavMap = null
@@ -144,6 +136,25 @@ class FavoriteUtil {
                 }
                 hasNewItems
             }
+        }
+
+        /**
+         * 新收藏排在普通旧收藏之前，但不能越过用户明确置顶的条目。
+         * 置顶项和普通项各自保持原有顺序，新收藏保持论坛返回顺序。
+         */
+        internal fun mergeNewFavoritesPreservingPins(
+            oldMap: LinkedHashMap<String, Favorite>,
+            newItems: List<Favorite>
+        ): LinkedHashMap<String, Favorite> {
+            val merged = LinkedHashMap<String, Favorite>()
+            oldMap.forEach { (url, favorite) ->
+                if (favorite.pinAnchorUrl != null) merged[url] = favorite
+            }
+            newItems.forEach { favorite -> merged[favorite.url] = favorite }
+            oldMap.forEach { (url, favorite) ->
+                if (favorite.pinAnchorUrl == null) merged[url] = favorite
+            }
+            return merged
         }
 
         suspend fun cleanupDeletedFavoritesSuspend(fullNetworkList: List<Favorite>) {

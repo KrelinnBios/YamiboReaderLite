@@ -413,11 +413,13 @@ fun FavoritePage(
         val isSameCategory = favoriteVM.currentCategory == previousCategory
         val isSameManageMode = uiState.isInManageMode == previousManageMode
         if (isSameCategory && isSameManageMode && isManualRefreshSession && refreshChainActive) {
-            val addedSupportedFavorites = favoriteList.count { favorite ->
-                favorite.url !in previousFavoriteUrls && favorite.type in 1..2
+            // 新拉取的收藏最初通常还是 type=0（等待后台识别），此时就要计入提示；
+            // 若只统计 1/2，等类型识别完成时 URL 已进入 previousFavoriteUrls，会永久漏报。
+            val addedVisibleFavorites = favoriteList.count { favorite ->
+                favorite.url !in previousFavoriteUrls && favorite.type in 0..2
             }
-            if (addedSupportedFavorites > 0) {
-                pendingNewFavoriteCount += addedSupportedFavorites
+            if (addedVisibleFavorites > 0) {
+                pendingNewFavoriteCount += addedVisibleFavorites
             }
         }
 

@@ -27,6 +27,13 @@ import org.shirakawatyu.yamibo.novel.repository.DirectoryRepository
 
 enum class UpdateCheckResult { SUCCESS, FAILURE, SKIPPED }
 
+/** 手动检查确认没有新增内容时，视为用户已处理旧提示；后台检查则继续保留未读更新。 */
+internal fun shouldKeepUnreadUpdate(
+    hadUnreadUpdate: Boolean,
+    detectedUpdate: Boolean,
+    acknowledgeExistingUpdate: Boolean
+): Boolean = detectedUpdate || (hadUnreadUpdate && !acknowledgeExistingUpdate)
+
 /**
  * 应用级（进程生命周期）更新检查引擎。
  *
@@ -290,7 +297,11 @@ object UpdateCheckEngine {
                     return@withLock UpdateCheckResult.SUCCESS
                 }
                 val detectedUpdate = currentReplies > profile.savedReplies
-                val keepUnreadUpdate = profile.hasUpdate || detectedUpdate
+                val keepUnreadUpdate = shouldKeepUnreadUpdate(
+                    hadUnreadUpdate = profile.hasUpdate,
+                    detectedUpdate = detectedUpdate,
+                    acknowledgeExistingUpdate = notify
+                )
                 NovelUpdateCheckUtil.updateRepliesSuspend(
                     url = url, newReplies = currentReplies,
                     hasUpdate = keepUnreadUpdate, lastCheckTime = checkedAt
@@ -340,7 +351,11 @@ object UpdateCheckEngine {
                     return@withLock UpdateCheckResult.SUCCESS
                 }
                 val detectedUpdate = currentReplies > profile.savedReplies
-                val keepUnreadUpdate = profile.hasUpdate || detectedUpdate
+                val keepUnreadUpdate = shouldKeepUnreadUpdate(
+                    hadUnreadUpdate = profile.hasUpdate,
+                    detectedUpdate = detectedUpdate,
+                    acknowledgeExistingUpdate = notify
+                )
                 OtherUpdateCheckUtil.updateRepliesSuspend(
                     url = url, newReplies = currentReplies,
                     hasUpdate = keepUnreadUpdate, lastCheckTime = checkedAt
@@ -458,7 +473,11 @@ object UpdateCheckEngine {
                 val detectedUpdate = newCount > baseChapterCount ||
                         (newLatestTid.isNotEmpty() && baseLatestTid.isNotEmpty() && newLatestTid != baseLatestTid)
 
-                val keepUnreadUpdate = oldProfile?.hasUpdate == true || (!isFirstCheck && detectedUpdate)
+                val keepUnreadUpdate = shouldKeepUnreadUpdate(
+                    hadUnreadUpdate = oldProfile?.hasUpdate == true,
+                    detectedUpdate = !isFirstCheck && detectedUpdate,
+                    acknowledgeExistingUpdate = notify
+                )
                 MangaUpdateCheckUtil.updateSnapshotSuspend(
                     url = url,
                     chapterCount = snapshotCount,
