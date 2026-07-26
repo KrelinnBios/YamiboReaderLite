@@ -97,6 +97,7 @@ Android 7.0（API 24）及以上。
 - [duck123ducker/yamibo_manga_reader](https://github.com/duck123ducker/yamibo_manga_reader)（参考）
 - [belleangelina/300X](https://github.com/belleangelina/300X)（Flutter 跨平台客户端）
 - [TnZzZHlp/Pocket300](https://github.com/TnZzZHlp/Pocket300)（Android 客户端）
+- [QAQadws/y300](https://github.com/QAQadws/y300)（Android 客户端）
 - [LittleSurvival/yamibo-app](https://github.com/LittleSurvival/yamibo-app)（Android 客户端）
 - [Arkalin/YamiboX](https://github.com/Arkalin/YamiboX)（SwiftUI iOS 客户端）
 
