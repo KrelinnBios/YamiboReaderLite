@@ -951,9 +951,11 @@ fun FavoritePage(
                     val hasUpdate = novelCheckMap[item.url]?.hasUpdate == true ||
                             mangaCheckMap[item.url]?.hasUpdate == true ||
                             otherCheckMap[item.url]?.hasUpdate == true
-                    val isCheckingUpdate = uiState.checkingUpdateUrls.contains(item.url) ||
-                            probingUrl == item.url ||
-                            probingUrl == item.lastMangaUrl
+                    val isOpeningFavorite = probingUrl?.let { activeUrl ->
+                        activeUrl == item.url || activeUrl == item.lastMangaUrl
+                    } == true
+                    val isCheckingUpdate =
+                        uiState.checkingUpdateUrls.contains(item.url) || isOpeningFavorite
                     val hasUpdateFailure = failedUpdateUrls.contains(item.url)
                     FavoriteItem(
                         item.title,
