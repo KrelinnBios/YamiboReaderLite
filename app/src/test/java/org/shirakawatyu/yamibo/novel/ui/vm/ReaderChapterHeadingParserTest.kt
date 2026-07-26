@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.ui.vm
 
 import org.jsoup.Jsoup
+import org.shirakawatyu.yamibo.novel.util.reader.HTMLUtil
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -84,13 +85,49 @@ class ReaderChapterHeadingParserTest {
         assertEquals(listOf(null, "1"), embedded.map { it.title })
         assertEquals(listOf("2"), leading.map { it.title })
         assertEquals("2 一边这样想着，我在位于贫民窟15公里外的市区办公窗口办理完手续。", leading.single().text)
-        assertEquals(true, containsReaderNumberedChapterStart(embedded))
-        assertEquals(true, containsReaderNumberedChapterStart(leading))
+        assertEquals(true, containsReaderChapterStart(embedded))
+        assertEquals(true, containsReaderChapterStart(leading))
         assertEquals(
             false,
-            containsReaderNumberedChapterStart(
+            containsReaderChapterStart(
                 splitReaderNumberedChapterSegments("没有数字章节的普通正文")
             )
         )
+    }
+
+    @Test
+    fun splitReaderEmbeddedChapterSegments_splitsMultipleStyledHeadingsInOnePost() {
+        val node = Jsoup.parse(
+            """
+            <div class="message">
+              <div>科幻部分尽是胡诌，烦请见谅</div>
+              <strong><font size="4"><strong>一、卖身契</strong></font></strong>
+              <div>第一章正文。</div>
+              <strong><font size="4"><strong>二、要求</strong></font></strong>
+              <div>第二章正文。</div>
+              <strong><font size="4"><strong>十、永生之问</strong><strong>2</strong></font></strong>
+              <div>带嵌套尾号的章节正文。</div>
+              <strong><font size="4"><strong>第八其零：乘龙载客的女孩</strong></font></strong>
+              <div>子章正文。</div>
+              <strong>第一章 尾声</strong>
+              <div>尾声正文。</div>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        val markedText = HTMLUtil.toText(markReaderEmbeddedChapterHeadings(node).html())
+        val segments = splitReaderEmbeddedChapterSegments(markedText)
+
+        assertEquals(
+            listOf(
+                "一、卖身契",
+                "二、要求",
+                "十、永生之问2",
+                "第八其零：乘龙载客的女孩",
+                "第一章 尾声"
+            ),
+            segments.mapNotNull { it.title }
+        )
+        assertEquals(true, segments.first { it.title == "二、要求" }.text.contains("第二章正文"))
     }
 }
