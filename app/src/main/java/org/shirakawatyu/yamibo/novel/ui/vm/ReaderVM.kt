@@ -1374,7 +1374,9 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val messageNodes = doc.getElementsByClass("message")
         if (messageNodes.isEmpty()) return result
 
-        val rawTexts = messageNodes.map { HTMLUtil.toText(it.html()) }
+        val rawTexts = messageNodes.map { node ->
+            HTMLUtil.toText(markReaderEmbeddedChapterHeadings(node).html())
+        }
         val delimiter = "|||YAMIBO_SEP|||"
         val combinedText = rawTexts.joinToString(delimiter)
 
@@ -1389,9 +1391,9 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
 
         val convertedTexts = convertedCombinedText.split(delimiter)
-        val numberedChapterSegments = convertedTexts.map(::splitReaderNumberedChapterSegments)
-        val firstNumberedMessageIndex = numberedChapterSegments.indexOfFirst { segments ->
-            containsReaderNumberedChapterStart(segments)
+        val chapterSegments = convertedTexts.map(::splitReaderEmbeddedChapterSegments)
+        val firstSegmentedMessageIndex = chapterSegments.indexOfFirst { segments ->
+            containsReaderChapterStart(segments)
         }
         val replyRegex = Regex("发表于\\s*\\d{4}-\\d{1,2}-\\d{1,2}")
 
@@ -1443,7 +1445,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             }
         }
         val useDetectedHeadings = detectedHeadings.any { it != null } ||
-            firstNumberedMessageIndex >= 0
+            firstSegmentedMessageIndex >= 0
 
         var currentValidTitle: String? = null
 
@@ -1453,24 +1455,24 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
             if (firstLine.contains(replyRegex)) continue
 
-            // 作品同时存在数字章节时，章节开始之前的独立介绍标题不属于正文目录；
-            // 同一楼层里的作品标题仍保留，并从其中的“1”开始切出正文第一章。
-            val suppressPrefaceHeading = firstNumberedMessageIndex >= 0 &&
-                i < firstNumberedMessageIndex &&
+            // 作品存在楼层内分段章节时，章节开始之前的独立介绍标题不属于正文目录；
+            // 同一楼层里的作品标题仍保留，并从其中首个分段标题开始切出正文第一章。
+            val suppressPrefaceHeading = firstSegmentedMessageIndex >= 0 &&
+                i < firstSegmentedMessageIndex &&
                 detectedHeadings[i]?.second == false
 
-            val messageSegments = numberedChapterSegments.getOrElse(i) {
-                splitReaderNumberedChapterSegments(
+            val messageSegments = chapterSegments.getOrElse(i) {
+                splitReaderEmbeddedChapterSegments(
                     convertedTexts.getOrElse(i) { rawTexts.getOrElse(i) { "" } }
                 )
             }
-            val messageHasNumberedChapter = containsReaderNumberedChapterStart(messageSegments)
+            val messageHasSegmentedChapter = containsReaderChapterStart(messageSegments)
             messageSegments.forEachIndexed { segmentIndex, segment ->
                 var isHardStart = false
                 if (segment.title != null) {
                     currentValidTitle = segment.title
                     isHardStart = true
-                } else if (segmentIndex == 0 && !messageHasNumberedChapter) {
+                } else if (segmentIndex == 0 && !messageHasSegmentedChapter) {
                     if (useDetectedHeadings) {
                         if (suppressPrefaceHeading) {
                             currentValidTitle = null
