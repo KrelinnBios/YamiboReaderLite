@@ -7,6 +7,42 @@ import org.junit.Test
 
 class ReaderChapterHeadingParserTest {
     @Test
+    fun extractReaderTextChapterHeading_stripsMarkdownHeadingMarker() {
+        assertEquals("第一话", extractReaderTextChapterHeading("# 第一话"))
+        assertEquals(
+            "番外篇 蟑螂 · 任务",
+            extractReaderTextChapterHeading("＃ 番外篇  蟑螂 · 任务")
+        )
+        assertNull(extractReaderTextChapterHeading("我一直憧憬着莉莉。"))
+    }
+
+    @Test
+    fun extractReaderStructuralHeading_skipsLongContainerAndFindsNestedTitle() {
+        val body = "正文段落。".repeat(30)
+        val node = Jsoup.parse(
+            """
+            <div class="message">
+              <div align="center">
+                <font size="4"># 最强的蛋包饭</font>
+                <font size="4">$body</font>
+              </div>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        assertEquals("最强的蛋包饭", extractReaderStructuralHeading(node))
+    }
+
+    @Test
+    fun extractReaderStructuralHeading_doesNotUseBodySentenceAsTitle() {
+        val node = Jsoup.parse(
+            """<div class="message"><font size="4">我一直憧憬着莉莉。</font></div>"""
+        ).selectFirst(".message")!!
+
+        assertNull(extractReaderStructuralHeading(node))
+    }
+
+    @Test
     fun extractReaderDateSubHeading_doesNotTreatSentenceContainingDateAsHeading() {
         val node = Jsoup.parse(
             """
