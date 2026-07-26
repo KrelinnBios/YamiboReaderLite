@@ -26,7 +26,7 @@ data class AuthenticatedHtmlPage(
 )
 
 object AuthenticatedThreadPageLoader {
-    const val CONTENT_VERSION = 3
+    const val CONTENT_VERSION = 4
 
     suspend fun loadReaderPage(
         tid: String,

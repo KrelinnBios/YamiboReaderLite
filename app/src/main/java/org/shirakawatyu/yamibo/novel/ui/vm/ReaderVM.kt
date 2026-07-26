@@ -349,14 +349,46 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         if (url.isBlank() || currentAuthorId == null || maxPage <= 0) return
         if (maxPage <= automaticCacheMaxPage || _isDiskCaching.value) return
 
-        val pagesToCache = (1..maxPage).toSet() - _cachedPages.value
+        val identityUrl = url
+        val identityAuthorId = currentAuthorId
+        val identityAliases = readerIdentityAliases()
         automaticCacheMaxPage = maxPage
-        if (pagesToCache.isNotEmpty()) {
-            startCaching(
-                pagesToCache = pagesToCache,
-                includeImages = _uiState.value.loadImages,
-                showProgressDialog = false
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            val validCachedPages = mutableSetOf<Int>()
+            for (page in 1..maxPage) {
+                if (
+                    isCurrentReaderCache(
+                        localCache.loadPageCompat(
+                            primaryUrl = identityUrl,
+                            pageNum = page,
+                            aliasUrls = identityAliases
+                        )
+                    )
+                ) {
+                    validCachedPages += page
+                }
+            }
+            val pagesToCache = (1..maxPage).toSet() - validCachedPages
+
+            withContext(Dispatchers.Main) {
+                if (
+                    url != identityUrl ||
+                    currentAuthorId != identityAuthorId ||
+                    automaticCacheMaxPage != maxPage
+                ) return@withContext
+                if (_isDiskCaching.value) {
+                    // 校验期间若被手动缓存抢占，允许缓存结束后的下一次加载重新补齐。
+                    automaticCacheMaxPage = 0
+                    return@withContext
+                }
+                if (pagesToCache.isNotEmpty()) {
+                    startCaching(
+                        pagesToCache = pagesToCache,
+                        includeImages = _uiState.value.loadImages,
+                        showProgressDialog = false
+                    )
+                }
+            }
         }
     }
 
@@ -459,7 +491,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
 
         viewModelScope.launch {
-            val memoryCacheData = getMemoryCacheCompat(pageNum)
+            val memoryCacheData = getMemoryCacheCompat(pageNum).takeIf(::isCurrentReaderCache)
 
             if (memoryCacheData != null) {
                 withContext(Dispatchers.IO) {
@@ -515,6 +547,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             globalIndexCollectorJob = null
             globalIndexUrl = null
             pageChapterTitles.clear()
+            automaticCacheMaxPage = 0
             _uiState.value = _uiState.value.copy(
                 globalChapters = emptyList(),
                 globalChapterIndexing = false
@@ -1380,6 +1413,10 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         }
 
         val convertedTexts = convertedCombinedText.split(delimiter)
+        val numberedChapterSegments = convertedTexts.map(::splitReaderNumberedChapterSegments)
+        val firstNumberedMessageIndex = numberedChapterSegments.indexOfFirst { segments ->
+            containsReaderNumberedChapterStart(segments)
+        }
         val replyRegex = Regex("发表于\\s*\\d{4}-\\d{1,2}-\\d{1,2}")
 
         val firstLines = messageNodes.indices.map { i ->
@@ -1430,32 +1467,55 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 }
             }
         }
-        val useDetectedHeadings = detectedHeadings.any { it != null }
+        val useDetectedHeadings = detectedHeadings.any { it != null } ||
+            firstNumberedMessageIndex >= 0
 
         var currentValidTitle: String? = null
 
         for (i in messageNodes.indices) {
             val node = messageNodes[i]
-            val rawText = convertedTexts.getOrElse(i) { rawTexts[i] }
             val firstLine = firstLines[i]
 
             if (firstLine.contains(replyRegex)) continue
 
-            var isHardStart = false
-            if (useDetectedHeadings) {
-                // 命中标题的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
-                detectedHeadings[i]?.let { (title, isHard) ->
-                    currentValidTitle = title
-                    isHardStart = isHard
-                }
-            } else {
-                currentValidTitle = firstLine.take(30)
-            }
+            // 作品同时存在数字章节时，章节开始之前的独立介绍标题不属于正文目录；
+            // 同一楼层里的作品标题仍保留，并从其中的“1”开始切出正文第一章。
+            val suppressPrefaceHeading = firstNumberedMessageIndex >= 0 &&
+                i < firstNumberedMessageIndex &&
+                detectedHeadings[i]?.second == false
 
-            if (rawText.isNotBlank()) {
-                result.add(
-                    Content(rawText, ContentType.TEXT, currentValidTitle, chapterStart = isHardStart)
+            val messageSegments = numberedChapterSegments.getOrElse(i) {
+                splitReaderNumberedChapterSegments(
+                    convertedTexts.getOrElse(i) { rawTexts.getOrElse(i) { "" } }
                 )
+            }
+            val messageHasNumberedChapter = containsReaderNumberedChapterStart(messageSegments)
+            messageSegments.forEachIndexed { segmentIndex, segment ->
+                var isHardStart = false
+                if (segment.title != null) {
+                    currentValidTitle = segment.title
+                    isHardStart = true
+                } else if (segmentIndex == 0 && !messageHasNumberedChapter) {
+                    if (useDetectedHeadings) {
+                        if (suppressPrefaceHeading) {
+                            currentValidTitle = null
+                        } else {
+                            // 命中标题的楼层开启新章节，其余楼层沿用上一章标题（不新增目录项）。
+                            detectedHeadings[i]?.let { (title, isHard) ->
+                                currentValidTitle = title
+                                isHardStart = isHard
+                            }
+                        }
+                    } else {
+                        currentValidTitle = firstLine.take(30)
+                    }
+                }
+
+                if (segment.text.isNotBlank()) {
+                    result.add(
+                        Content(segment.text, ContentType.TEXT, currentValidTitle, chapterStart = isHardStart)
+                    )
+                }
             }
 
             if (loadImages) {

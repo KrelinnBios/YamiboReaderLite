@@ -35,4 +35,26 @@ class ReaderChapterHeadingParserTest {
         assertEquals("现在 - 2044 年 1 月", extractReaderDateSubHeading(currentDateHeading))
         assertEquals("三年前 - 2041 年 5 月", extractReaderDateSubHeading(relativeDateHeading))
     }
+
+    @Test
+    fun splitReaderNumberedChapterSegments_splitsEmbeddedAndLeadingChapterNumbers() {
+        val embedded = splitReaderNumberedChapterSegments(
+            "卖身之事\n著：小野美由纪\n1\n当我得到这闪耀着银色光芒的新身体时……"
+        )
+        val leading = splitReaderNumberedChapterSegments(
+            "2 一边这样想着，我在位于贫民窟15公里外的市区办公窗口办理完手续。"
+        )
+
+        assertEquals(listOf(null, "1"), embedded.map { it.title })
+        assertEquals(listOf("2"), leading.map { it.title })
+        assertEquals("2 一边这样想着，我在位于贫民窟15公里外的市区办公窗口办理完手续。", leading.single().text)
+        assertEquals(true, containsReaderNumberedChapterStart(embedded))
+        assertEquals(true, containsReaderNumberedChapterStart(leading))
+        assertEquals(
+            false,
+            containsReaderNumberedChapterStart(
+                splitReaderNumberedChapterSegments("没有数字章节的普通正文")
+            )
+        )
+    }
 }

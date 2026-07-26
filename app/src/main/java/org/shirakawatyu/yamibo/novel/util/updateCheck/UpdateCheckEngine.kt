@@ -241,21 +241,32 @@ object UpdateCheckEngine {
         }
     }
 
-    private suspend fun fetchNovelRepliesQueued(tid: String, authorId: String): Int? {
-        return novelMetaRequestMutex.withLock {
-            val now = System.currentTimeMillis()
-            val elapsed = now - lastNovelMetaRequestStartedAt
-            if (elapsed in 0L until NOVEL_META_REQUEST_INTERVAL_MS) {
-                delay(NOVEL_META_REQUEST_INTERVAL_MS - elapsed)
-            }
-            lastNovelMetaRequestStartedAt = System.currentTimeMillis()
+    private suspend fun fetchNovelRepliesQueued(tid: String, authorId: String?): Int? {
+        val filteredReplies = if (!authorId.isNullOrBlank()) {
+            try {
+                novelMetaRequestMutex.withLock {
+                    val now = System.currentTimeMillis()
+                    val elapsed = now - lastNovelMetaRequestStartedAt
+                    if (elapsed in 0L until NOVEL_META_REQUEST_INTERVAL_MS) {
+                        delay(NOVEL_META_REQUEST_INTERVAL_MS - elapsed)
+                    }
+                    lastNovelMetaRequestStartedAt = System.currentTimeMillis()
 
-            val novelApi = YamiboRetrofit.getInstance().create(NovelApi::class.java)
-            val resp = novelApi.getThreadMeta(tid, authorId).string()
-            val json = JSON.parseObject(resp)
-            val thread = json.getJSONObject("Variables")?.getJSONObject("thread")
-            thread?.getString("replies")?.toIntOrNull()
+                    val novelApi = YamiboRetrofit.getInstance().create(NovelApi::class.java)
+                    val resp = novelApi.getThreadMeta(tid, authorId).string()
+                    val json = JSON.parseObject(resp)
+                    val thread = json.getJSONObject("Variables")?.getJSONObject("thread")
+                    thread?.getString("replies")?.toIntOrNull()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                null
+            }
+        } else {
+            null
         }
+        if (filteredReplies != null) return filteredReplies
+        return fetchOtherRepliesQueued(tid)
     }
 
     // ---- 小说检查（搬自原 FavoriteVM.runNovelUpdateCheck，新增 notify 门控）----
@@ -270,11 +281,6 @@ object UpdateCheckEngine {
             if (notify) toast("查询失败，无法识别帖子ID")
             return UpdateCheckResult.FAILURE
         }
-        if (authorId.isNullOrBlank()) {
-            if (notify) toast("查询失败，缺少作者ID")
-            return UpdateCheckResult.FAILURE
-        }
-
         return checkLockFor(url).withLock {
             val profile = NovelUpdateCheckUtil.getMapSuspend()[url]
             try {
@@ -289,7 +295,7 @@ object UpdateCheckEngine {
                     // 首次追踪：建立基线，不算"有更新"
                     NovelUpdateCheckUtil.saveProfileSuspend(
                         NovelUpdateCheckProfile(
-                            title = title, url = url, authorId = authorId,
+                            title = title, url = url, authorId = authorId.orEmpty(),
                             savedReplies = currentReplies, hasUpdate = false, lastCheckTime = checkedAt
                         )
                     )

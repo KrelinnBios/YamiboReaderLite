@@ -339,7 +339,7 @@ fun ForumBlocklistDialog(
                 ) {
                     Text(
                         "清空",
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 15.sp
                     )
                 }

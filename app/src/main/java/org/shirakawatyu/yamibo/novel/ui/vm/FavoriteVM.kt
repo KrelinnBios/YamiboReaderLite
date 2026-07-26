@@ -62,8 +62,8 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             "55" to "轻小说/译文区",
             "60" to "TXT小说区"
         )
-        private val MANGA_FIDS = MANGA_SECTIONS_BY_FID.keys
-        private val NOVEL_FIDS = NOVEL_SECTIONS_BY_FID.keys
+        private val MANGA_FIDS = FavoriteTypeResolver.MANGA_FIDS
+        private val NOVEL_FIDS = FavoriteTypeResolver.NOVEL_FIDS
         private val MANGA_SECTIONS = MANGA_SECTIONS_BY_FID.values
         private val NOVEL_SECTIONS = NOVEL_SECTIONS_BY_FID.values
     }
@@ -137,7 +137,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     classificationQueueJob?.cancel()
                     classificationQueueJob = viewModelScope.launch {
                         fullList
-                            .filter { it.sourceFid.isNullOrBlank() }
+                            .filter { getStoredFavoriteType(it) == 0 }
                             .forEach { favorite ->
                                 probeFavoriteTypeInBackground(favorite)
                                 delay(300L)
@@ -224,7 +224,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
      * 因此左滑探测不会把用户从收藏页带走。
      */
     fun probeFavoriteTypeInBackground(favorite: Favorite) {
-        if (favorite.type != 0) return
+        if (getStoredFavoriteType(favorite) != 0) return
         val alreadyProbing = synchronized(typeProbeJobsLock) {
             typeProbeJobs[favorite.url]?.isActive == true
         }
@@ -248,11 +248,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     }
 
     suspend fun resolveFavoriteTypeForOpen(favorite: Favorite): Int {
-        val inferredType = when (favorite.sourceFid) {
-            in MANGA_FIDS -> 2
-            in NOVEL_FIDS -> 1
-            else -> favorite.type
-        }
+        val inferredType = getStoredFavoriteType(favorite)
         if (inferredType != 0) return inferredType
 
         return withContext(Dispatchers.IO) {
@@ -263,6 +259,11 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         }
     }
 
+    fun getReliableFavoriteType(favorite: Favorite): Int = getStoredFavoriteType(favorite)
+
+    private fun getStoredFavoriteType(favorite: Favorite): Int =
+        FavoriteTypeResolver.reliableType(favorite)
+
     private suspend fun probeFavoriteTypeSuspend(favorite: Favorite): TypeProbeResult? {
         val tid = MangaTitleCleaner.extractTidFromUrl(favorite.url)
         if (tid == null) {
@@ -270,7 +271,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 type = 3,
                 title = favorite.title,
                 authorId = favorite.authorId ?: "",
-                sourceFid = ""
+                sourceFid = FavoriteTypeResolver.DETECTED_OTHER_SOURCE_FID
             )
         }
 
@@ -280,17 +281,27 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         val variables = json.getJSONObject("Variables") ?: return null
         val thread = variables.getJSONObject("thread") ?: return null
         val forumName = variables.getJSONObject("forum")?.getString("name") ?: ""
-        val title = thread.getString("subject") ?: favorite.title
+        val title = FavoriteUtil.decodeTitle(thread.getString("subject") ?: favorite.title)
         val authorId = thread.getString("authorid") ?: ""
         val fid = thread.getString("fid") ?: ""
 
         val type = when {
             fid in MANGA_FIDS || MANGA_SECTIONS.any { forumName.contains(it) } -> 2
             fid in NOVEL_FIDS || (forumName.isNotEmpty() && NOVEL_SECTIONS.any { forumName.contains(it) }) -> 1
-            else -> 3
+            fid.isNotBlank() || forumName.isNotBlank() -> 3
+            // 元数据不完整不能直接记为“其他”，否则一次临时异常会永久隐藏真实漫画/小说。
+            else -> return null
+        }
+        val resolvedSourceFid = fid.ifBlank {
+            if (type == 3) FavoriteTypeResolver.DETECTED_OTHER_SOURCE_FID else ""
         }
 
-        return TypeProbeResult(type = type, title = title, authorId = authorId, sourceFid = fid)
+        return TypeProbeResult(
+            type = type,
+            title = title,
+            authorId = authorId,
+            sourceFid = resolvedSourceFid
+        )
     }
 
     private suspend fun applyTypeProbeResult(favorite: Favorite, result: TypeProbeResult): Boolean {
@@ -319,7 +330,25 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
             }
         }
 
-        updatedFavorite?.let { FavoriteUtil.updateFavoriteSuspend(it) }
+        updatedFavorite?.let { updated ->
+            FavoriteUtil.updateFavoriteSuspend(updated)
+            when (updated.type) {
+                1 -> {
+                    MangaUpdateCheckUtil.removeProfileSuspend(updated.url)
+                    OtherUpdateCheckUtil.removeProfileSuspend(updated.url)
+                }
+
+                2 -> {
+                    NovelUpdateCheckUtil.removeProfileSuspend(updated.url)
+                    OtherUpdateCheckUtil.removeProfileSuspend(updated.url)
+                }
+
+                3 -> {
+                    NovelUpdateCheckUtil.removeProfileSuspend(updated.url)
+                    MangaUpdateCheckUtil.removeProfileSuspend(updated.url)
+                }
+            }
+        }
         withContext(Dispatchers.Main) { updateUiList() }
         return updatedFavorite != null
     }
@@ -383,8 +412,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         val supportedOnly = pendingFiltered.filter { favorite ->
             when (favorite.type) {
                 0 -> true
-                1 -> favorite.sourceFid.isNullOrBlank() || favorite.sourceFid in NOVEL_FIDS
-                2 -> favorite.sourceFid.isNullOrBlank() || favorite.sourceFid in MANGA_FIDS
+                1, 2 -> FavoriteTypeResolver.reliableType(favorite) == favorite.type
                 else -> false
             }
         }
@@ -394,6 +422,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         } else {
             supportedOnly.filter { it.type == currentCategory }
         }
+        val orderedList = FavoriteUtil.orderPinnedFavoritesFirst(filteredList)
 
         val categoryCounts = mapOf(
             -1 to supportedOnly.size,
@@ -403,7 +432,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
 
         _uiState.update {
             it.copy(
-                favoriteList = filteredList,
+                favoriteList = orderedList,
                 categoryCounts = categoryCounts
             )
         }
@@ -526,7 +555,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                     for (i in 0 until list.size) {
                         val item = list.getJSONObject(i) ?: continue
                         val favId = item.getString("favid") ?: ""
-                        val title = item.getString("title") ?: ""
+                        val title = FavoriteUtil.decodeTitle(item.getString("title") ?: "")
                         val url = FavoriteUtil.normalizeUrl(item.getString("url") ?: "")
 
                         val favorite = Favorite(title, url)
@@ -1109,7 +1138,7 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val updatedFavorite = favorite.copy(
                 type = type,
-                sourceFid = null
+                sourceFid = FavoriteTypeResolver.MANUAL_SOURCE_FID
             )
 
             stateMutex.withLock {
@@ -1136,26 +1165,47 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
     }
 
     fun checkUpdateAfterTypeProbe(favorite: Favorite) {
+        val storedType = getStoredFavoriteType(favorite)
+        if (storedType != 0) {
+            val checkedFavorite = if (storedType == favorite.type) {
+                favorite
+            } else {
+                favorite.copy(type = storedType)
+            }
+            when (storedType) {
+                1 -> checkNovelUpdate(checkedFavorite)
+                2 -> checkMangaUpdate(checkedFavorite)
+                else -> checkOtherUpdate(checkedFavorite)
+            }
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching { probeFavoriteTypeSuspend(favorite) }.getOrNull()
-            val checkedFavorite = if (result != null) {
-                applyTypeProbeResult(favorite, result)
-                when (result.type) {
-                    1 -> {
-                        val cleanTitle = cleanNovelProbeTitle(result.title).ifBlank { favorite.title }
-                        favorite.copy(
-                            type = 1,
-                            title = cleanTitle,
-                            authorId = result.authorId.takeIf { it.isNotBlank() },
-                            sourceFid = result.sourceFid
-                        )
-                    }
-
-                    2 -> favorite.copy(type = 2, sourceFid = result.sourceFid)
-                    else -> favorite.copy(type = 3, sourceFid = result.sourceFid)
+            if (result == null) {
+                markUpdateCheckFinished(favorite.url, UpdateCheckResult.FAILURE)
+                withContext(Dispatchers.Main) {
+                    YamiboToast.show(
+                        context = applicationContext,
+                        message = "暂时无法识别收藏类型，请稍后重试"
+                    )
                 }
-            } else {
-                favorite.copy(type = 3)
+                return@launch
+            }
+            applyTypeProbeResult(favorite, result)
+            val checkedFavorite = when (result.type) {
+                1 -> {
+                    val cleanTitle = cleanNovelProbeTitle(result.title).ifBlank { favorite.title }
+                    favorite.copy(
+                        type = 1,
+                        title = cleanTitle,
+                        authorId = result.authorId.takeIf { it.isNotBlank() },
+                        sourceFid = result.sourceFid
+                    )
+                }
+
+                2 -> favorite.copy(type = 2, sourceFid = result.sourceFid)
+                else -> favorite.copy(type = 3, sourceFid = result.sourceFid)
             }
 
             when (checkedFavorite.type) {

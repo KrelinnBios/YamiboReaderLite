@@ -17,6 +17,7 @@ import kotlinx.coroutines.sync.withLock
 import org.shirakawatyu.yamibo.novel.bean.Favorite
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.DataStoreUtil
+import org.jsoup.parser.Parser
 import kotlin.coroutines.resume
 
 /**
@@ -106,7 +107,7 @@ class FavoriteUtil {
             return writeMutex.withLock {
                 val oldMap = getFavoriteMapSuspend()
                 var hasNewItems = false
-                var hasUpdatedFavIds = false
+                var hasUpdatedMetadata = false
                 val pureNewItems = mutableListOf<Favorite>()
 
                 for (netFav in pageList) {
@@ -115,17 +116,22 @@ class FavoriteUtil {
                         pureNewItems.add(netFav)
                         hasNewItems = true
                     } else {
-                        // 发现老数据：仅在内存中做 O(1) 的脏数据更新，把缺失的 favId 补上
+                        // 发现老数据：同步论坛标题和缺失的 favId，保留本地阅读进度等字段。
+                        val decodedTitle = decodeTitle(netFav.title)
+                        if (decodedTitle.isNotBlank() && oldFav.title != decodedTitle) {
+                            oldFav.title = decodedTitle
+                            hasUpdatedMetadata = true
+                        }
                         if (oldFav.favId != netFav.favId && !netFav.favId.isNullOrEmpty()) {
                             oldFav.favId = netFav.favId
-                            hasUpdatedFavIds = true
+                            hasUpdatedMetadata = true
                         }
                     }
                 }
 
                 val newMap = mergeNewFavoritesPreservingPins(oldMap, pureNewItems)
 
-                if (hasNewItems || hasUpdatedFavIds) {
+                if (hasNewItems || hasUpdatedMetadata) {
                     pendingFavMap = null
                     suspendCancellableCoroutine { cont ->
                         DataStoreUtil.Companion.addData(
@@ -155,6 +161,31 @@ class FavoriteUtil {
                 if (favorite.pinAnchorUrl == null) merged[url] = favorite
             }
             return merged
+        }
+
+        /**
+         * 展示收藏时始终让置顶项优先，同时保持置顶组和普通组各自的原始顺序。
+         *
+         * 持久化顺序可能来自旧数据或同步中的中间状态，不能仅依赖 map 顺序判断置顶位置。
+         */
+        internal fun orderPinnedFavoritesFirst(items: List<Favorite>): List<Favorite> {
+            if (items.none { it.pinAnchorUrl != null }) return items
+            return items.filter { it.pinAnchorUrl != null } +
+                    items.filter { it.pinAnchorUrl == null }
+        }
+
+        /**
+         * Discuz 收藏接口中的标题偶尔会被重复转义，例如 &amp;amp;。
+         * 最多解码两层，既修正显示，也避免对异常输入无限循环。
+         */
+        internal fun decodeTitle(rawTitle: String): String {
+            var decoded = rawTitle
+            repeat(2) {
+                val next = Parser.unescapeEntities(decoded, false)
+                if (next == decoded) return decoded
+                decoded = next
+            }
+            return decoded
         }
 
         suspend fun cleanupDeletedFavoritesSuspend(fullNetworkList: List<Favorite>) {
@@ -202,11 +233,12 @@ class FavoriteUtil {
 
         suspend fun checkAndUpdateTitleSuspend(url: String, title: String?) {
             if (title.isNullOrBlank()) return
+            val decodedTitle = decodeTitle(title)
             writeMutex.withLock {
                 val map = getFavoriteMapSuspend()
                 map[url]?.let { fav ->
-                    if (fav.title != title) {
-                        map[url] = fav.copy(title = title)
+                    if (fav.title != decodedTitle) {
+                        map[url] = fav.copy(title = decodedTitle)
                         pendingFavMap = null
                         suspendCancellableCoroutine { cont ->
                             DataStoreUtil.Companion.addData(
@@ -228,7 +260,7 @@ class FavoriteUtil {
                     val rawUrl = obj.getString("url") ?: ""
                     val normalizedUrl = normalizeUrl(rawUrl)
                     val fav = Favorite(
-                        title = obj.getString("title") ?: "",
+                        title = decodeTitle(obj.getString("title") ?: ""),
                         url = normalizedUrl,
                         lastPage = obj.getIntValue("lastPage"),
                         lastView = obj.getIntValue("lastView"),

@@ -64,4 +64,35 @@ class FavoriteUtilTest {
             result.keys.toList()
         )
     }
+
+    @Test
+    fun displayOrderAlwaysKeepsPinnedFavoritesFirst() {
+        val normalNew = Favorite(
+            title = "最新收藏",
+            url = "forum.php?mod=viewthread&tid=10"
+        )
+        val pinned = Favorite(
+            title = "置顶收藏",
+            url = "forum.php?mod=viewthread&tid=11",
+            pinAnchorUrl = "forum.php?mod=viewthread&tid=9"
+        )
+        val normalOld = Favorite(
+            title = "旧收藏",
+            url = "forum.php?mod=viewthread&tid=12"
+        )
+
+        val result = FavoriteUtil.orderPinnedFavoritesFirst(
+            listOf(normalNew, pinned, normalOld)
+        )
+
+        assertEquals(listOf(pinned.url, normalNew.url, normalOld.url), result.map { it.url })
+    }
+
+    @Test
+    fun decodeTitleRepairsRepeatedDiscuzEscaping() {
+        assertEquals(
+            "【姜姐姐 & Miss PM】月夜花園 01",
+            FavoriteUtil.decodeTitle("【姜姐姐 &amp;amp; Miss PM】月夜花園 01")
+        )
+    }
 }

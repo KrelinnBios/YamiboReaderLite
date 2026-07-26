@@ -584,7 +584,7 @@ fun HistoryPage(navController: NavController) {
                 }) {
                     Text(
                         "确定",
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 15.sp
                     )
                 }
