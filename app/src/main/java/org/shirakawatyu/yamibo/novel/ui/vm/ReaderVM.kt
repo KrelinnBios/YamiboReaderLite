@@ -1277,19 +1277,6 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         )
     }
 
-    // 作者排版章节小标题的特征：居中、大字号（size>=4）或标题标签。这些才是真正的章节标题，
-    // 而促销链接、致谢、正文叙述句等不会用这种排版。size=4 用于《我憧憬着莉莉》这类
-    // 标题写成 <font size=4>#第三话</font> 的小说（正文虽也可能 size=4，但 selectFirst 取到的
-    // 首个 size=4 元素就是标题，且 24 字上限会挡掉整段正文）。
-    private val chapterHeadingSelector =
-        "h1, h2, h3, center, div[align=center], font[size=4], font[size=5], font[size=6], font[size=7]"
-
-    // 纯文本章节标题：楼层首行以「第N章/节/卷/篇/幕/话/回」或「序章/楔子/引子/尾声/后记/番外」开头。
-    // 用于《主仆百合》这类不用居中大字号、而是直接写「第一章 造化弄人」的小说。
-    private val chapterHeadingTextRegex = Regex(
-        """^(?:序章|楔子|引子|尾声|尾聲|后记|後記|番外|第[零〇一二三四五六七八九十百千万兩两\d]+(?:章|节|節|卷|篇|幕|话|話|回))"""
-    )
-
     // 「Episode N / EP N / Chapter N」式分话标记：部分译者（如《一周一次买下同班同学》《如果你愿意成为我的朋友》）
     // 用英文标记分话，既不是「第N话」也不是居中大字号，原先识别不到。这类楼层与已识别到的中文标题（如「序章」）
     // 混排时，会因没有自己的标题而全部并入上一章，导致目录只剩第一章。标记可能在楼层正文首行，也可能紧跟在一行
@@ -1316,17 +1303,6 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                 }
             }
         return null
-    }
-
-    /** 从单个楼层中提取「标题样式」文本（取不到或过长则返回 null）。 */
-    private fun extractStructuralHeading(node: org.jsoup.nodes.Element): String? {
-        return node.selectFirst(chapterHeadingSelector)?.text()
-            ?.replace(' ', ' ')
-            ?.replace(Regex("\\s+"), " ")
-            ?.trim()
-            ?.replace(Regex("^[#＃]+\\s*"), "")
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && it.length <= 24 }
     }
 
     // 引导标题栏检测用：遇到这些标签视为「正文/换行开始」，标题段到此结束。
@@ -1434,11 +1410,10 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val detectedHeadings: List<Pair<String, Boolean>?> = messageNodes.indices.map { i ->
             val firstLine = firstLines[i]
             if (firstLine.contains(replyRegex)) return@map null
-            val normalizedFirst = firstLine.replace(Regex("\\s+"), " ").trim()
+            val textHeading = extractReaderTextChapterHeading(firstLine)
             when {
                 // 1) 「第N章/序章…」编号标题：硬分章，每次出现都是新章
-                chapterHeadingTextRegex.containsMatchIn(normalizedFirst) ->
-                    normalizedFirst.take(30) to true
+                textHeading != null -> textHeading.take(30) to true
                 // 2) 「现在 - 2044 年 1 月」这类带完整日期的小标题：作者按此分章，硬分章
                 else -> {
                     val dateHeading = extractReaderDateSubHeading(messageNodes[i])
@@ -1459,7 +1434,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                                 convertChineseIfNeeded(titleBar, translationMode) to false
                             } else {
                                 // 5) 居中/大字号的装饰性标题：软标题，连续同名才合并
-                                extractStructuralHeading(messageNodes[i])
+                                extractReaderStructuralHeading(messageNodes[i])
                                     ?.let { convertChineseIfNeeded(it, translationMode) to false }
                             }
                         }
