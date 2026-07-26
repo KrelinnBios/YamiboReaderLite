@@ -108,7 +108,7 @@ fun ContentViewer(
                     }
                 },
                 contentDescription = "Image Content",
-                loading = { CircularProgressIndicator() })
+                loading = { NovelImageLoadingIndicator() })
         } else if (data.type == ContentType.TEXT) {
             // [竖屏文本行]
             if (data.chapterTitle == "footer" && data.data.contains("正在加载下一页") || data.data == "刷新本页内容") {
@@ -220,7 +220,7 @@ fun ContentViewer(
                         }
                     },
                     contentDescription = "Image Content",
-                    loading = { CircularProgressIndicator() })
+                    loading = { NovelImageLoadingIndicator() })
             } else if (data.type == ContentType.TEXT) {
                 if (data.chapterTitle == "footer" && data.data.contains("正在加载下一页") || data.data == "刷新本页内容") {
                     Box(
@@ -287,5 +287,19 @@ fun ContentViewer(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun NovelImageLoadingIndicator() {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(28.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 2.5.dp
+        )
     }
 }
