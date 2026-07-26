@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.ui.vm
 
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.TextNode
 
 private val readerDateHeadingRegex = Regex(
     """^(?:(?:现在|如今|当时|过去|未来|[零〇一二三四五六七八九十百\d]+年(?:前|后))\s*[-—–~～：:]\s*)?\d{3,4}\s*年\s*\d{1,2}\s*月(?:\s*\d{1,2}\s*[日号])?$"""
@@ -12,14 +13,21 @@ private const val readerStructuralHeadingSelector =
     "h1, h2, h3, center, div[align=center], font[size=4], font[size=5], font[size=6], font[size=7]"
 private val readerHeadingSkipAncestors = setOf("li", "a", "ul", "ol", "table")
 private val readerNumberedChapterLineRegex = Regex("""^\s*(\d{1,2})(?:\s+.*)?$""")
+private val readerEmbeddedChineseChapterHeadingRegex = Regex(
+    """^(?:[零〇一二三四五六七八九十百千万兩两\d]{1,8}[、，,.．]\s*\S.+|第[零〇一二三四五六七八九十百千万兩两\d]+其[零〇一二三四五六七八九十百千万兩两\d]+[：:]\s*\S.+)$"""
+)
 private val readerHeadingTrailingDeny = "。！？!?".toSet()
+private const val readerEmbeddedHeadingStartMarker = "|||YAMIBO_CHAPTER_START|||"
+private const val readerEmbeddedHeadingEndMarker = "|||YAMIBO_CHAPTER_END|||"
+private const val readerEmbeddedHeadingSelector =
+    "strong, b, h1, h2, h3, h4, center, div[align=center], font[size=4], font[size=5], font[size=6], font[size=7]"
 
 internal data class ReaderNumberedChapterSegment(
     val text: String,
     val title: String?
 )
 
-internal fun containsReaderNumberedChapterStart(
+internal fun containsReaderChapterStart(
     segments: List<ReaderNumberedChapterSegment>
 ): Boolean = segments.any { it.title != null }
 
@@ -109,4 +117,104 @@ internal fun splitReaderNumberedChapterSegments(text: String): List<ReaderNumber
     return segments.ifEmpty {
         listOf(ReaderNumberedChapterSegment(text.trim(), null))
     }
+}
+
+/**
+ * 在楼层 HTML 中标记所有独立的章节标题元素。
+ *
+ * Discuz 帖子常在同一楼层连续发布多章，且标题由多层 strong/font 嵌套。这里只标记最外层
+ * 的短标题元素，避免同一标题被重复拆分；标记会在正文统一简繁转换后再解析。
+ */
+internal fun markReaderEmbeddedChapterHeadings(node: Element): Element {
+    val clone = node.clone()
+    clone.select(readerEmbeddedHeadingSelector)
+        .asSequence()
+        .map { element -> element to normalizeReaderHeading(element.text()) }
+        .filter { (_, candidate) -> isReaderEmbeddedChapterHeading(candidate) }
+        .filterNot { (element, _) ->
+            element.parents().any { parent ->
+                parent.tagName() in readerHeadingSkipAncestors ||
+                    (parent != clone &&
+                        parent.`is`(readerEmbeddedHeadingSelector) &&
+                        isReaderEmbeddedChapterHeading(normalizeReaderHeading(parent.text())))
+            }
+        }
+        .toList()
+        .forEach { (element, _) ->
+            element.before(TextNode(readerEmbeddedHeadingStartMarker))
+            element.after(TextNode(readerEmbeddedHeadingEndMarker))
+        }
+    return clone
+}
+
+/** 将带标记的单个楼层正文拆成多个章节，并继续兼容原有的独立阿拉伯数字章节。 */
+internal fun splitReaderEmbeddedChapterSegments(text: String): List<ReaderNumberedChapterSegment> {
+    if (!text.contains(readerEmbeddedHeadingStartMarker)) {
+        return splitReaderNumberedChapterSegments(text)
+    }
+
+    val structuralSegments = mutableListOf<ReaderNumberedChapterSegment>()
+    var cursor = 0
+    while (cursor < text.length) {
+        val headingStart = text.indexOf(readerEmbeddedHeadingStartMarker, cursor)
+        if (headingStart < 0) {
+            val tail = text.substring(cursor).trim()
+            if (tail.isNotBlank()) {
+                structuralSegments += ReaderNumberedChapterSegment(tail, null)
+            }
+            break
+        }
+
+        val preface = text.substring(cursor, headingStart).trim()
+        if (preface.isNotBlank()) {
+            structuralSegments += ReaderNumberedChapterSegment(preface, null)
+        }
+
+        val titleStart = headingStart + readerEmbeddedHeadingStartMarker.length
+        val titleEnd = text.indexOf(readerEmbeddedHeadingEndMarker, titleStart)
+        if (titleEnd < 0) {
+            val unparsed = text.substring(headingStart).trim()
+            if (unparsed.isNotBlank()) {
+                structuralSegments += ReaderNumberedChapterSegment(unparsed, null)
+            }
+            break
+        }
+
+        val title = normalizeReaderHeading(text.substring(titleStart, titleEnd))
+        val bodyStart = titleEnd + readerEmbeddedHeadingEndMarker.length
+        val nextHeadingStart = text.indexOf(readerEmbeddedHeadingStartMarker, bodyStart)
+            .takeIf { it >= 0 } ?: text.length
+        val body = buildString {
+            append(title)
+            val remainder = text.substring(bodyStart, nextHeadingStart).trim()
+            if (remainder.isNotBlank()) {
+                append('\n')
+                append(remainder)
+            }
+        }.trim()
+
+        if (body.isNotBlank()) {
+            structuralSegments += ReaderNumberedChapterSegment(body, title)
+        }
+        cursor = nextHeadingStart
+    }
+
+    return structuralSegments.flatMap { structural ->
+        val numberedSegments = splitReaderNumberedChapterSegments(structural.text)
+        numberedSegments.mapIndexed { index, numbered ->
+            if (index == 0 && numbered.title == null && structural.title != null) {
+                numbered.copy(title = structural.title)
+            } else {
+                numbered
+            }
+        }
+    }.ifEmpty {
+        listOf(ReaderNumberedChapterSegment(text.trim(), null))
+    }
+}
+
+private fun isReaderEmbeddedChapterHeading(candidate: String): Boolean {
+    if (candidate.isBlank() || candidate.length > 40) return false
+    return extractReaderTextChapterHeading(candidate) != null ||
+        readerEmbeddedChineseChapterHeadingRegex.matches(candidate)
 }
