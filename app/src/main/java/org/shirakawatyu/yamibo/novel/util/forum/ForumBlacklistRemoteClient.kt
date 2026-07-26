@@ -91,7 +91,7 @@ internal object ForumBlacklistRemoteClient {
         val request = builder
             // 黑名单表单只存在于电脑版模板。App 的论坛会话通常带 mobile=2，
             // 必须仅在本次原生请求中改成 mobile=no，不能修改 WebView 的全局会话。
-            .header("Cookie", desktopCookie(cookie))
+            .header("Cookie", YamiboSession.desktopCookie(cookie))
             .header("Referer", blacklistUrl.toString())
             .build()
         return YamiboRetrofit.okHttpClient.newCall(request).execute().use { response ->
@@ -106,34 +106,6 @@ internal object ForumBlacklistRemoteClient {
             }
             response.body?.string().orEmpty()
         }
-    }
-
-    internal fun desktopCookie(cookie: String): String {
-        var hasMobileCookie = false
-        val parts = cookie.split(';').mapNotNull { rawPart ->
-            val part = rawPart.trim()
-            val separator = part.indexOf('=')
-            if (separator <= 0) return@mapNotNull null
-            val name = part.substring(0, separator).trim()
-            if (isMobileCookieName(name)) {
-                hasMobileCookie = true
-                "$name=no"
-            } else {
-                part
-            }
-        }.toMutableList()
-
-        if (!hasMobileCookie) {
-            val authCookieName = parts.asSequence()
-                .map { it.substringBefore('=').trim() }
-                .firstOrNull { it.endsWith("_auth", ignoreCase = true) }
-            val mobileCookieName = authCookieName
-                ?.removeSuffix("auth")
-                ?.plus("mobile")
-                ?: "mobile"
-            parts += "$mobileCookieName=no"
-        }
-        return parts.joinToString("; ")
     }
 
     private fun isMobileCookieName(name: String): Boolean =

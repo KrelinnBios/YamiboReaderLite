@@ -97,23 +97,4 @@ class ForumBlacklistRemoteClientTest {
         assertNull(ForumBlacklistRemoteClient.parseSnapshot("<html><form name=\"loginform\"></form></html>"))
     }
 
-    @Test
-    fun desktopCookieReplacesPrefixedMobileCookieWithoutChangingLogin() {
-        assertEquals(
-            "EeqY_2132_auth=secret; EeqY_2132_mobile=no; EeqY_2132_sid=abc",
-            ForumBlacklistRemoteClient.desktopCookie(
-                "EeqY_2132_auth=secret; EeqY_2132_mobile=2; EeqY_2132_sid=abc"
-            )
-        )
-    }
-
-    @Test
-    fun desktopCookieAddsMatchingPrefixedMobileCookieWhenMissing() {
-        assertEquals(
-            "EeqY_2132_auth=secret; EeqY_2132_sid=abc; EeqY_2132_mobile=no",
-            ForumBlacklistRemoteClient.desktopCookie(
-                "EeqY_2132_auth=secret; EeqY_2132_sid=abc"
-            )
-        )
-    }
 }

@@ -4,6 +4,7 @@ import okhttp3.ResponseBody
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -22,7 +23,8 @@ interface MangaApi {
     @GET("/misc.php?mod=tag&type=thread&mobile=no")
     suspend fun getTagPageHtml(
         @Query("id") tagId: String,
-        @Query("page") page: Int = 1
+        @Query("page") page: Int = 1,
+        @Header("Cookie") cookie: String? = null
     ): ResponseBody
 
     @Headers("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
@@ -33,7 +35,8 @@ interface MangaApi {
         @Field("srchfid[]") fids: List<String>,
         @Field("srchtxt") keyword: String,
         @Field("srchtype") type: String = "title",
-        @Field("searchsubmit") searchSubmit: String = "yes"
+        @Field("searchsubmit") searchSubmit: String = "yes",
+        @Header("Cookie") cookie: String? = null
     ): ResponseBody
 
     // 用于搜索结果的后续翻页
@@ -41,7 +44,8 @@ interface MangaApi {
     @GET("/search.php?mod=forum&orderby=dateline&ascdesc=desc&searchsubmit=yes&mobile=no")
     suspend fun searchForumPage(
         @Query("searchid") searchid: String,
-        @Query("page") page: Int
+        @Query("page") page: Int,
+        @Header("Cookie") cookie: String? = null
     ): ResponseBody
     // 获取帖子详情
     @GET("/api/mobile/index.php?module=viewthread&version=4")

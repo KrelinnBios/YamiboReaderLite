@@ -15,4 +15,22 @@ class YamiboSessionTest {
 
         assertEquals("auth=fresh; salt=web; sid=stored", merged)
     }
+
+    @Test
+    fun desktopCookie_replacesPrefixedMobileCookieWithoutChangingLogin() {
+        assertEquals(
+            "EeqY_2132_auth=secret; EeqY_2132_mobile=no; EeqY_2132_sid=abc",
+            YamiboSession.desktopCookie(
+                "EeqY_2132_auth=secret; EeqY_2132_mobile=2; EeqY_2132_sid=abc"
+            )
+        )
+    }
+
+    @Test
+    fun desktopCookie_addsMatchingPrefixedMobileCookieWhenMissing() {
+        assertEquals(
+            "EeqY_2132_auth=secret; EeqY_2132_sid=abc; EeqY_2132_mobile=no",
+            YamiboSession.desktopCookie("EeqY_2132_auth=secret; EeqY_2132_sid=abc")
+        )
+    }
 }

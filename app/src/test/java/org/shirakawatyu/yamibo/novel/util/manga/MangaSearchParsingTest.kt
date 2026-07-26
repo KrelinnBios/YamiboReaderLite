@@ -10,6 +10,16 @@ class MangaSearchParsingTest {
     private val fullTitle = "【提灯喵汉化组】后续任凭想象[やナい]把我弄得乱七八糟吧！"
 
     @Test
+    fun tagIdsAreReadFromRealPcThreadLinkShapes() {
+        val html = """
+            <a title="drunken_my_boss" href="https://bbs.yamibo.com/misc.php?mod=tag&amp;id=20378">tag</a>
+            <a href="misc.php?mod=tag&amp;id=21754">tag</a>
+        """.trimIndent()
+
+        assertEquals(listOf("20378", "21754"), MangaHtmlParser.findTagIdsMobile(html))
+    }
+
+    @Test
     fun searchKeywordUsesContinuousDistinctiveTitleSegment() {
         assertEquals("把我弄得乱七八糟吧", MangaTitleCleaner.getSearchKeyword(fullTitle))
     }

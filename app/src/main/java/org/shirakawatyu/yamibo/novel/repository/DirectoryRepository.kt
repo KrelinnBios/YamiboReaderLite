@@ -3,6 +3,7 @@ package org.shirakawatyu.yamibo.novel.repository
 import android.content.Context
 import android.util.Log
 import com.alibaba.fastjson2.JSON
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -15,10 +16,12 @@ import kotlinx.coroutines.withContext
 import org.shirakawatyu.yamibo.novel.bean.DirectoryStrategy
 import org.shirakawatyu.yamibo.novel.bean.MangaChapterItem
 import org.shirakawatyu.yamibo.novel.bean.MangaDirectory
+import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.network.MangaApi
 import org.shirakawatyu.yamibo.novel.parser.MangaHtmlParser
+import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import java.io.File
 import java.io.IOException
@@ -847,35 +850,62 @@ class DirectoryRepository private constructor(private val context: Context) {
 
             if (!forceSearch && currentDir.strategy == DirectoryStrategy.TAG) {
                 val tagIdList = currentDir.sourceKey.split(",")
+                val desktopCookie = YamiboSession.desktopCookie(
+                    YamiboSession.cookieFor(RequestConfig.BASE_URL)
+                )
+                var tagFetchFailed = false
                 for ((index, tagId) in tagIdList.withIndex()) {
                     if (tagId.isBlank()) continue
-                    val html1 = mangaApi.getTagPageHtml(tagId, 1).string()
-                    val parsed = MangaHtmlParser.parseListHtml(html1, index)
-                    if (parsed.isNotEmpty()) {
-                        newChapters.addAll(parsed)
-                        val total = MangaHtmlParser.extractTotalPages(html1)
-                        if (total > 1) {
-                            for (p in 2..total) {
-                                newChapters.addAll(
-                                    MangaHtmlParser.parseListHtml(
-                                        mangaApi.getTagPageHtml(tagId, p).string(), index
+                    try {
+                        val html1 = mangaApi.getTagPageHtml(
+                            tagId = tagId,
+                            page = 1,
+                            cookie = desktopCookie
+                        ).string()
+                        val parsed = MangaHtmlParser.parseListHtml(html1, index)
+                        if (parsed.isNotEmpty()) {
+                            newChapters.addAll(parsed)
+                            val total = MangaHtmlParser.extractTotalPages(html1)
+                            if (total > 1) {
+                                for (p in 2..total) {
+                                    newChapters.addAll(
+                                        MangaHtmlParser.parseListHtml(
+                                            mangaApi.getTagPageHtml(
+                                                tagId = tagId,
+                                                page = p,
+                                                cookie = desktopCookie
+                                            ).string(),
+                                            index
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        tagFetchFailed = true
+                        Log.w(LOG_TAG, "Tag directory request failed for tagId=$tagId", e)
                     }
                 }
 
-                if (newChapters.isEmpty()) {
-                    searchPerformed = true
-                    val res = performSearch(
-                        rawTitle = firstRawTitle,
-                        cleanBookName = currentDir.cleanBookName,
-                        configuredKeywords = exactKeyword,
-                        sourceFid = sourceFid
-                    )
-                    if (res.isFailure) return@withContext Result.failure(res.exceptionOrNull()!!)
-                    newChapters.addAll(res.getOrNull()!!)
+                if (newChapters.isEmpty() || tagFetchFailed) {
+                    val res = try {
+                        performSearch(
+                            rawTitle = firstRawTitle,
+                            cleanBookName = currentDir.cleanBookName,
+                            configuredKeywords = exactKeyword,
+                            sourceFid = sourceFid
+                        )
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        Result.failure(e)
+                    }
+                    if (res.isSuccess) {
+                        searchPerformed = true
+                        newChapters.addAll(res.getOrNull().orEmpty())
+                    } else if (newChapters.isEmpty()) {
+                        return@withContext Result.failure(res.exceptionOrNull()!!)
+                    }
                 }
             } else {
                 searchPerformed = true
@@ -949,6 +979,7 @@ class DirectoryRepository private constructor(private val context: Context) {
             }
             Result.success(DirectoryUpdateResult(finalDir, searchPerformed))
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             Result.failure(e)
         }
     }
@@ -972,10 +1003,14 @@ class DirectoryRepository private constructor(private val context: Context) {
         val formHash = profileJson.getJSONObject("Variables")?.getString("formhash")
             ?.takeIf(String::isNotBlank)
             ?: return Result.failure(Exception("无法获取搜索校验信息"))
+        val desktopCookie = YamiboSession.desktopCookie(
+            YamiboSession.cookieFor(RequestConfig.BASE_URL)
+        )
         val firstPageHtml = mangaApi.searchForum(
             formHash = formHash,
             fids = listOf(safeSourceFid),
-            keyword = forumKeyword
+            keyword = forumKeyword,
+            cookie = desktopCookie
         ).string()
         if (MangaHtmlParser.isFloodControlOrError(firstPageHtml)) return Result.failure(Exception("触发论坛防灌水限制，请稍后再试"))
 
@@ -987,7 +1022,11 @@ class DirectoryRepository private constructor(private val context: Context) {
 
         if (searchId != null && totalPages > 1) {
             for (p in 2..totalPages) {
-                val pageHtml = mangaApi.searchForumPage(searchid = searchId, page = p).string()
+                val pageHtml = mangaApi.searchForumPage(
+                    searchid = searchId,
+                    page = p,
+                    cookie = desktopCookie
+                ).string()
                 allItems.addAll(MangaHtmlParser.parseListHtml(pageHtml))
             }
         }

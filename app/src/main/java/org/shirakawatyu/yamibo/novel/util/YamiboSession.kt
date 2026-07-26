@@ -20,6 +20,34 @@ object YamiboSession {
         return mergeCookieHeaders(cookieHeaders)
     }
 
+    internal fun desktopCookie(cookie: String): String {
+        var hasMobileCookie = false
+        val parts = cookie.split(';').mapNotNull { rawPart ->
+            val part = rawPart.trim()
+            val separator = part.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            val name = part.substring(0, separator).trim()
+            if (isMobileCookieName(name)) {
+                hasMobileCookie = true
+                "$name=no"
+            } else {
+                part
+            }
+        }.toMutableList()
+
+        if (!hasMobileCookie) {
+            val authCookieName = parts.asSequence()
+                .map { it.substringBefore('=').trim() }
+                .firstOrNull { it.endsWith("_auth", ignoreCase = true) }
+            val mobileCookieName = authCookieName
+                ?.removeSuffix("auth")
+                ?.plus("mobile")
+                ?: "mobile"
+            parts += "$mobileCookieName=no"
+        }
+        return parts.joinToString("; ")
+    }
+
     fun syncToWebView(url: String, cookie: String = cookieFor(url)) {
         if (cookie.isBlank()) return
         runCatching {
@@ -61,4 +89,8 @@ object YamiboSession {
         }
         return cookies.values.joinToString("; ")
     }
+
+    private fun isMobileCookieName(name: String): Boolean =
+        name.equals("mobile", ignoreCase = true) ||
+                name.endsWith("_mobile", ignoreCase = true)
 }
