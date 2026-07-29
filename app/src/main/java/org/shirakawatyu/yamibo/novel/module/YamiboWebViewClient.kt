@@ -468,7 +468,7 @@ open class YamiboWebViewClient : WebViewClient() {
             """.trimIndent(), null
         )
         view?.evaluateJavascript(ATTACH_INTERCEPT_JS, null)
-        view?.evaluateJavascript(MobileBlogJsScripts.ENHANCEMENTS_JS, null)
+        view?.evaluateJavascript(MobileBlogJsScripts.enhancementsJs(GlobalData.currentUid), null)
     }
 
     override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
