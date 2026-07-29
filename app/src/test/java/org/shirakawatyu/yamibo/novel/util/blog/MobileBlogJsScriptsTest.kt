@@ -59,6 +59,7 @@ class MobileBlogJsScriptsTest {
         assertTrue(script.contains("renderOptions();"))
         assertTrue(script.contains("background:var(--dz-BG-color,#551200)!important"))
         assertTrue(script.contains("background:transparent!important"))
+        assertTrue(script.contains(".ybr-option:disabled{opacity:1;cursor:default}"))
         assertTrue(script.contains("meter.appendChild(countNode)"))
         assertTrue(script.contains("flex-direction:column;align-items:center;justify-content:flex-end"))
         assertTrue(script.contains(".ybr-count{display:block;margin-bottom:3px"))
