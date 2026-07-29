@@ -18,6 +18,44 @@ class ReaderChapterHeadingParserTest {
     }
 
     @Test
+    fun extractReaderChapterHeadingAfterDivider_skipsAuthorNoteAndFindsChapterTitle() {
+        val node = Jsoup.parse(
+            """
+            <div class="message">
+              谢谢大家支持<br>
+              在大家的鼓励下马上就着手了第二章<br>
+              <hr class="l">
+              <font size="3"><br>
+                第二章　从幼小的开始攻击<br>
+                <br>
+                哈…哈…好累…到底走了多久。<br>
+              </font>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        assertEquals(
+            "第二章　从幼小的开始攻击",
+            extractReaderChapterHeadingAfterDivider(node)
+        )
+    }
+
+    @Test
+    fun extractReaderChapterHeadingAfterDivider_doesNotUseAuthorNoteWithoutChapter() {
+        val node = Jsoup.parse(
+            """
+            <div class="message">
+              后篇来了<br>
+              <hr class="l">
+              <font size="3">AI 生成的角色图片，仅供参考。</font>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        assertNull(extractReaderChapterHeadingAfterDivider(node))
+    }
+
+    @Test
     fun extractReaderStructuralHeading_skipsLongContainerAndFindsNestedTitle() {
         val body = "正文段落。".repeat(30)
         val node = Jsoup.parse(
