@@ -885,7 +885,8 @@ fun HistoryPage(navController: NavController) {
                                     .padding(horizontal = 12.dp, vertical = 4.dp),
                                 color = MaterialTheme.colorScheme.tertiary,
                                 shape = RoundedCornerShape(14.dp),
-                                tonalElevation = 1.dp
+                                tonalElevation = 0.dp,
+                                shadowElevation = 1.dp
                             ) {
                             Row(
                                 modifier = Modifier
