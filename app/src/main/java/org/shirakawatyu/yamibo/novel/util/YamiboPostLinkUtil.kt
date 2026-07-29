@@ -8,6 +8,7 @@ object YamiboPostLinkUtil {
         """(?i)(?:https?://)?(?:(?:bbs|m|www)\.)?yamibo\.com/[^\s<>"']+"""
     )
     private val threadPathRegex = Regex("""^/thread-\d+(?:-\d+){0,2}\.html$""", RegexOption.IGNORE_CASE)
+    private val forumPathRegex = Regex("""^/forum-\d+(?:-\d+){0,2}\.html$""", RegexOption.IGNORE_CASE)
     private val imagePathRegex = Regex(
         """(?:^|/)(?:data/attachment/.*|\S+\.(?:jpg|jpeg|png|webp|gif|bmp))$""",
         RegexOption.IGNORE_CASE
@@ -110,24 +111,71 @@ object YamiboPostLinkUtil {
     }
 
     /**
-     * 帖子链接兜底补 mobile=2：mobile cookie 一旦被电脑版页面（如 mobile=no 的标签页）
-     * 污染成 no，之后所有不带 mobile 参数的帖子跳转（我的主题/我的回复/历史记录/原帖）
-     * 都会渲染成电脑版，表现为"没有内容或被弹回"。给帖子链接显式带上 mobile=2 后，
-     * 服务器会渲染手机版并顺带清掉污染的 mobile cookie（实测 Set-Cookie deleted）。
-     * 仅处理站内帖子链接；已带 mobile 参数时返回 null 不改写。
-     * 用户主动切到电脑版会话时也不改写：手机版会话点帖子开手机版、
-     * 电脑版会话点帖子开电脑版，保持模板一致。
+     * App 默认保持当前模板：尚未主动切到电脑版时，Discuz 的分页或跳转链接如果没有
+     * mobile 参数，就补上 mobile=2，避免版块/帖子下一页因 cookie 或链接缺失突然变成电脑版。
+     * 只有明确的论坛模板切换入口才改变用户选择；普通分页即使错误带有 mobile=no，在用户
+     * 尚未切换前也会纠正为手机版。当前已经是电脑版会话时，后续跳转保持电脑版。
+     *
+     * 标签页和明确进入的个人空间沿用现有电脑版流程；静态资源、附件、搜索等也不属于
+     * 常规论坛页面。无需改写时返回 null，避免 loadUrl 循环。
      */
-    fun forceMobilePostUrl(url: String?): String? {
+    fun forceMobileForumPageUrl(url: String?, desktopSession: Boolean): String? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
-        if (!isPostUrl(parsed)) return null
-        if (!parsed.queryParameter("mobile").isNullOrBlank()) return null
-        if (isDesktopWebSession()) return null
+        if (!isMobileForumPage(parsed)) return null
+        if (explicitDesktopTemplateSelection(url) != null) return null
+        if (desktopSession) return null
+        val mobileValues = parsed.queryParameterValues("mobile")
+        if (mobileValues.size == 1 &&
+            (mobileValues.single().equals("2", ignoreCase = true) ||
+                    mobileValues.single().equals("yes", ignoreCase = true))
+        ) {
+            return null
+        }
         return parsed.newBuilder()
+            .scheme("https")
+            .host("bbs.yamibo.com")
+            .removeAllQueryParameters("mobile")
             .addQueryParameter("mobile", "2")
             .build()
             .toString()
+    }
+    /**
+     * 识别明确的模板选择。任何 mobile=2/yes 页面都能确认当前已回到手机版；只有论坛
+     * 首页的纯 mobile=no 切换入口才记为用户主动选择电脑版，分页或特殊页面的 no 不算。
+     */
+    fun explicitDesktopTemplateSelection(url: String?): Boolean? {
+        val parsed = url?.toHttpUrlOrNull() ?: return null
+        if (parsed.host.lowercase() !in validHosts) return null
+        val values = parsed.queryParameterValues("mobile")
+        if (values.size != 1) return null
+        return when (values.single()?.lowercase()) {
+            "2", "yes" -> false
+            "no" -> {
+                val isForumHome =
+                    parsed.encodedPath.lowercase() in setOf("/", "/index.php", "/forum.php")
+                val hasOnlyMobile =
+                    parsed.queryParameterNames.all { it.equals("mobile", ignoreCase = true) }
+                true.takeIf { isForumHome && hasOnlyMobile }
+            }
+            else -> null
+        }
+    }
+    private fun isMobileForumPage(url: HttpUrl): Boolean {
+        if (threadPathRegex.matches(url.encodedPath) || forumPathRegex.matches(url.encodedPath)) {
+            return true
+        }
+        return when (url.encodedPath.lowercase()) {
+            "/", "/index.php", "/forum.php", "/member.php" -> true
+            "/home.php" -> {
+                val isDesktopSpace =
+                    url.queryParameter("mod").equals("space", ignoreCase = true) &&
+                            url.queryParameter("mobile").equals("no", ignoreCase = true)
+                !isDesktopSpace
+            }
+            "/misc.php" -> !url.queryParameter("mod").equals("tag", ignoreCase = true)
+            else -> false
+        }
     }
 
     private fun isPostUrl(url: HttpUrl): Boolean {
