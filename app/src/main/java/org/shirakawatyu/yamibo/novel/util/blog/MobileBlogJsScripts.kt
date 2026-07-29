@@ -1,6 +1,13 @@
 package org.shirakawatyu.yamibo.novel.util.blog
 
 internal object MobileBlogJsScripts {
+    private const val CURRENT_UID_PLACEHOLDER = "__YAMIBO_CURRENT_UID__"
+
+    fun enhancementsJs(currentUid: String): String = ENHANCEMENTS_JS.replace(
+        CURRENT_UID_PLACEHOLDER,
+        currentUid.takeIf { it.matches(Regex("[1-9]\\d*")) }.orEmpty()
+    )
+
     val ENHANCEMENTS_JS = """
         (function() {
             var body = document.body;
@@ -59,6 +66,8 @@ internal object MobileBlogJsScripts {
                 }
             }
             var blogId = pageUrl.searchParams.get('id') || '';
+            var currentUid = '__YAMIBO_CURRENT_UID__';
+            var isOwnBlog = Boolean(currentUid && ownerUid === currentUid);
             var reactionTypes = [
                 { clickId: '1', label: '路过' },
                 { clickId: '2', label: '雷人' },
@@ -71,7 +80,7 @@ internal object MobileBlogJsScripts {
                 var style = document.createElement('style');
                 style.id = 'yamibo-mobile-blog-reaction-style';
                 style.textContent = [
-                    '#yamibo-blog-reactions{margin:18px 0 10px;color:var(--dz-FC-333,#333)}',
+                    '#yamibo-blog-reactions{margin:36px 0 10px;color:var(--dz-FC-333,#333)}',
                     '#yamibo-blog-reactions .ybr-options{display:grid;',
                     'grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}',
                     '#yamibo-blog-reactions .ybr-option,',
@@ -83,15 +92,15 @@ internal object MobileBlogJsScripts {
                     'text-shadow:none!important;color:var(--dz-FC-color,#6e2b19)!important;',
                     'min-width:0;padding:0 2px;text-align:center;cursor:pointer}',
                     '#yamibo-blog-reactions .ybr-option:disabled{opacity:.5;cursor:default}',
-                    '#yamibo-blog-reactions .ybr-meter{position:relative;height:82px;display:flex;',
-                    'align-items:flex-end;justify-content:center;margin-bottom:8px}',
+                    '#yamibo-blog-reactions .ybr-meter{height:82px;display:flex;',
+                    'flex-direction:column;align-items:center;justify-content:flex-end;margin-bottom:8px}',
                     '#yamibo-blog-reactions .ybr-bar{position:relative;display:block;width:26px;',
                     'min-height:4px;border-radius:4px 4px 1px 1px;',
                     'background:var(--dz-BG-color,#551200)!important;',
                     'background-image:none!important;box-shadow:none!important;',
                     'transition:height .2s ease}',
-                    '#yamibo-blog-reactions .ybr-count{position:absolute;left:50%;top:0;',
-                    'transform:translateX(-50%);font-size:11px;line-height:1;',
+                    '#yamibo-blog-reactions .ybr-count{display:block;margin-bottom:3px;',
+                    'font-size:11px;line-height:1;',
                     'color:var(--dz-FC-666,#666);white-space:nowrap}',
                     '#yamibo-blog-reactions .ybr-label{display:block;font-size:12px;',
                     'line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -121,7 +130,7 @@ internal object MobileBlogJsScripts {
             function setBusy(nextBusy) {
                 busy = nextBusy;
                 section.querySelectorAll('.ybr-option').forEach(function(button) {
-                    button.disabled = nextBusy;
+                    button.disabled = isOwnBlog || nextBusy;
                 });
             }
 
@@ -139,7 +148,7 @@ internal object MobileBlogJsScripts {
                     var button = document.createElement('button');
                     button.type = 'button';
                     button.className = 'ybr-option';
-                    button.disabled = busy;
+                    button.disabled = isOwnBlog || busy;
                     button.setAttribute('data-clickid', type.clickId);
                     button.setAttribute('aria-label', '给帖主表态：' + type.label);
 
@@ -177,14 +186,18 @@ internal object MobileBlogJsScripts {
                 });
                 counts = nextCounts;
                 renderOptions();
-                statusBox.textContent = String(payload.message || '点击选项即可给帖主表态');
+                statusBox.textContent = String(
+                    payload.message ||
+                    (isOwnBlog ? '自己的日志仅可查看表态' : '点击选项即可给帖主表态')
+                );
                 setBusy(false);
             }
 
             window.__yamiboBlogReactionReceive = function(requestId, payload) {
                 if (String(requestId) !== activeRequest) return;
                 if (payload && payload.error) {
-                    statusBox.textContent = String(payload.error) + '；点击选项可重试';
+                    statusBox.textContent = String(payload.error) +
+                        (isOwnBlog ? '' : '；点击选项可重试');
                     setBusy(false);
                     return;
                 }
@@ -195,7 +208,7 @@ internal object MobileBlogJsScripts {
                 var button = event.target && event.target.closest
                     ? event.target.closest('.ybr-option[data-clickid]')
                     : null;
-                if (!button || busy) return;
+                if (!button || busy || isOwnBlog) return;
                 var clickId = button.getAttribute('data-clickid') || '';
                 if (!/^[1-5]$/.test(clickId)) return;
                 if (!window.AndroidBlogReaction || !/^[1-9]\d*$/.test(ownerUid)) {
