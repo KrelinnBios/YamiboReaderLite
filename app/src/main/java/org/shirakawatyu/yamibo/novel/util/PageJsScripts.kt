@@ -2481,6 +2481,192 @@ $styleString
             yamiboSyncPullRefreshGuard();
         })();
     """.trimIndent()
+
+    val PRESERVE_RATE_POSITION_JS = """
+        (function() {
+            if (window.__yamiboPreserveRatePositionV1) return;
+            window.__yamiboPreserveRatePositionV1 = true;
+
+            var CONTEXT_KEY = 'yamibo:rate-context:v1';
+            var PENDING_KEY = 'yamibo:pending-rate-return:v1';
+            var MAX_AGE_MS = 120000;
+
+            function parseUrl(raw) {
+                try { return new URL(raw, document.baseURI); } catch (e) { return null; }
+            }
+
+            function read(key) {
+                try {
+                    var value = sessionStorage.getItem(key);
+                    return value ? JSON.parse(value) : null;
+                } catch (e) { return null; }
+            }
+
+            function write(key, value) {
+                try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+            }
+
+            function remove(key) {
+                try { sessionStorage.removeItem(key); } catch (e) {}
+            }
+
+            function threadId(url) {
+                if (!url) return '';
+                var tid = url.searchParams.get('tid') || '';
+                if (
+                    String(url.searchParams.get('mod') || '').toLowerCase() === 'viewthread' &&
+                    /^\d+${'$'}/.test(tid)
+                ) return tid;
+                var path = String(url.pathname || '').replace(/^\/+/, '');
+                var match = /^thread-(\d+)(?:-\d+){0,2}\.html${'$'}/i.exec(path);
+                return match ? match[1] : '';
+            }
+
+            function fresh(value) {
+                return value && Date.now() - Number(value.createdAt || 0) <= MAX_AGE_MS;
+            }
+
+            function targetUrl(value) {
+                var url = parseUrl(value && value.returnUrl);
+                if (!url) return '';
+                url.hash = 'pid' + String(value.pid || '');
+                return url.href;
+            }
+
+            function rememberLink(link) {
+                var rateUrl = parseUrl(link && link.href);
+                var currentUrl = parseUrl(location.href);
+                if (!rateUrl || !currentUrl) return;
+                if (
+                    String(rateUrl.searchParams.get('mod') || '').toLowerCase() !== 'misc' ||
+                    String(rateUrl.searchParams.get('action') || '').toLowerCase() !== 'rate'
+                ) return;
+                var tid = rateUrl.searchParams.get('tid') || '';
+                var pid = rateUrl.searchParams.get('pid') || '';
+                if (!/^\d+${'$'}/.test(pid) || threadId(currentUrl) !== tid) return;
+                currentUrl.hash = '';
+                write(CONTEXT_KEY, {
+                    tid: tid,
+                    pid: pid,
+                    returnUrl: currentUrl.href,
+                    createdAt: Date.now()
+                });
+            }
+
+            function pendingFor(form) {
+                var tidNode = form.querySelector('input[name="tid"]');
+                var pidNode = form.querySelector('input[name="pid"]');
+                var tid = tidNode ? String(tidNode.value || '') : '';
+                var pid = pidNode ? String(pidNode.value || '') : '';
+                if (!/^\d+${'$'}/.test(tid) || !/^\d+${'$'}/.test(pid)) return null;
+
+                var context = read(CONTEXT_KEY);
+                var currentUrl = parseUrl(location.href);
+                var returnUrl = '';
+                if (fresh(context) && String(context.tid) === tid && String(context.pid) === pid) {
+                    returnUrl = context.returnUrl;
+                } else if (threadId(currentUrl) === tid) {
+                    currentUrl.hash = '';
+                    returnUrl = currentUrl.href;
+                }
+                return returnUrl ? {
+                    tid: tid,
+                    pid: pid,
+                    returnUrl: returnUrl,
+                    createdAt: Date.now()
+                } : null;
+            }
+
+            function wrapSuccessHandler() {
+                var original = window.succeedhandle_rate;
+                if (typeof original !== 'function' || original.__yamiboPreserveRatePosition) return;
+                var wrapped = function() {
+                    var args = Array.prototype.slice.call(arguments);
+                    var pending = read(PENDING_KEY);
+                    var target = fresh(pending) ? targetUrl(pending) : '';
+                    if (target) args[0] = target;
+                    return original.apply(this, args);
+                };
+                wrapped.__yamiboPreserveRatePosition = true;
+                window.succeedhandle_rate = wrapped;
+            }
+
+            function prepareSubmit(form) {
+                var pending = pendingFor(form);
+                if (!pending) return;
+                write(PENDING_KEY, pending);
+                var referer = form.querySelector('input[name="referer"]');
+                if (referer) referer.value = targetUrl(pending);
+                wrapSuccessHandler();
+
+                var createdAt = pending.createdAt;
+                setTimeout(function() {
+                    var latest = read(PENDING_KEY);
+                    if (
+                        latest &&
+                        Number(latest.createdAt) === createdAt &&
+                        document.visibilityState !== 'hidden'
+                    ) remove(PENDING_KEY);
+                }, 15000);
+            }
+
+            function scrollToPost(pid) {
+                var attempts = 0;
+                function scroll() {
+                    var post = document.getElementById('pid' + String(pid || ''));
+                    if (post) {
+                        try { post.scrollIntoView({ block: 'center', inline: 'nearest' }); }
+                        catch (e) { post.scrollIntoView(); }
+                    } else if (++attempts < 6) {
+                        setTimeout(scroll, attempts * 150);
+                    }
+                }
+                scroll();
+            }
+
+            document.addEventListener('click', function(event) {
+                var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+                if (link) rememberLink(link);
+            }, true);
+
+            document.addEventListener('submit', function(event) {
+                var form = event.target;
+                if (!form || form.nodeType !== 1) return;
+                var action = parseUrl(form.getAttribute('action') || '');
+                if (
+                    form.id === 'rateform' ||
+                    (action &&
+                        String(action.searchParams.get('mod') || '').toLowerCase() === 'misc' &&
+                        String(action.searchParams.get('action') || '').toLowerCase() === 'rate')
+                ) prepareSubmit(form);
+            }, true);
+
+            var pending = read(PENDING_KEY);
+            if (!fresh(pending)) {
+                if (pending) remove(PENDING_KEY);
+                return;
+            }
+            if (threadId(parseUrl(location.href)) !== String(pending.tid || '')) return;
+
+            var target = targetUrl(pending);
+            var current = parseUrl(location.href);
+            var original = parseUrl(pending.returnUrl);
+            if (!target || !current || !original) {
+                remove(PENDING_KEY);
+                return;
+            }
+            current.hash = '';
+            original.hash = '';
+            if (current.href === original.href) {
+                remove(PENDING_KEY);
+                remove(CONTEXT_KEY);
+                scrollToPost(pending.pid);
+            } else {
+                window.location.replace(target);
+            }
+        })();
+    """.trimIndent()
+
     val BBS_COMMIT_BOOTSTRAP_JS by lazy {
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
@@ -2490,6 +2676,7 @@ $styleString
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2502,6 +2689,7 @@ $styleString
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2510,6 +2698,7 @@ $styleString
         combineJs(
             "OTHER_WEB_INIT_PSWP_JS" to OTHER_WEB_INIT_PSWP_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2520,6 +2709,7 @@ $styleString
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2529,6 +2719,7 @@ $styleString
             "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
@@ -2537,6 +2728,7 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
+            "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
             "INJECT_COPY_LINK_JS" to INJECT_COPY_LINK_JS
         )
     }
