@@ -42,6 +42,7 @@ import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderMemoryPrewarmManager
+import org.shirakawatyu.yamibo.novel.util.reader.ReaderSpacingOptions
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.reader.CacheData
@@ -556,22 +557,25 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             updateCachedPagesFromIndex(localCache.index.value)
 
             val applySettingsAndLoad = { settings: ReaderSettings? ->
-                val savedFontSize = settings?.fontSizePx
-                    ?.let { ValueUtil.pxToSp(it) }
-                    ?.value
-                    ?.coerceIn(14f, 34f)
-                    ?: 24f
-                val minimumLineHeight = (savedFontSize * 1.2f).coerceAtLeast(17f)
-                val maximumLineHeight = (savedFontSize * 2f).coerceAtMost(68f)
-                val savedLineHeight = settings?.lineHeightPx
-                    ?.let { ValueUtil.pxToSp(it) }
-                    ?.value
-                    ?.coerceIn(minimumLineHeight, maximumLineHeight)
-                    ?: 43f
+                val savedFontSize = ReaderSpacingOptions.snapFontSize(
+                    settings?.fontSizePx
+                        ?.let { ValueUtil.pxToSp(it) }
+                        ?.value
+                        ?: 24f
+                )
+                val savedLineHeight = ReaderSpacingOptions.snapLineHeight(
+                    value = settings?.lineHeightPx
+                        ?.let { ValueUtil.pxToSp(it) }
+                        ?.value
+                        ?: 43.2f,
+                    fontSize = savedFontSize
+                )
                 _uiState.value = _uiState.value.copy(
                     fontSize = savedFontSize.sp,
                     lineHeight = savedLineHeight.sp,
-                    padding = (settings?.paddingDp ?: 16f).coerceIn(4f, 40f).dp,
+                    padding = ReaderSpacingOptions.snapPadding(
+                        settings?.paddingDp ?: 16f
+                    ).dp,
                     nightMode = false,
                     backgroundColor = null,
                     loadImages = settings?.loadImages ?: false,
@@ -2096,27 +2100,33 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
     fun onSetLineHeight(lineHeight: TextUnit) {
         val currentFontSizeValue = _uiState.value.fontSize.value
-        val coercedLineHeightValue = lineHeight.value.coerceIn(
-            minimumValue = (currentFontSizeValue * 1.2f).coerceAtLeast(17f),
-            maximumValue = (currentFontSizeValue * 2f).coerceAtMost(68f)
+        val snappedLineHeight = ReaderSpacingOptions.snapLineHeight(
+            value = lineHeight.value,
+            fontSize = currentFontSizeValue
         )
-        _uiState.value = _uiState.value.copy(lineHeight = coercedLineHeightValue.sp)
+        _uiState.value = _uiState.value.copy(lineHeight = snappedLineHeight.sp)
     }
 
     fun onSetFontSize(fontSize: TextUnit) {
-        val safeFontSize = fontSize.value.coerceIn(14f, 34f)
+        val currentFontSize = _uiState.value.fontSize.value
         val currentLineHeight = _uiState.value.lineHeight.value
-        val minimumLineHeight = (safeFontSize * 1.2f).coerceAtLeast(17f)
-        val maximumLineHeight = (safeFontSize * 2f).coerceAtMost(68f)
+        val currentLineHeightRatio = currentLineHeight / currentFontSize
+        val safeFontSize = ReaderSpacingOptions.snapFontSize(fontSize.value)
+        val safeLineHeight = ReaderSpacingOptions.snapLineHeight(
+            value = safeFontSize * currentLineHeightRatio,
+            fontSize = safeFontSize
+        )
         _uiState.value = _uiState.value.copy(
             fontSize = safeFontSize.sp,
-            lineHeight = currentLineHeight.coerceIn(minimumLineHeight, maximumLineHeight).sp
+            lineHeight = safeLineHeight.sp
         )
         updateFontRatios()
     }
 
     fun onSetPadding(padding: Dp) {
-        _uiState.value = _uiState.value.copy(padding = padding.value.coerceIn(4f, 40f).dp)
+        _uiState.value = _uiState.value.copy(
+            padding = ReaderSpacingOptions.snapPadding(padding.value).dp
+        )
     }
 
     fun toggleLoadImages(load: Boolean) {

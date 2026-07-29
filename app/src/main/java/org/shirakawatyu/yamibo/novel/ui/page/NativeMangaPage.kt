@@ -1319,25 +1319,28 @@ fun NativeMangaPage(
                             .weight(1f)
                             .padding(horizontal = 8.dp)
                     ) {
+                        val currentDirectory = mangaDirVM.currentDirectory
+                        val currentChapter =
+                            currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
+                        val chapterTitle = currentChapter?.let { chapter ->
+                            val displayNumber = getDisplayChapterNum(
+                                chapter.rawTitle,
+                                chapter.chapterNum,
+                                currentItem?.tid
+                            )
+                            MangaTitleCleaner.getDisplayChapterTitle(
+                                rawTitle = chapter.rawTitle,
+                                bookName = currentDirectory?.cleanBookName.orEmpty(),
+                                fallback = displayNumber
+                            )
+                        } ?: currentItem?.chapterTitle ?: "漫画阅读"
                         Text(
-                            text = currentItem?.chapterTitle
-                                ?: mangaDirVM.currentDirectory?.cleanBookName ?: "漫画阅读",
+                            text = chapterTitle,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 15.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        val chap =
-                            mangaDirVM.currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
-                        if (chap != null) {
-                            val displayNum =
-                                getDisplayChapterNum(chap.rawTitle, chap.chapterNum, currentItem?.tid)
-                            Text(
-                                "第 $displayNum 话",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
-                            )
-                        }
                     }
                     TextButton(onClick = returnToOriginalPost) {
                         Text(

@@ -152,6 +152,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.reader.CustomStatusBar
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
+import org.shirakawatyu.yamibo.novel.util.reader.ReaderSpacingOptions
 import org.shirakawatyu.yamibo.novel.util.reader.rememberScreenCorner
 import kotlin.math.roundToInt
 
@@ -922,32 +923,21 @@ fun ReaderPage(
                             IconButton(onClick = exitReader) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                             }
-                            // 与漫画阅读界面一致：标题放在弹出菜单中间，不再常驻正文顶部
+                            // 顶栏只显示当前目录章节名，与章节目录保持一致。
                             Column(
                                 modifier = Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = bookTitle.ifBlank {
-                                        currentChapterTitle?.takeIf { it.isNotBlank() && it != "footer" }
-                                            ?: "小说阅读"
-                                    },
+                                    text = currentChapterTitle
+                                        ?.takeIf { it.isNotBlank() && it != "footer" }
+                                        ?: "小说阅读",
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 15.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                currentChapterTitle
-                                    ?.takeIf { it.isNotBlank() && it != "footer" && bookTitle.isNotBlank() }
-                                    ?.let { chapter ->
-                                        Text(
-                                            text = chapter,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 12.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+
                             }
                             TextButton(
                                 onClick = {
@@ -1533,24 +1523,20 @@ private fun SpacingSettingsMenu(
             ReaderSettingSlider(
                 label = "正文字号",
                 value = uiState.fontSize.value,
-                valueRange = 14f..34f,
-                steps = 9,
+                options = ReaderSpacingOptions.FONT_SIZES,
                 onValueChange = { onSetFontSize(it.sp) }
             )
-            val minLineHeight = (uiState.fontSize.value * 1.2f).coerceAtLeast(17f)
-            val maxLineHeight = (uiState.fontSize.value * 2f).coerceAtMost(68f)
+
             ReaderSettingSlider(
                 label = "行距",
                 value = uiState.lineHeight.value,
-                valueRange = minLineHeight..maxLineHeight,
-                steps = 7,
+                options = ReaderSpacingOptions.lineHeights(uiState.fontSize.value),
                 onValueChange = { onSetLineHeight(it.sp) }
             )
             ReaderSettingSlider(
                 label = "页边距",
                 value = uiState.padding.value,
-                valueRange = 4f..40f,
-                steps = 8,
+                options = ReaderSpacingOptions.PAGE_PADDINGS,
                 onValueChange = { onSetPadding(it.dp) }
             )
             CompactOptionRow(

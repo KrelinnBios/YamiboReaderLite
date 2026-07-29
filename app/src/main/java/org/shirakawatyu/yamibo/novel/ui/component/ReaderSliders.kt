@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.shirakawatyu.yamibo.novel.ui.theme.yamiboSliderColors
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun ReaderProgressSlider(
@@ -66,4 +68,26 @@ fun ReaderSettingSlider(
             colors = yamiboSliderColors()
         )
     }
+}
+
+@Composable
+fun ReaderSettingSlider(
+    label: String,
+    value: Float,
+    options: List<Float>,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    require(options.size >= 2) { "ReaderSettingSlider 至少需要两个选项" }
+    val selectedIndex = options.indices.minBy { index -> abs(options[index] - value) }
+    ReaderSettingSlider(
+        label = label,
+        value = selectedIndex.toFloat(),
+        valueRange = 0f..options.lastIndex.toFloat(),
+        steps = (options.size - 2).coerceAtLeast(0),
+        onValueChange = { index ->
+            onValueChange(options[index.roundToInt().coerceIn(options.indices)])
+        },
+        modifier = modifier
+    )
 }

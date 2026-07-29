@@ -35,7 +35,7 @@ data class GlobalChapter(
  * @property htmlList HTML内容列表，默认为空列表
  * @property currentView 当前视图索引，默认为1
  * @property initPage 初始页面索引，默认为0
- * @property lineHeight 文本行高，默认为43.sp
+ * @property lineHeight 文本行高，默认为43.2.sp
  * @property padding 内边距，默认为16.dp
  * @property fontSize 字体大小，默认为24.sp
  * @property letterSpacing 字符间距，默认为2.sp
@@ -59,7 +59,7 @@ data class ReaderState(
     val globalChapters: List<GlobalChapter> = listOf(),
     // 全书目录是否仍在补全（已索引论坛页数 < maxWebView）。
     val globalChapterIndexing: Boolean = false,
-    val lineHeight: TextUnit = 43.sp,
+    val lineHeight: TextUnit = 43.2.sp,
     val padding: Dp = 16.dp,
     val fontSize: TextUnit = 24.sp,
     val letterSpacing: TextUnit = 2.sp,
