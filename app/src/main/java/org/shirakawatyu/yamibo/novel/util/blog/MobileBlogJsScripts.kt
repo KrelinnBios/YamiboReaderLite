@@ -91,7 +91,7 @@ internal object MobileBlogJsScripts {
                     'background-image:none!important;box-shadow:none!important;',
                     'text-shadow:none!important;color:var(--dz-FC-color,#6e2b19)!important;',
                     'min-width:0;padding:0 2px;text-align:center;cursor:pointer}',
-                    '#yamibo-blog-reactions .ybr-option:disabled{opacity:.5;cursor:default}',
+                    '#yamibo-blog-reactions .ybr-option:disabled{opacity:1;cursor:default}',
                     '#yamibo-blog-reactions .ybr-meter{height:82px;display:flex;',
                     'flex-direction:column;align-items:center;justify-content:flex-end;margin-bottom:8px}',
                     '#yamibo-blog-reactions .ybr-bar{position:relative;display:block;width:26px;',
