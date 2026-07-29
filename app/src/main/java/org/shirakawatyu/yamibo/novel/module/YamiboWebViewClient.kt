@@ -28,6 +28,8 @@ import org.shirakawatyu.yamibo.novel.util.CookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
+import org.shirakawatyu.yamibo.novel.util.blog.BlogReactionJsBridge
+import org.shirakawatyu.yamibo.novel.util.blog.MobileBlogJsScripts
 
 open class YamiboWebViewClient : WebViewClient() {
 
@@ -66,6 +68,7 @@ open class YamiboWebViewClient : WebViewClient() {
 
         fun setupDownloadListener(webView: WebView) {
             webView.addJavascriptInterface(AttachmentNameBridge(), "__yamiboAttach")
+            webView.addJavascriptInterface(BlogReactionJsBridge(webView), "AndroidBlogReaction")
             webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
                 try {
                     val aid = Uri.parse(url).getQueryParameter("aid")
@@ -465,6 +468,7 @@ open class YamiboWebViewClient : WebViewClient() {
             """.trimIndent(), null
         )
         view?.evaluateJavascript(ATTACH_INTERCEPT_JS, null)
+        view?.evaluateJavascript(MobileBlogJsScripts.ENHANCEMENTS_JS, null)
     }
 
     override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {

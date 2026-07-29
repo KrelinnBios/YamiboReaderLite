@@ -22,4 +22,13 @@ class DarkClassicCssTest {
     fun keepsDesktopRanklistSelectedRules() {
         assertTrue(css.contains(".pg_ranklist .tbn li.a"))
     }
+
+    @Test
+    fun themesDesktopRateFormPopup() {
+        assertTrue(css.contains("#fwin_rate .tm_c"))
+        assertTrue(css.contains("#rateform .dt th"))
+        assertTrue(css.contains("#rateform .reasonselect"))
+        assertTrue(css.contains("#rateform ul[id^=scoreoption]"))
+        assertTrue(css.contains("#rateform .dpbtn"))
+    }
 }
