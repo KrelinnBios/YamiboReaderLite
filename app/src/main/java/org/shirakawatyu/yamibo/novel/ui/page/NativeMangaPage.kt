@@ -94,6 +94,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
@@ -1298,51 +1299,56 @@ fun NativeMangaPage(
                 exit = fadeOut() + slideOutVertically { -it },
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
                         .pointerInput(Unit) { detectTapGestures {} }
                         .statusBarsPadding()
-                        .padding(horizontal = 4.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(64.dp)
+                        .padding(horizontal = 4.dp)
                 ) {
-                    IconButton(onClick = performExit) {
+                    val currentDirectory = mangaDirVM.currentDirectory
+                    val currentChapter =
+                        currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
+                    val chapterTitle = currentChapter?.let { chapter ->
+                        val displayNumber = getDisplayChapterNum(
+                            chapter.rawTitle,
+                            chapter.chapterNum,
+                            currentItem?.tid
+                        )
+                        MangaTitleCleaner.getDisplayChapterTitle(
+                            rawTitle = chapter.rawTitle,
+                            bookName = currentDirectory?.cleanBookName.orEmpty(),
+                            fallback = displayNumber
+                        )
+                    } ?: currentItem?.chapterTitle ?: "漫画阅读"
+                    Text(
+                        text = chapterTitle,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .padding(horizontal = 72.dp)
+                    )
+                    IconButton(
+                        onClick = performExit,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             "返回",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp)
+                    TextButton(
+                        onClick = returnToOriginalPost,
+                        modifier = Modifier.align(Alignment.CenterEnd)
                     ) {
-                        val currentDirectory = mangaDirVM.currentDirectory
-                        val currentChapter =
-                            currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
-                        val chapterTitle = currentChapter?.let { chapter ->
-                            val displayNumber = getDisplayChapterNum(
-                                chapter.rawTitle,
-                                chapter.chapterNum,
-                                currentItem?.tid
-                            )
-                            MangaTitleCleaner.getDisplayChapterTitle(
-                                rawTitle = chapter.rawTitle,
-                                bookName = currentDirectory?.cleanBookName.orEmpty(),
-                                fallback = displayNumber
-                            )
-                        } ?: currentItem?.chapterTitle ?: "漫画阅读"
-                        Text(
-                            text = chapterTitle,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    TextButton(onClick = returnToOriginalPost) {
                         Text(
                             "原帖",
                             color = MaterialTheme.colorScheme.primary,
