@@ -181,7 +181,22 @@ private fun formatDateOnly(millis: Long): String {
     return "${cal.get(Calendar.YEAR)}.${cal.get(Calendar.MONTH) + 1}.${cal.get(Calendar.DAY_OF_MONTH)}"
 }
 
-private const val HISTORY_HEATMAP_START_YEAR = 2026
+internal data class HistoryMonth(val year: Int, val month0: Int)
+
+internal fun historyMonth(timestamp: Long): HistoryMonth =
+    Calendar.getInstance().apply { timeInMillis = timestamp }.let { calendar ->
+        HistoryMonth(
+            year = calendar.get(Calendar.YEAR),
+            month0 = calendar.get(Calendar.MONTH)
+        )
+    }
+
+internal fun historyMonths(entries: List<HistoryEntry>): List<HistoryMonth> =
+    entries.asSequence()
+        .map { historyMonth(it.timestamp) }
+        .distinct()
+        .sortedWith(compareBy(HistoryMonth::year, HistoryMonth::month0))
+        .toList()
 
 private fun historyDateKey(timestamp: Long): String {
     val calendar = Calendar.getInstance().apply { timeInMillis = timestamp }
@@ -211,23 +226,24 @@ private fun HistoryHeatmapPickerDialog(
             .groupingBy { historyDateKey(it.timestamp) }
             .eachCount()
     }
-    val latestTimestamp = remember(historyEntries) {
-        historyEntries.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
+    val availableMonths = remember(historyEntries) {
+        historyMonths(historyEntries)
     }
-    val initialCalendar = remember(latestTimestamp) {
-        Calendar.getInstance().apply {
-            timeInMillis = latestTimestamp
-            if (get(Calendar.YEAR) < HISTORY_HEATMAP_START_YEAR) {
-                clear()
-                set(HISTORY_HEATMAP_START_YEAR, Calendar.JANUARY, 1)
-            }
-        }
+    val initialMonthIndex = remember(availableMonths, selectedStart) {
+        val selectedMonthIndex = selectedStart
+            ?.let(::historyMonth)
+            ?.let { availableMonths.indexOf(it) }
+            ?: -1
+        selectedMonthIndex.takeIf { it >= 0 }
+            ?: availableMonths.lastIndex.coerceAtLeast(0)
     }
-    val now = Calendar.getInstance()
-    val currentYear = now.get(Calendar.YEAR)
-    val currentMonth0 = now.get(Calendar.MONTH)
-    var displayYear by remember { mutableStateOf(initialCalendar.get(Calendar.YEAR)) }
-    var displayMonth0 by remember { mutableStateOf(initialCalendar.get(Calendar.MONTH)) }
+    var displayMonthIndex by remember(availableMonths, selectedStart) {
+        mutableStateOf(initialMonthIndex)
+    }
+    val fallbackMonth = remember { historyMonth(System.currentTimeMillis()) }
+    val displayMonth = availableMonths.getOrNull(displayMonthIndex) ?: fallbackMonth
+    val displayYear = displayMonth.year
+    val displayMonth0 = displayMonth.month0
     var draftStart by remember(selectedStart) { mutableStateOf(selectedStart) }
     var draftEnd by remember(selectedEnd) { mutableStateOf(selectedEnd) }
 
@@ -252,9 +268,8 @@ private fun HistoryHeatmapPickerDialog(
         .values
         .maxOrNull()
         ?: 0
-    val canMovePrevious = displayYear > HISTORY_HEATMAP_START_YEAR || displayMonth0 > 0
-    val canMoveNext = displayYear < currentYear ||
-            (displayYear == currentYear && displayMonth0 < currentMonth0)
+    val canMovePrevious = displayMonthIndex > 0
+    val canMoveNext = displayMonthIndex < availableMonths.lastIndex
     val primary = MaterialTheme.colorScheme.primary
     val dayShape = RoundedCornerShape(8.dp)
 
@@ -298,19 +313,12 @@ private fun HistoryHeatmapPickerDialog(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(
-                    onClick = {
-                        if (displayMonth0 == 0) {
-                            displayYear--
-                            displayMonth0 = Calendar.DECEMBER
-                        } else {
-                            displayMonth0--
-                        }
-                    },
+                    onClick = { displayMonthIndex-- },
                     enabled = canMovePrevious
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "上个月"
+                        contentDescription = "上一个有记录的月份"
                     )
                 }
                 Text(
@@ -319,19 +327,12 @@ private fun HistoryHeatmapPickerDialog(
                     textAlign = TextAlign.Center
                 )
                 IconButton(
-                    onClick = {
-                        if (displayMonth0 == Calendar.DECEMBER) {
-                            displayYear++
-                            displayMonth0 = Calendar.JANUARY
-                        } else {
-                            displayMonth0++
-                        }
-                    },
+                    onClick = { displayMonthIndex++ },
                     enabled = canMoveNext
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "下个月"
+                        contentDescription = "下一个有记录的月份"
                     )
                 }
             }
@@ -540,7 +541,7 @@ fun HistoryPage(navController: NavController) {
             ),
             OnboardingStep(
                 title = "浏览历史小提示",
-                description = "点击搜索框右侧的日历图标可以按日期筛选：日历中颜色越深表示当天浏览记录越多，只能点选有记录的日期。点一个日期筛选当天，再点另一个日期即为范围，重复点击已选日期可以取消。筛选生效后上方会出现日期标签，点击标签可以清除。"
+                description = "点击搜索框右侧的日历图标可以按日期筛选：左右箭头只切换到有浏览记录的月份，颜色越深表示当天记录越多，只能点选有记录的日期。点一个日期筛选当天，再点另一个日期即为范围，重复点击已选日期可以取消。筛选生效后上方会出现日期标签，点击标签可以清除。"
             ),
             OnboardingStep(
                 title = "浏览历史小提示",
@@ -764,7 +765,10 @@ fun HistoryPage(navController: NavController) {
                                 )
                             }
                         }
-                        IconButton(onClick = { showDatePicker = true }) {
+                        IconButton(
+                            onClick = { showDatePicker = true },
+                            enabled = historyList.isNotEmpty()
+                        ) {
                             Icon(
                                 CalendarIcon,
                                 contentDescription = "按日期筛选",
