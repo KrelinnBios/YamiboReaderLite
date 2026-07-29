@@ -2,6 +2,7 @@ package org.shirakawatyu.yamibo.novel.ui.vm
 
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
+import org.shirakawatyu.yamibo.novel.util.reader.HTMLUtil
 
 private val readerDateHeadingRegex = Regex(
     """^(?:(?:现在|如今|当时|过去|未来|[零〇一二三四五六七八九十百\d]+年(?:前|后))\s*[-—–~～：:]\s*)?\d{3,4}\s*年\s*\d{1,2}\s*月(?:\s*\d{1,2}\s*[日号])?$"""
@@ -44,6 +45,32 @@ internal fun extractReaderTextChapterHeading(firstLine: String): String? {
     return candidate.takeIf {
         it.isNotBlank() && readerTextChapterHeadingRegex.containsMatchIn(it)
     }
+}
+
+/**
+ * 提取作者留言分隔线后的正式章节标题。
+ *
+ * 有些连载楼层会先写更新说明或致谢，再用 `<hr>` 分隔正文；真正的“第 N 章/序章/番外”
+ * 位于分隔线之后。只扫描分隔线后的前几行，避免把后续正文里提到的章节号误当标题。
+ */
+internal fun extractReaderChapterHeadingAfterDivider(node: Element): String? {
+    return node.select("hr")
+        .asSequence()
+        .firstNotNullOfOrNull { divider ->
+            val followingHtml = buildString {
+                var sibling = divider.nextSibling()
+                while (sibling != null) {
+                    append(sibling.outerHtml())
+                    sibling = sibling.nextSibling()
+                }
+            }
+            HTMLUtil.toText(followingHtml)
+                .lineSequence()
+                .map(::normalizeReaderHeading)
+                .filter(String::isNotBlank)
+                .take(8)
+                .firstNotNullOfOrNull(::extractReaderTextChapterHeading)
+        }
 }
 
 /**
