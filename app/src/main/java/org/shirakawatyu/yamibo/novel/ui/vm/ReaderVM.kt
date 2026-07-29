@@ -1401,41 +1401,50 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             (convertedTexts.getOrElse(i) { rawTexts[i] })
                 .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         }
+        val dividerHeadings = messageNodes.map { node ->
+            extractReaderChapterHeadingAfterDivider(node)
+                ?.let { convertChineseIfNeeded(it, translationMode) }
+        }
+        val usesDividerChapterHeadings = dividerHeadings.any { it != null }
 
-        // 章节标题用两种信号识别真正的章节小标题（Pair 的第二个值表示是否「硬分章」）：
-        // 1) 首行匹配「第N章/序章/楔子…」等文本标题（如《主仆百合》直接写「第一章 造化弄人」）——
-        //    这类编号标题每次出现都是新章，标为硬分章，即便两章同名（如两个「第七章」）也不合并；
-        // 2) 楼层里有「标题样式」元素（居中/大字号/标题标签，如《愿在沉船中安眠》的时间小标题）——
-        //    这类重复属同章装饰，不硬分章，连续同名仍合并成一章。
+        // 多种标题信号共同识别真正的章节小标题（Pair 的第二个值表示是否「硬分章」）。
         // 命中的楼层才开启新章节，其余楼层视为上一章延续，不再把简介/闲聊/致谢/正文句当成章节。
         // 整帖都识别不到时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
         val detectedHeadings: List<Pair<String, Boolean>?> = messageNodes.indices.map { i ->
             val firstLine = firstLines[i]
             if (firstLine.contains(replyRegex)) return@map null
             val textHeading = extractReaderTextChapterHeading(firstLine)
+            val dividerHeading = dividerHeadings[i]
             when {
-                // 1) 「第N章/序章…」编号标题：硬分章，每次出现都是新章
+                // 1) 作者留言后的分隔线正文：优先取分隔线后的正式编号标题。
+                dividerHeading != null -> dividerHeading.take(30) to true
+                // 2) 「第N章/序章…」编号标题：硬分章，每次出现都是新章。
                 textHeading != null -> textHeading.take(30) to true
-                // 2) 「现在 - 2044 年 1 月」这类带完整日期的小标题：作者按此分章，硬分章
+                // 3) 「现在 - 2044 年 1 月」这类带完整日期的小标题：作者按此分章，硬分章。
                 else -> {
                     val dateHeading = extractReaderDateSubHeading(messageNodes[i])
                     if (dateHeading != null) {
                         convertChineseIfNeeded(dateHeading, translationMode) to true
                     } else {
-                        // 3) 「Episode N」式英文分话标记：每话一个楼层，硬分章
+                        // 4) 「Episode N」式英文分话标记：每话一个楼层，硬分章。
                         val episodeHeading = extractEpisodeHeading(
                             convertedTexts.getOrElse(i) { rawTexts[i] }
                         )
                         if (episodeHeading != null) {
                             episodeHeading to true
                         } else {
-                            // 4) 引导式中文标题栏（<strong>夏梦4</strong>/<font>秋惑3</font> 等，字号非 5/6/7）：
-                            //    软标题，连续同名才合并。覆盖后期改用中文标题栏分话的长篇。
-                            val titleBar = extractLeadingTitleBar(messageNodes[i])
+                            // 5) 引导式中文标题栏（<strong>夏梦4</strong>/<font>秋惑3</font> 等，字号非 5/6/7）：
+                            //    软标题，连续同名才合并。若同页已经采用“留言 + 分隔线 + 正文标题”的排版，
+                            //    则不再拿其它楼层的首句兜底，避免把致谢或更新说明收进目录。
+                            val titleBar = if (usesDividerChapterHeadings) {
+                                null
+                            } else {
+                                extractLeadingTitleBar(messageNodes[i])
+                            }
                             if (titleBar != null) {
                                 convertChineseIfNeeded(titleBar, translationMode) to false
                             } else {
-                                // 5) 居中/大字号的装饰性标题：软标题，连续同名才合并
+                                // 6) 居中/大字号的装饰性标题：软标题，连续同名才合并。
                                 extractReaderStructuralHeading(messageNodes[i])
                                     ?.let { convertChineseIfNeeded(it, translationMode) to false }
                             }
