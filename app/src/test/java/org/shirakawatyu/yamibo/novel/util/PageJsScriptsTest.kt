@@ -61,4 +61,30 @@ class PageJsScriptsTest {
         assertTrue(script.contains("document.querySelectorAll('p > em')"))
         assertTrue(script.contains("getBlockedUser(map, authorUid, authorName)"))
     }
+
+    @Test
+    fun ratingReturnPreservesThreadPageAndRatedPost() {
+        val script = PageJsScripts.PRESERVE_RATE_POSITION_JS
+
+        assertTrue(script.contains("yamibo:rate-context:v1"))
+        assertTrue(script.contains("yamibo:pending-rate-return:v1"))
+        assertTrue(script.contains("form.id === 'rateform'"))
+        assertTrue(script.contains("input[name=\"referer\"]"))
+        assertTrue(script.contains("window.succeedhandle_rate"))
+        assertTrue(script.contains("url.hash = 'pid'"))
+        assertTrue(script.contains("window.location.replace(target)"))
+        assertTrue(script.contains("scrollIntoView"))
+    }
+
+    @Test
+    fun ratingReturnIsInjectedIntoEveryForumCapableWebView() {
+        val marker = "__yamiboPreserveRatePositionV1"
+
+        assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
+        assertTrue(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertTrue(PageJsScripts.MINE_MANGA_REINJECT_JS.contains(marker))
+        assertTrue(PageJsScripts.OTHER_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertTrue(PageJsScripts.MANGA_BOOTSTRAP_JS.contains(marker))
+    }
 }
