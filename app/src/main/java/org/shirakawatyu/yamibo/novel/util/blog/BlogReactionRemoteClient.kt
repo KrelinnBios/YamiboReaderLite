@@ -14,22 +14,12 @@ import java.io.IOException
 internal data class BlogReactionOption(
     val clickId: String,
     val label: String,
-    val iconUrl: String,
     val count: Int,
-    val barClass: String,
     val actionUrl: String
-)
-
-internal data class BlogReactionUser(
-    val uid: String,
-    val username: String,
-    val avatarUrl: String,
-    val reaction: String
 )
 
 internal data class BlogReactionSnapshot(
     val options: List<BlogReactionOption>,
-    val users: List<BlogReactionUser>,
     val totalCount: Int
 )
 
@@ -41,6 +31,13 @@ internal data class BlogReactionUpdate(
 internal object BlogReactionRemoteClient {
     private const val FORUM_ROOT = "https://bbs.yamibo.com/"
     private val numericId = Regex("[1-9]\\d*")
+    private val fallbackLabels = mapOf(
+        "1" to "路过",
+        "2" to "雷人",
+        "3" to "握手",
+        "4" to "鲜花",
+        "5" to "鸡蛋"
+    )
 
     fun fetchSnapshot(ownerUid: String, blogId: String): BlogReactionSnapshot {
         val blogUrl = desktopBlogUrl(ownerUid, blogId)
@@ -197,47 +194,26 @@ internal object BlogReactionRemoteClient {
             val clickId = parsedAction.queryParameter("clickid")
                 ?.takeIf { it.matches(numericId) }
                 ?: return@mapNotNull null
-            val iconUrl = link.selectFirst("img[src*=/static/image/click/]")
-                ?.absUrl("src")
-                .orEmpty()
-            val label = link.ownText().trim()
-            if (iconUrl.isBlank() || label.isBlank()) return@mapNotNull null
-            val bar = link.selectFirst(".atdc > div")
+            val label = link.ownText().trim().ifBlank {
+                fallbackLabels[clickId].orEmpty()
+            }
+            if (label.isBlank()) return@mapNotNull null
             BlogReactionOption(
                 clickId = clickId,
                 label = label,
-                iconUrl = iconUrl,
                 count = link.selectFirst(".atdc em")?.text()?.trim()?.toIntOrNull() ?: 0,
-                barClass = bar?.classNames()
-                    ?.firstOrNull { it.matches(Regex("ac[1-4]")) }
-                    .orEmpty(),
                 actionUrl = actionUrl
             )
         }.distinctBy { it.clickId }
         if (options.isEmpty()) return null
 
-        val users = clickDiv.select("#trace_ul > li").mapNotNull { item ->
-            val profileLink = item.selectFirst(".avt a[href], p a[href]") ?: return@mapNotNull null
-            val uid = extractUid(profileLink.attr("href")) ?: return@mapNotNull null
-            val nameLink = item.selectFirst("p a")
-            val username = nameLink?.attr("title")?.trim()
-                ?.takeIf(String::isNotBlank)
-                ?: nameLink?.text()?.trim()?.takeIf(String::isNotBlank)
-                ?: "UID $uid"
-            BlogReactionUser(
-                uid = uid,
-                username = username,
-                avatarUrl = item.selectFirst(".avt img[src]")?.absUrl("src").orEmpty(),
-                reaction = item.selectFirst(".avt a[title]")?.attr("title")?.trim().orEmpty()
-            )
-        }.distinctBy { it.uid }
         val totalCount = Regex("(\\d+)\\s*人")
             .find(clickDiv.selectFirst("h3")?.text().orEmpty())
             ?.groupValues
             ?.getOrNull(1)
             ?.toIntOrNull()
             ?: options.sumOf { it.count }
-        return BlogReactionSnapshot(options, users, totalCount)
+        return BlogReactionSnapshot(options, totalCount)
     }
 
     internal fun extractResponseMessage(html: String): String {
@@ -259,16 +235,6 @@ internal object BlogReactionRemoteClient {
             .orEmpty()
     }
 
-    private fun reactionState(snapshot: BlogReactionSnapshot): Pair<List<Pair<String, Int>>, List<String>> =
-        snapshot.options.map { it.clickId to it.count } to snapshot.users.map { it.uid }
-
-    private fun extractUid(href: String): String? =
-        Regex("space-uid-([1-9]\\d*)", RegexOption.IGNORE_CASE)
-            .find(href)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: Regex("[?&]uid=([1-9]\\d*)", RegexOption.IGNORE_CASE)
-                .find(href)
-                ?.groupValues
-                ?.getOrNull(1)
+    private fun reactionState(snapshot: BlogReactionSnapshot): List<Pair<String, Int>> =
+        snapshot.options.map { it.clickId to it.count }
 }

@@ -64,17 +64,7 @@ internal class BlogReactionJsBridge(webView: WebView) {
             linkedMapOf(
                 "clickId" to option.clickId,
                 "label" to option.label,
-                "iconUrl" to option.iconUrl,
-                "count" to option.count,
-                "barClass" to option.barClass
-            )
-        },
-        "users" to snapshot.users.map { user ->
-            linkedMapOf(
-                "uid" to user.uid,
-                "username" to user.username,
-                "avatarUrl" to user.avatarUrl,
-                "reaction" to user.reaction
+                "count" to option.count
             )
         },
         "message" to message

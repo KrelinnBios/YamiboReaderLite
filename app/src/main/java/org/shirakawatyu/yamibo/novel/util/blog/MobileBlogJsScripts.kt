@@ -41,9 +41,8 @@ internal object MobileBlogJsScripts {
             }
             installInviteNavigation();
 
-            if (window.__yamiboMobileBlogEnhancementsV1) return;
-            window.__yamiboMobileBlogEnhancementsV1 = true;
-            if (!window.AndroidBlogReaction) return;
+            if (window.__yamiboMobileBlogEnhancementsV2) return;
+            window.__yamiboMobileBlogEnhancementsV2 = true;
 
             var foot = document.querySelector('.viewthread .plc > .threadlist_foot') ||
                 document.querySelector('.threadlist_foot');
@@ -60,45 +59,42 @@ internal object MobileBlogJsScripts {
                 }
             }
             var blogId = pageUrl.searchParams.get('id') || '';
-            if (!/^[1-9]\d*$/.test(ownerUid)) return;
+            var reactionTypes = [
+                { clickId: '1', label: '路过' },
+                { clickId: '2', label: '雷人' },
+                { clickId: '3', label: '握手' },
+                { clickId: '4', label: '鲜花' },
+                { clickId: '5', label: '鸡蛋' }
+            ];
 
             if (!document.getElementById('yamibo-mobile-blog-reaction-style')) {
                 var style = document.createElement('style');
                 style.id = 'yamibo-mobile-blog-reaction-style';
                 style.textContent = [
-                    '#yamibo-blog-reactions{margin:16px 0 10px;padding:4px 0 12px;',
-                    'background:transparent;color:var(--dz-FC-333,#333)}',
-                    '#yamibo-blog-reactions .ybr-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}',
-                    '#yamibo-blog-reactions .ybr-option{appearance:none;border:0;background:transparent;',
-                    'color:var(--dz-FC-color,#c06f3e);min-width:0;padding:0;text-align:center}',
-                    '#yamibo-blog-reactions .ybr-option:disabled{opacity:.55}',
-                    '#yamibo-blog-reactions .ybr-meter{height:64px;display:flex;align-items:flex-end;',
-                    'justify-content:center;margin-bottom:6px}',
-                    '#yamibo-blog-reactions .ybr-bar{position:relative;width:24px;min-height:2px;border-radius:2px 2px 0 0;',
-                    'background:#d43800;transition:height .2s ease}',
-                    '#yamibo-blog-reactions .ybr-bar.ac2{background:#5e9f25}',
-                    '#yamibo-blog-reactions .ybr-bar.ac3{background:#f08a24}',
-                    '#yamibo-blog-reactions .ybr-bar.ac4{background:#448aca}',
+                    '#yamibo-blog-reactions{margin:18px 0 10px;padding:14px 10px 12px;',
+                    'border:1px solid var(--dz-BG-6,#ddd);border-radius:8px;',
+                    'background:var(--dz-BG-0,#fff);color:var(--dz-FC-333,#333)}',
+                    '#yamibo-blog-reactions .ybr-title{font-size:14px;font-weight:600;',
+                    'line-height:1.4;margin:0 0 14px}',
+                    '#yamibo-blog-reactions .ybr-options{display:grid;',
+                    'grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}',
+                    '#yamibo-blog-reactions .ybr-option{appearance:none;border:0;',
+                    'background:transparent;color:var(--dz-FC-color,#6e2b19);',
+                    'min-width:0;padding:0 2px;text-align:center;cursor:pointer}',
+                    '#yamibo-blog-reactions .ybr-option:disabled{opacity:.5;cursor:default}',
+                    '#yamibo-blog-reactions .ybr-meter{height:82px;display:flex;',
+                    'align-items:flex-end;justify-content:center;margin-bottom:8px}',
+                    '#yamibo-blog-reactions .ybr-bar{position:relative;display:block;width:26px;',
+                    'min-height:4px;border-radius:4px 4px 1px 1px;background:#4ea1ff;',
+                    'box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;',
+                    'transition:height .2s ease}',
                     '#yamibo-blog-reactions .ybr-count{position:absolute;left:50%;bottom:100%;',
-                    'transform:translate(-50%,-3px);font-size:11px;line-height:1;color:var(--dz-FC-666,#666)}',
-                    '#yamibo-blog-reactions .ybr-icon{display:block;width:34px;height:34px;',
-                    'object-fit:contain;margin:0 auto 4px}',
-                    '#yamibo-blog-reactions .ybr-label{display:block;font-size:12px;white-space:nowrap;',
-                    'overflow:hidden;text-overflow:ellipsis}',
-                    '#yamibo-blog-reactions .ybr-friends-title{font-size:13px;font-weight:600;',
-                    'margin:16px 0 9px}',
-                    '#yamibo-blog-reactions .ybr-users{display:flex;gap:10px;overflow-x:auto;',
-                    'padding:0 0 4px;scrollbar-width:none}',
-                    '#yamibo-blog-reactions .ybr-users::-webkit-scrollbar{display:none}',
-                    '#yamibo-blog-reactions .ybr-user{flex:0 0 52px;min-width:0;text-align:center;',
-                    'color:var(--dz-FC-color,#c06f3e)}',
-                    '#yamibo-blog-reactions .ybr-avatar{display:block;width:44px;height:44px;',
-                    'object-fit:cover;border-radius:6px;margin:0 auto 4px;background:var(--dz-BG-5,#f4f4f4)}',
-                    '#yamibo-blog-reactions .ybr-name{display:block;font-size:11px;white-space:nowrap;',
-                    'overflow:hidden;text-overflow:ellipsis}',
-                    '#yamibo-blog-reactions .ybr-status{font-size:12px;color:var(--dz-FC-999,#999);',
-                    'text-align:center;padding:12px 0}',
-                    '#yamibo-blog-reactions .ybr-status:empty{display:none}'
+                    'transform:translate(-50%,-5px);font-size:11px;line-height:1;',
+                    'color:var(--dz-FC-666,#666);white-space:nowrap}',
+                    '#yamibo-blog-reactions .ybr-label{display:block;font-size:12px;',
+                    'line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+                    '#yamibo-blog-reactions .ybr-status{min-height:17px;font-size:12px;',
+                    'line-height:1.4;color:var(--dz-FC-999,#999);text-align:center;padding-top:12px}'
                 ].join('');
                 (document.head || document.documentElement).appendChild(style);
             }
@@ -106,18 +102,16 @@ internal object MobileBlogJsScripts {
             var section = document.createElement('section');
             section.id = 'yamibo-blog-reactions';
             section.innerHTML =
+                '<div class="ybr-title">给帖主表态</div>' +
                 '<div class="ybr-options"></div>' +
-                '<div class="ybr-friends-title"></div>' +
-                '<div class="ybr-users"></div>' +
-                '<div class="ybr-status">正在加载表态…</div>';
+                '<div class="ybr-status">正在加载票数…</div>';
             foot.parentNode.insertBefore(section, foot);
 
             var optionsBox = section.querySelector('.ybr-options');
-            var friendsTitle = section.querySelector('.ybr-friends-title');
-            var usersBox = section.querySelector('.ybr-users');
             var statusBox = section.querySelector('.ybr-status');
             var activeRequest = '';
             var busy = false;
+            var counts = {};
 
             function makeRequestId() {
                 return String(Date.now()) + '-' + Math.random().toString(36).slice(2);
@@ -130,76 +124,70 @@ internal object MobileBlogJsScripts {
                 });
             }
 
-            function render(payload) {
-                var options = Array.isArray(payload.options) ? payload.options : [];
-                var users = Array.isArray(payload.users) ? payload.users : [];
-                var maximum = Math.max.apply(null, options.map(function(option) {
-                    return Number(option.count) || 0;
-                }).concat([1]));
+            function renderOptions() {
+                var knownCounts = reactionTypes.map(function(type) {
+                    return Object.prototype.hasOwnProperty.call(counts, type.clickId)
+                        ? Number(counts[type.clickId]) || 0
+                        : 0;
+                });
+                var maximum = Math.max.apply(null, knownCounts.concat([1]));
                 optionsBox.textContent = '';
-                options.forEach(function(option) {
-                    var count = Number(option.count) || 0;
+                reactionTypes.forEach(function(type) {
+                    var known = Object.prototype.hasOwnProperty.call(counts, type.clickId);
+                    var count = known ? Number(counts[type.clickId]) || 0 : 0;
                     var button = document.createElement('button');
                     button.type = 'button';
                     button.className = 'ybr-option';
-                    button.setAttribute('data-clickid', String(option.clickId || ''));
+                    button.disabled = busy;
+                    button.setAttribute('data-clickid', type.clickId);
+                    button.setAttribute('aria-label', '给帖主表态：' + type.label);
 
                     var meter = document.createElement('span');
                     meter.className = 'ybr-meter';
                     var bar = document.createElement('span');
-                    bar.className = 'ybr-bar ' + String(option.barClass || '');
-                    bar.style.height = (count > 0 ? Math.max(8, Math.round(count / maximum * 64)) : 2) + 'px';
+                    bar.className = 'ybr-bar';
+                    bar.style.height = (
+                        known && count > 0
+                            ? Math.max(10, Math.round(count / maximum * 68))
+                            : 4
+                    ) + 'px';
                     var countNode = document.createElement('span');
                     countNode.className = 'ybr-count';
-                    countNode.textContent = String(count);
+                    countNode.textContent = known ? String(count) : '…';
                     bar.appendChild(countNode);
                     meter.appendChild(bar);
 
-                    var icon = document.createElement('img');
-                    icon.className = 'ybr-icon';
-                    icon.alt = '';
-                    icon.src = String(option.iconUrl || '');
                     var label = document.createElement('span');
                     label.className = 'ybr-label';
-                    label.textContent = String(option.label || '');
+                    label.textContent = type.label;
                     button.appendChild(meter);
-                    button.appendChild(icon);
                     button.appendChild(label);
                     optionsBox.appendChild(button);
                 });
+            }
 
-                var total = Number(payload.totalCount) || 0;
-                friendsTitle.textContent = total > 0 ? '刚表态过的朋友（' + total + ' 人）' : '';
-                usersBox.textContent = '';
-                users.forEach(function(user) {
-                    var link = document.createElement('a');
-                    link.className = 'ybr-user';
-                    link.href = 'home.php?mod=space&uid=' +
-                        encodeURIComponent(String(user.uid || '')) + '&do=profile&mobile=2';
-                    var avatar = document.createElement('img');
-                    avatar.className = 'ybr-avatar';
-                    avatar.alt = '';
-                    avatar.src = String(user.avatarUrl || '');
-                    avatar.title = String(user.reaction || '');
-                    var name = document.createElement('span');
-                    name.className = 'ybr-name';
-                    name.textContent = String(user.username || '');
-                    link.appendChild(avatar);
-                    link.appendChild(name);
-                    usersBox.appendChild(link);
+            function renderPayload(payload) {
+                var serverOptions = Array.isArray(payload.options) ? payload.options : [];
+                var nextCounts = {};
+                serverOptions.forEach(function(option) {
+                    var clickId = String(option.clickId || '');
+                    if (!reactionTypes.some(function(type) { return type.clickId === clickId; })) return;
+                    nextCounts[clickId] = Math.max(0, Number(option.count) || 0);
                 });
-                statusBox.textContent = String(payload.message || '');
+                counts = nextCounts;
+                renderOptions();
+                statusBox.textContent = String(payload.message || '点击选项即可给帖主表态');
                 setBusy(false);
             }
 
             window.__yamiboBlogReactionReceive = function(requestId, payload) {
                 if (String(requestId) !== activeRequest) return;
                 if (payload && payload.error) {
-                    statusBox.textContent = String(payload.error);
+                    statusBox.textContent = String(payload.error) + '；点击选项可重试';
                     setBusy(false);
                     return;
                 }
-                render(payload || {});
+                renderPayload(payload || {});
             };
 
             optionsBox.addEventListener('click', function(event) {
@@ -208,13 +196,22 @@ internal object MobileBlogJsScripts {
                     : null;
                 if (!button || busy) return;
                 var clickId = button.getAttribute('data-clickid') || '';
-                if (!/^[1-9]\d*$/.test(clickId)) return;
+                if (!/^[1-5]$/.test(clickId)) return;
+                if (!window.AndroidBlogReaction || !/^[1-9]\d*$/.test(ownerUid)) {
+                    statusBox.textContent = '表态功能暂时不可用';
+                    return;
+                }
                 setBusy(true);
                 statusBox.textContent = '正在提交表态…';
                 activeRequest = makeRequestId();
                 window.AndroidBlogReaction.react(ownerUid, blogId, clickId, activeRequest);
             });
 
+            renderOptions();
+            if (!window.AndroidBlogReaction || !/^[1-9]\d*$/.test(ownerUid)) {
+                statusBox.textContent = '表态功能暂时不可用';
+                return;
+            }
             activeRequest = makeRequestId();
             window.AndroidBlogReaction.load(ownerUid, blogId, activeRequest);
         })();
