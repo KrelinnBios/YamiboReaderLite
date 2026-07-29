@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.dnsoverhttps.DnsOverHttps
 import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
+import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
@@ -471,8 +472,8 @@ class YamiboRetrofit {
                 // 让跟随后的请求仍用旧 cookie，服务器返回切换前的模板——表现为暗黑下点「电脑版」要点两次
                 // （第一次只把 cookie 同步进了 CookieManager，第二次才生效）。亮色模式由 WebView 原生导航，
                 // 其自带 cookie 处理会跨重定向带上新 cookie，故一次到位。
-                // 这里关闭自动跟随，手动逐跳把 Set-Cookie 同步进 CookieManager，并用其最新值作为下一跳的
-                // Cookie，使切换一次到位；普通页面无重定向，循环只跑一跳，行为与原先一致。
+                // 这里关闭自动跟随，在本次代理链内同步合并 Set-Cookie，同时写回 CookieManager，
+                // 使切换一次到位；普通页面无重定向，循环只跑一跳，行为与原先一致。
                 return try {
                     val cm = android.webkit.CookieManager.getInstance()
                     val manualRedirectClient = okHttpClient.newBuilder()
@@ -481,6 +482,7 @@ class YamiboRetrofit {
                         .build()
 
                     var currentUrl = urlStr
+                    var redirectCookie = cm.getCookie(currentUrl).orEmpty()
                     var anchor: String? = null
                     var hops = 0
                     while (true) {
@@ -489,9 +491,9 @@ class YamiboRetrofit {
                         if (hops == 0) {
                             request.requestHeaders?.forEach { (k, v) -> reqBuilder.header(k, v) }
                         }
-                        // 始终用 CookieManager 中的最新 cookie（含上一跳刚同步进去的切换 cookie）
-                        val cmCookie = cm.getCookie(currentUrl)
-                        if (!cmCookie.isNullOrEmpty()) reqBuilder.header("Cookie", cmCookie)
+                        // CookieManager#setCookie 是异步的，不能在重定向下一跳立即依赖它。
+                        // 在本次代理链内同步合并 Set-Cookie，确保 mobile=no/2 当场生效。
+                        if (redirectCookie.isNotEmpty()) reqBuilder.header("Cookie", redirectCookie)
                         if (reqBuilder.build().header("Referer").isNullOrBlank()) {
                             reqBuilder.header("Referer", "https://bbs.yamibo.com/")
                         }
@@ -502,7 +504,12 @@ class YamiboRetrofit {
                         }
 
                         val response = manualRedirectClient.newCall(reqBuilder.build()).execute()
-                        // 先把本跳 Set-Cookie 同步进 CookieManager，供下一跳与 WebView 使用
+                        redirectCookie = ForumRedirectCookieUtil.merge(
+                            redirectCookie,
+                            response.request.url,
+                            response.headers("Set-Cookie")
+                        )
+                        // 同时把本跳 Set-Cookie 写回 CookieManager，供 WebView 后续导航使用
                         syncSetCookieToWebView(response)
 
                         if (response.isRedirect) {
