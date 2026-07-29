@@ -7,6 +7,7 @@ import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
+import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import java.io.IOException
 
@@ -123,7 +124,8 @@ internal object BlogReactionRemoteClient {
 
     private fun execute(builder: Request.Builder): String {
         val cookie = YamiboSession.cookieFor(FORUM_ROOT)
-        val request = builder
+        var redirectCookie = YamiboSession.desktopCookie(cookie)
+        var request = builder
             .cacheControl(CacheControl.FORCE_NETWORK)
             .header(
                 "User-Agent",
@@ -131,22 +133,52 @@ internal object BlogReactionRemoteClient {
                         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             )
             .apply {
-                if (cookie.isNotBlank()) {
-                    header("Cookie", YamiboSession.desktopCookie(cookie))
+                if (redirectCookie.isNotBlank()) {
+                    header("Cookie", redirectCookie)
                 }
             }
             .build()
-        return YamiboRetrofit.okHttpClient.newCall(request).execute().use { response ->
+        val client = YamiboRetrofit.okHttpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
+        var hops = 0
+        while (true) {
+            val response = client.newCall(
+                request.newBuilder()
+                    .apply {
+                        if (redirectCookie.isNotBlank()) header("Cookie", redirectCookie)
+                    }
+                    .build()
+            ).execute()
+            redirectCookie = ForumRedirectCookieUtil.merge(
+                redirectCookie,
+                response.request.url,
+                response.headers("Set-Cookie")
+            )
             YamiboSession.storeSetCookies(
                 response.request.url.toString(),
                 response.headers("Set-Cookie").filterNot { header ->
                     isMobileCookieName(header.substringBefore('=').trim())
                 }
             )
-            if (!response.isSuccessful) {
-                throw IOException("表态请求失败：HTTP ${response.code}")
+            if (response.isRedirect) {
+                val location = response.header("Location")
+                val resolved = location?.let { response.request.url.resolve(it) }
+                response.close()
+                if (resolved == null || hops >= 8) {
+                    throw IOException("表态请求重定向失败")
+                }
+                request = request.newBuilder().url(resolved).get().build()
+                hops++
+                continue
             }
-            response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val responseCode = response.code
+                response.close()
+                throw IOException("表态请求失败：HTTP $responseCode")
+            }
+            return response.use { it.body?.string().orEmpty() }
         }
     }
 
