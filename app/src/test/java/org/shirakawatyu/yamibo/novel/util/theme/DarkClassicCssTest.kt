@@ -31,4 +31,13 @@ class DarkClassicCssTest {
         assertTrue(css.contains("#rateform ul[id^=scoreoption]"))
         assertTrue(css.contains("#rateform .dpbtn"))
     }
+
+    @Test
+    fun themesDesktopBlogInvitePage() {
+        assertTrue(css.contains("#nv_misc.pg_invite #ct .usd"))
+        assertTrue(css.contains("#nv_misc.pg_invite #ct .tbx span.a"))
+        assertTrue(css.contains("#nv_misc.pg_invite #friends li"))
+        assertTrue(css.contains("#nv_misc.pg_invite #inviteform"))
+        assertTrue(css.contains("#nv_misc.pg_invite #ct .pn.pnc"))
+    }
 }
