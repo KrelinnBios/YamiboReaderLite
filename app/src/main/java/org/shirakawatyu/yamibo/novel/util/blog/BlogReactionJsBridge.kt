@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import java.lang.ref.WeakReference
 
 internal class BlogReactionJsBridge(webView: WebView) {
@@ -15,7 +16,7 @@ internal class BlogReactionJsBridge(webView: WebView) {
 
     @JavascriptInterface
     fun load(ownerUid: String, blogId: String, requestId: String) {
-        launchForCurrentBlog(ownerUid, blogId, requestId) {
+        launchForCurrentBlog(ownerUid, blogId, requestId, allowOwnBlog = true) {
             runCatching {
                 BlogReactionRemoteClient.fetchSnapshot(ownerUid, blogId)
             }.fold(
@@ -43,10 +44,19 @@ internal class BlogReactionJsBridge(webView: WebView) {
         ownerUid: String,
         blogId: String,
         requestId: String,
+        allowOwnBlog: Boolean = false,
         action: () -> Unit
     ) {
         val webView = webViewRef.get() ?: return
         webView.post {
+            if (
+                !allowOwnBlog &&
+                GlobalData.currentUid.isNotBlank() &&
+                GlobalData.currentUid == ownerUid
+            ) {
+                deliver(requestId, mapOf("error" to "不能给自己的日志表态"))
+                return@post
+            }
             if (!matchesCurrentMobileBlog(webView.url, ownerUid, blogId)) {
                 deliver(requestId, mapOf("error" to "当前页面无法使用表态功能"))
                 return@post
