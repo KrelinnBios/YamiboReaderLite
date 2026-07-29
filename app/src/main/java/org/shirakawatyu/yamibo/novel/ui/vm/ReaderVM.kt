@@ -567,7 +567,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                     value = settings?.lineHeightPx
                         ?.let { ValueUtil.pxToSp(it) }
                         ?.value
-                        ?: 43.2f,
+                        ?: 34.56f,
                     fontSize = savedFontSize
                 )
                 _uiState.value = _uiState.value.copy(

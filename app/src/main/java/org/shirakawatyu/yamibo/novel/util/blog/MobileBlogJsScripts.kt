@@ -71,25 +71,27 @@ internal object MobileBlogJsScripts {
                 var style = document.createElement('style');
                 style.id = 'yamibo-mobile-blog-reaction-style';
                 style.textContent = [
-                    '#yamibo-blog-reactions{margin:18px 0 10px;padding:14px 10px 12px;',
-                    'border:1px solid var(--dz-BG-6,#ddd);border-radius:8px;',
-                    'background:var(--dz-BG-0,#fff);color:var(--dz-FC-333,#333)}',
-                    '#yamibo-blog-reactions .ybr-title{font-size:14px;font-weight:600;',
-                    'line-height:1.4;margin:0 0 14px}',
+                    '#yamibo-blog-reactions{margin:18px 0 10px;color:var(--dz-FC-333,#333)}',
                     '#yamibo-blog-reactions .ybr-options{display:grid;',
                     'grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}',
-                    '#yamibo-blog-reactions .ybr-option{appearance:none;border:0;',
-                    'background:transparent;color:var(--dz-FC-color,#6e2b19);',
+                    '#yamibo-blog-reactions .ybr-option,',
+                    '#yamibo-blog-reactions .ybr-option:hover,',
+                    '#yamibo-blog-reactions .ybr-option:focus,',
+                    '#yamibo-blog-reactions .ybr-option:active{appearance:none;',
+                    'border:0!important;background:transparent!important;',
+                    'background-image:none!important;box-shadow:none!important;',
+                    'text-shadow:none!important;color:var(--dz-FC-color,#6e2b19)!important;',
                     'min-width:0;padding:0 2px;text-align:center;cursor:pointer}',
                     '#yamibo-blog-reactions .ybr-option:disabled{opacity:.5;cursor:default}',
-                    '#yamibo-blog-reactions .ybr-meter{height:82px;display:flex;',
+                    '#yamibo-blog-reactions .ybr-meter{position:relative;height:82px;display:flex;',
                     'align-items:flex-end;justify-content:center;margin-bottom:8px}',
                     '#yamibo-blog-reactions .ybr-bar{position:relative;display:block;width:26px;',
-                    'min-height:4px;border-radius:4px 4px 1px 1px;background:#4ea1ff;',
-                    'box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;',
+                    'min-height:4px;border-radius:4px 4px 1px 1px;',
+                    'background:var(--dz-BG-color,#551200)!important;',
+                    'background-image:none!important;box-shadow:none!important;',
                     'transition:height .2s ease}',
-                    '#yamibo-blog-reactions .ybr-count{position:absolute;left:50%;bottom:100%;',
-                    'transform:translate(-50%,-5px);font-size:11px;line-height:1;',
+                    '#yamibo-blog-reactions .ybr-count{position:absolute;left:50%;top:0;',
+                    'transform:translateX(-50%);font-size:11px;line-height:1;',
                     'color:var(--dz-FC-666,#666);white-space:nowrap}',
                     '#yamibo-blog-reactions .ybr-label{display:block;font-size:12px;',
                     'line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
@@ -102,7 +104,6 @@ internal object MobileBlogJsScripts {
             var section = document.createElement('section');
             section.id = 'yamibo-blog-reactions';
             section.innerHTML =
-                '<div class="ybr-title">给帖主表态</div>' +
                 '<div class="ybr-options"></div>' +
                 '<div class="ybr-status">正在加载票数…</div>';
             foot.parentNode.insertBefore(section, foot);
@@ -154,7 +155,7 @@ internal object MobileBlogJsScripts {
                     var countNode = document.createElement('span');
                     countNode.className = 'ybr-count';
                     countNode.textContent = known ? String(count) : '…';
-                    bar.appendChild(countNode);
+                    meter.appendChild(countNode);
                     meter.appendChild(bar);
 
                     var label = document.createElement('span');

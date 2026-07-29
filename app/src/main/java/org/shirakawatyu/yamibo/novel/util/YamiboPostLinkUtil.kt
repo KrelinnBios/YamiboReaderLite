@@ -140,11 +140,13 @@ object YamiboPostLinkUtil {
             .build()
             .toString()
     }
+
     /**
-     * 识别明确的模板选择。任何 mobile=2/yes 页面都能确认当前已回到手机版；只有论坛
-     * 首页的纯 mobile=no 切换入口才记为用户主动选择电脑版，分页或特殊页面的 no 不算。
+     * 识别明确的模板选择。任何 mobile=2/yes 页面都能确认当前已回到手机版；论坛首页的
+     * 纯 mobile=no，或手机版当前页面仅改为 mobile=no，均是用户点击模板切换入口。
+     * 其它分页或特殊页面单独携带的 mobile=no 不算全局模板选择。
      */
-    fun explicitDesktopTemplateSelection(url: String?): Boolean? {
+    fun explicitDesktopTemplateSelection(url: String?, currentUrl: String? = null): Boolean? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
         val values = parsed.queryParameterValues("mobile")
@@ -156,11 +158,38 @@ object YamiboPostLinkUtil {
                     parsed.encodedPath.lowercase() in setOf("/", "/index.php", "/forum.php")
                 val hasOnlyMobile =
                     parsed.queryParameterNames.all { it.equals("mobile", ignoreCase = true) }
-                true.takeIf { isForumHome && hasOnlyMobile }
+                true.takeIf {
+                    isForumHome && hasOnlyMobile ||
+                            isSamePageTemplateSwitch(parsed, currentUrl?.toHttpUrlOrNull())
+                }
             }
             else -> null
         }
     }
+
+    private fun isSamePageTemplateSwitch(target: HttpUrl, current: HttpUrl?): Boolean {
+        if (current == null || current.host.lowercase() !in validHosts) return false
+        val currentMobile = current.queryParameterValues("mobile")
+        if (currentMobile.size > 1 ||
+            currentMobile.singleOrNull()?.let { value ->
+                !value.equals("2", ignoreCase = true) &&
+                        !value.equals("yes", ignoreCase = true)
+            } == true
+        ) {
+            return false
+        }
+        return withoutMobile(target) == withoutMobile(current)
+    }
+
+    private fun withoutMobile(url: HttpUrl): String =
+        url.newBuilder()
+            .scheme("https")
+            .host("bbs.yamibo.com")
+            .removeAllQueryParameters("mobile")
+            .fragment(null)
+            .build()
+            .toString()
+
     private fun isMobileForumPage(url: HttpUrl): Boolean {
         if (threadPathRegex.matches(url.encodedPath) || forumPathRegex.matches(url.encodedPath)) {
             return true

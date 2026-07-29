@@ -41,10 +41,15 @@ class MobileBlogJsScriptsTest {
     fun reactionAreaUsesFixedTextBarsWithoutImagesOrUserList() {
         val script = MobileBlogJsScripts.ENHANCEMENTS_JS
 
-        assertTrue(script.contains("给帖主表态"))
         assertTrue(script.contains("{ clickId: '1', label: '路过' }"))
         assertTrue(script.contains("{ clickId: '5', label: '鸡蛋' }"))
         assertTrue(script.contains("renderOptions();"))
+        assertTrue(script.contains("background:var(--dz-BG-color,#551200)!important"))
+        assertTrue(script.contains("background:transparent!important"))
+        assertTrue(script.contains("meter.appendChild(countNode)"))
+        assertFalse(script.contains("<div class=\"ybr-title\">"))
+        assertFalse(script.contains("border:1px solid var(--dz-BG-6"))
+        assertFalse(script.contains("bar.appendChild(countNode)"))
         assertFalse(script.contains("ybr-icon"))
         assertFalse(script.contains("ybr-users"))
         assertFalse(script.contains("ybr-avatar"))

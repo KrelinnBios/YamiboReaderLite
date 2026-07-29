@@ -352,7 +352,7 @@ open class YamiboWebViewClient : WebViewClient() {
             openExternalUrl(view, safeUrl)
             return true
         }
-        YamiboPostLinkUtil.explicitDesktopTemplateSelection(safeUrl)?.let { selected ->
+        YamiboPostLinkUtil.explicitDesktopTemplateSelection(safeUrl, view?.url)?.let { selected ->
             userSelectedDesktopTemplate = selected
         }
         YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->

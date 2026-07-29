@@ -156,6 +156,27 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2"
             )
         )
+        assertEquals(
+            true,
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no",
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2"
+            )
+        )
+        assertEquals(
+            true,
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/thread-573162-2-1.html?mobile=no#pid41559541",
+                "https://bbs.yamibo.com/thread-573162-2-1.html?mobile=2#pid41559541"
+            )
+        )
+        assertEquals(
+            true,
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no",
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162"
+            )
+        )
         // 分页、标签页携带 mobile 参数不代表用户切换了全局模板
         assertNull(
             YamiboPostLinkUtil.explicitDesktopTemplateSelection(
@@ -165,6 +186,12 @@ class YamiboPostLinkUtilTest {
         assertNull(
             YamiboPostLinkUtil.explicitDesktopTemplateSelection(
                 "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=no"
+            )
+        )
+        assertNull(
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573163&mobile=no",
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2"
             )
         )
     }
