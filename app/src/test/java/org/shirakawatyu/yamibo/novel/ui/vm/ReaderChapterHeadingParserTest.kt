@@ -154,6 +154,38 @@ class ReaderChapterHeadingParserTest {
     }
 
     @Test
+    fun linkedPurchaseTextIsNotEligibleForLeadingChapterTitle() {
+        val directLink = Jsoup.parse(
+            """
+            <a href="https://www.amazon.co.jp/dp/B0CG1D7R1P">
+              <font size="4"><strong>点此日亚购买</strong></font>
+            </a>
+            """.trimIndent()
+        ).selectFirst("a")!!
+        val linkedWrapper = Jsoup.parse(
+            """<font size="4"><a href="https://example.com">外部链接</a></font>"""
+        ).selectFirst("font")!!
+        val plainTitle = Jsoup.parse(
+            """<strong><font size="3">夏梦4</font></strong>"""
+        ).selectFirst("strong")!!
+
+        assertTrue(isReaderLinkedTitleElement(directLink))
+        assertTrue(isReaderLinkedTitleElement(linkedWrapper))
+        assertFalse(isReaderLinkedTitleElement(plainTitle))
+    }
+
+    @Test
+    fun proseLineEndingWithContinuationPunctuationIsNotEligibleForLeadingTitle() {
+        assertTrue(
+            endsWithReaderTitleContinuationPunctuation(
+                "处在人生的悬崖边的奔三声优『吉冈奏绘』、"
+            )
+        )
+        assertTrue(endsWithReaderTitleContinuationPunctuation("故事从这里开始，"))
+        assertFalse(endsWithReaderTitleContinuationPunctuation("夏梦4"))
+    }
+
+    @Test
     fun splitReaderNumberedChapterSegments_splitsEmbeddedAndLeadingChapterNumbers() {
         val embedded = splitReaderNumberedChapterSegments(
             "卖身之事\n著：小野美由纪\n1\n当我得到这闪耀着银色光芒的新身体时……"
