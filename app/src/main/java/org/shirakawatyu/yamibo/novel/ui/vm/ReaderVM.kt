@@ -1335,7 +1335,9 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
                         if (sb.isBlank() && child.tagName().lowercase() == "br") continue
                         return finalizeTitleBar(sb.toString())
                     }
-                    // 内联元素（strong/b/font/i/a/span 等）取其文本继续累积。
+                    // 购买、引用和楼层导航链接不是正文标题，不能把链接文字收进章节目录。
+                    if (isReaderLinkedTitleElement(child)) return null
+                    // 其余内联元素（strong/b/font/i/span 等）取其文本继续累积。
                     sb.append(child.text())
                 }
                 else -> {}
@@ -1351,7 +1353,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val cleaned = title.replace(Regex("^[#＃]+\\s*"), "").trim()
         if (cleaned.isEmpty() || cleaned.length > 24) return null
         if (cleaned.first() in titleBarLeadingDeny) return null
-        if (cleaned.last() in titleBarTrailingDeny) return null
+        if (
+            cleaned.last() in titleBarTrailingDeny ||
+            endsWithReaderTitleContinuationPunctuation(cleaned)
+        ) {
+            return null
+        }
         return cleaned
     }
 
