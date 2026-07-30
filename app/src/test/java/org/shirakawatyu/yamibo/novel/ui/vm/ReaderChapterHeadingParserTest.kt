@@ -3,10 +3,52 @@ package org.shirakawatyu.yamibo.novel.ui.vm
 import org.jsoup.Jsoup
 import org.shirakawatyu.yamibo.novel.util.reader.HTMLUtil
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderChapterHeadingParserTest {
+    @Test
+    fun linkedFirstFloorDirectoryDoesNotCreateDuplicateChapterHeadings() {
+        val node = Jsoup.parseBodyFragment(
+            """
+            <div class="message" data-post-id="40946503">
+              <div><a href="forum.php?mod=viewthread&amp;tid=546124">7.14更新了</a></div>
+              <div>—————目录—————</div>
+              <div><strong>第一章</strong></div>
+              <div><a href="forum.php?mod=redirect&amp;goto=findpost&amp;ptid=544422&amp;pid=40946515">『潮味未至』 其一</a></div>
+              <div><a href="forum.php?mod=redirect&amp;goto=findpost&amp;ptid=544422&amp;pid=40946523">『潮味未至』 其二</a></div>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        assertTrue(isReaderLinkedChapterDirectory(node, "544422"))
+
+        val marked = markReaderEmbeddedChapterHeadings(node, "544422")
+        assertFalse(marked.html().contains("YAMIBO_CHAPTER_START"))
+    }
+
+    @Test
+    fun directoryLabelAndSinglePostLinkAreNotEnoughToSuppressHeadings() {
+        val node = Jsoup.parseBodyFragment(
+            """
+            <div class="message">
+              <div>返回目录</div>
+              <div><strong>第一章</strong></div>
+              <a href="forum.php?mod=redirect&amp;goto=findpost&amp;ptid=544422&amp;pid=40946515">查看本楼</a>
+            </div>
+            """.trimIndent()
+        ).selectFirst(".message")!!
+
+        assertFalse(isReaderLinkedChapterDirectory(node, "544422"))
+        assertTrue(
+            markReaderEmbeddedChapterHeadings(node, "544422")
+                .html()
+                .contains("YAMIBO_CHAPTER_START")
+        )
+    }
+
     @Test
     fun extractReaderTextChapterHeading_stripsMarkdownHeadingMarker() {
         assertEquals("第一话", extractReaderTextChapterHeading("# 第一话"))
