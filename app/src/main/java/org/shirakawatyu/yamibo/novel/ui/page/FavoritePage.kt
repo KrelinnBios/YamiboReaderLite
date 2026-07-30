@@ -1376,8 +1376,8 @@ fun FavoritePage(
                         }
                     ) {
                         Text(
-                            "删除",
-                            color = MaterialTheme.colorScheme.primary,
+                            "确认",
+                            color = MaterialTheme.colorScheme.error,
                             fontSize = 15.sp
                         )
                     }
@@ -1399,7 +1399,6 @@ fun FavoritePage(
                 title = {
                     Text(
                         "删除收藏",
-                        color = MaterialTheme.colorScheme.error,
                         fontSize = 18.sp
                     )
                 },
@@ -1419,7 +1418,7 @@ fun FavoritePage(
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("确认删除", fontSize = 15.sp)
+                        Text("确认", fontSize = 15.sp)
                     }
                 },
                 dismissButton = {
