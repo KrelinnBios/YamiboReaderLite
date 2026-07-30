@@ -22,6 +22,9 @@ private const val readerEmbeddedHeadingStartMarker = "|||YAMIBO_CHAPTER_START|||
 private const val readerEmbeddedHeadingEndMarker = "|||YAMIBO_CHAPTER_END|||"
 private const val readerEmbeddedHeadingSelector =
     "strong, b, h1, h2, h3, h4, center, div[align=center], font[size=4], font[size=5], font[size=6], font[size=7]"
+private val readerDirectoryLabelRegex = Regex("""(?:目录|目錄)""")
+private val readerLinkedPostTidRegex = Regex("""(?:[?&](?:ptid|tid)=(\d+))""")
+private val readerLinkedPostPidRegex = Regex("""(?:[?&]pid=(\d+)|#pid(\d+))""")
 
 internal data class ReaderNumberedChapterSegment(
     val text: String,
@@ -31,6 +34,32 @@ internal data class ReaderNumberedChapterSegment(
 internal fun containsReaderChapterStart(
     segments: List<ReaderNumberedChapterSegment>
 ): Boolean = segments.any { it.title != null }
+
+/**
+ * 识别一楼中由作者维护的本帖楼层目录。
+ *
+ * 目录里的“第一章/第二章”和更新说明只是导航分组，不是正文章节；真正章节会在后续楼层
+ * 再按 pid 与楼层标题解析。必须同时出现目录文字和至少两个指向当前帖不同 pid 的链接，
+ * 避免普通正文里提到“目录”或偶尔引用一个楼层时被误判。
+ */
+internal fun isReaderLinkedChapterDirectory(node: Element, threadId: String): Boolean {
+    if (threadId.isBlank() || !readerDirectoryLabelRegex.containsMatchIn(node.text())) return false
+
+    val linkedPostIds = node.select("a[href]")
+        .asSequence()
+        .mapNotNull { link ->
+            val href = link.attr("href").replace("&amp;", "&")
+            val linkedTid = readerLinkedPostTidRegex.find(href)?.groupValues?.get(1)
+            val pidMatch = readerLinkedPostPidRegex.find(href) ?: return@mapNotNull null
+            val linkedPid = pidMatch.groupValues.drop(1).firstOrNull { it.isNotBlank() }
+            linkedPid?.takeIf { linkedTid == threadId }
+        }
+        .distinct()
+        .take(2)
+        .count()
+
+    return linkedPostIds >= 2
+}
 
 private fun normalizeReaderHeading(value: String): String = value
     .replace(' ', ' ')
@@ -152,8 +181,17 @@ internal fun splitReaderNumberedChapterSegments(text: String): List<ReaderNumber
  * Discuz 帖子常在同一楼层连续发布多章，且标题由多层 strong/font 嵌套。这里只标记最外层
  * 的短标题元素，避免同一标题被重复拆分；标记会在正文统一简繁转换后再解析。
  */
-internal fun markReaderEmbeddedChapterHeadings(node: Element): Element {
+internal fun markReaderEmbeddedChapterHeadings(
+    node: Element,
+    linkedDirectoryThreadId: String? = null
+): Element {
     val clone = node.clone()
+    if (
+        linkedDirectoryThreadId != null &&
+        isReaderLinkedChapterDirectory(clone, linkedDirectoryThreadId)
+    ) {
+        return clone
+    }
     clone.select(readerEmbeddedHeadingSelector)
         .asSequence()
         .map { element -> element to normalizeReaderHeading(element.text()) }
