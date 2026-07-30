@@ -70,6 +70,7 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.bean.HistoryEntry
 import org.shirakawatyu.yamibo.novel.global.GlobalData
+import org.shirakawatyu.yamibo.novel.ui.theme.YamiboColors
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
@@ -469,8 +470,8 @@ fun HistoryPage(navController: NavController) {
     val scope = rememberCoroutineScope()
 
     val pageBackground = MaterialTheme.colorScheme.background
-    val topBarColor = MaterialTheme.colorScheme.primary
-    val topBarContentColor = MaterialTheme.colorScheme.onPrimary
+    val topBarColor = darkThemeColor(YamiboColors.onSurface) { statusBar }
+    val topBarContentColor = darkThemeColor(Color.Black) { onPrimary }
     // 搜索框背景色：暗黑模式下与历史记录卡片（tertiary）一致，浅色模式保持 surfaceVariant。
     val searchBoxContainerColor = darkModeColor(
         light = MaterialTheme.colorScheme.surfaceVariant,
