@@ -1378,8 +1378,12 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         val messageNodes = doc.getElementsByClass("message")
         if (messageNodes.isEmpty()) return result
 
+        val threadId = extractTid()
+        val linkedDirectoryMessages = messageNodes.map { node ->
+            isReaderLinkedChapterDirectory(node, threadId)
+        }
         val rawTexts = messageNodes.map { node ->
-            HTMLUtil.toText(markReaderEmbeddedChapterHeadings(node).html())
+            HTMLUtil.toText(markReaderEmbeddedChapterHeadings(node, threadId).html())
         }
         val delimiter = "|||YAMIBO_SEP|||"
         val combinedText = rawTexts.joinToString(delimiter)
@@ -1405,9 +1409,13 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
             (convertedTexts.getOrElse(i) { rawTexts[i] })
                 .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         }
-        val dividerHeadings = messageNodes.map { node ->
-            extractReaderChapterHeadingAfterDivider(node)
-                ?.let { convertChineseIfNeeded(it, translationMode) }
+        val dividerHeadings = messageNodes.mapIndexed { index, node ->
+            if (linkedDirectoryMessages[index]) {
+                null
+            } else {
+                extractReaderChapterHeadingAfterDivider(node)
+                    ?.let { convertChineseIfNeeded(it, translationMode) }
+            }
         }
         val usesDividerChapterHeadings = dividerHeadings.any { it != null }
 
@@ -1415,6 +1423,7 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
         // 命中的楼层才开启新章节，其余楼层视为上一章延续，不再把简介/闲聊/致谢/正文句当成章节。
         // 整帖都识别不到时，回退到旧的「取楼层首行」逻辑，兼容普通排版的小说。
         val detectedHeadings: List<Pair<String, Boolean>?> = messageNodes.indices.map { i ->
+            if (linkedDirectoryMessages[i]) return@map null
             val firstLine = firstLines[i]
             if (firstLine.contains(replyRegex)) return@map null
             val textHeading = extractReaderTextChapterHeading(firstLine)
