@@ -18,6 +18,7 @@ private val readerEmbeddedChineseChapterHeadingRegex = Regex(
     """^(?:[零〇一二三四五六七八九十百千万兩两\d]{1,8}[、，,.．]\s*\S.+|第[零〇一二三四五六七八九十百千万兩两\d]+其[零〇一二三四五六七八九十百千万兩两\d]+[：:]\s*\S.+)$"""
 )
 private val readerHeadingTrailingDeny = "。！？!?".toSet()
+private val readerTitleContinuationPunctuation = "、，,；;：:".toSet()
 private const val readerEmbeddedHeadingStartMarker = "|||YAMIBO_CHAPTER_START|||"
 private const val readerEmbeddedHeadingEndMarker = "|||YAMIBO_CHAPTER_END|||"
 private const val readerEmbeddedHeadingSelector =
@@ -67,6 +68,17 @@ private fun normalizeReaderHeading(value: String): String = value
     .trim()
     .replace(Regex("^[#＃]+\\s*"), "")
     .trim()
+
+/** 带 href 的链接属于购买、引用或楼层导航，不作为正文开头的章节标题。 */
+internal fun isReaderLinkedTitleElement(element: Element): Boolean {
+    return (element.tagName().equals("a", ignoreCase = true) && element.hasAttr("href")) ||
+        element.selectFirst("a[href]") != null
+}
+
+/** 以连接性标点结尾的短句仍是正文片段，不作为章节标题。 */
+internal fun endsWithReaderTitleContinuationPunctuation(value: String): Boolean {
+    return value.lastOrNull() in readerTitleContinuationPunctuation
+}
 
 /** 提取楼层首行的“第 N 话/番外/后记”等章节标题，并兼容作者使用的 Markdown # 前缀。 */
 internal fun extractReaderTextChapterHeading(firstLine: String): String? {
