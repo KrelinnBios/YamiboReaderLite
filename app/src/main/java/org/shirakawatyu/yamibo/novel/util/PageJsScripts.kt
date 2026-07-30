@@ -2585,7 +2585,19 @@ $styleString
                     var pending = read(PENDING_KEY);
                     var target = fresh(pending) ? targetUrl(pending) : '';
                     if (target) args[0] = target;
-                    return original.apply(this, args);
+                    var result = original.apply(this, args);
+                    if (fresh(pending)) {
+                        setTimeout(function() {
+                            var current = parseUrl(location.href);
+                            if (threadId(current) === String(pending.tid || '')) {
+                                scrollToPost(pending.pid, function() {
+                                    remove(PENDING_KEY);
+                                    remove(CONTEXT_KEY);
+                                });
+                            }
+                        }, 0);
+                    }
+                    return result;
                 };
                 wrapped.__yamiboPreserveRatePosition = true;
                 window.succeedhandle_rate = wrapped;
@@ -2610,14 +2622,19 @@ $styleString
                 }, 15000);
             }
 
-            function scrollToPost(pid) {
+            function scrollToPost(pid, onFound) {
+                var normalizedPid = String(pid || '');
                 var attempts = 0;
                 function scroll() {
-                    var post = document.getElementById('pid' + String(pid || ''));
+                    var post =
+                        document.getElementById('pid' + normalizedPid) ||
+                        document.getElementById('post_' + normalizedPid) ||
+                        document.getElementById('postmessage_' + normalizedPid);
                     if (post) {
                         try { post.scrollIntoView({ block: 'center', inline: 'nearest' }); }
                         catch (e) { post.scrollIntoView(); }
-                    } else if (++attempts < 6) {
+                        if (typeof onFound === 'function') onFound();
+                    } else if (++attempts < 12) {
                         setTimeout(scroll, attempts * 150);
                     }
                 }
@@ -2658,9 +2675,10 @@ $styleString
             current.hash = '';
             original.hash = '';
             if (current.href === original.href) {
-                remove(PENDING_KEY);
-                remove(CONTEXT_KEY);
-                scrollToPost(pending.pid);
+                scrollToPost(pending.pid, function() {
+                    remove(PENDING_KEY);
+                    remove(CONTEXT_KEY);
+                });
             } else {
                 window.location.replace(target);
             }
