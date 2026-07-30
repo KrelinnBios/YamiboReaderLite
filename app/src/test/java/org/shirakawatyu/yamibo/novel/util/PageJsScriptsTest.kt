@@ -73,7 +73,12 @@ class PageJsScriptsTest {
         assertTrue(script.contains("window.succeedhandle_rate"))
         assertTrue(script.contains("url.hash = 'pid'"))
         assertTrue(script.contains("window.location.replace(target)"))
-        assertTrue(script.contains("scrollIntoView"))
+        assertTrue(script.contains("var result = original.apply(this, args)"))
+        assertTrue(script.contains("scrollToPost(pending.pid, function()"))
+        assertTrue(script.contains("document.getElementById('pid' + normalizedPid)"))
+        assertTrue(script.contains("document.getElementById('post_' + normalizedPid)"))
+        assertTrue(script.contains("document.getElementById('postmessage_' + normalizedPid)"))
+        assertTrue(script.contains("post.scrollIntoView"))
     }
 
     @Test
