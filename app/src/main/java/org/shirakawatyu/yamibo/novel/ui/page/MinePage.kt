@@ -40,6 +40,8 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1353,12 +1355,23 @@ fun MinePage(
     }
     val lockedStatusHeight = lockedStatusHeightValue.dp
     val isFullscreen = isFullscreenState.value || autoOpenMangaMode
+    val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+
+    LaunchedEffect(isFullscreen, isImeVisible) {
+        bottomNavBarVM.setBottomNavBarVisibility(!isFullscreen && !isImeVisible)
+    }
+
     val topSpacerColor = if (isFullscreen) Color.Black else darkThemeColor(YamiboColors.primary) { statusBar }
-    val bottomPad = if (isFullscreen) lockedNavHeight else (lockedNavHeight + 50.dp)
+    val bottomPad = when {
+        isFullscreen -> lockedNavHeight
+        isImeVisible -> 0.dp
+        else -> lockedNavHeight + 50.dp
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .background(if (isFullscreen) Color.Black else MaterialTheme.colorScheme.background)
     ) {
         Spacer(
