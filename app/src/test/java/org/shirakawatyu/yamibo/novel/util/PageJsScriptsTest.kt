@@ -6,6 +6,16 @@ import org.junit.Test
 
 class PageJsScriptsTest {
     @Test
+    fun forumChromeKeepsPrivateMessageComposerVisible() {
+        val css = PageJsScripts.getForumChromeHideCss()
+
+        assertTrue(css.contains(".foot.flex-box:not(.foot_reply):not(.msg_post)"))
+        assertTrue(css.contains("#pmform .foot_height { display: block !important; }"))
+        assertTrue(css.contains("#pmform .foot.msg_post { display: flex !important; }"))
+        assertFalse(css.contains(".foot.flex-box:not(.foot_reply) {"))
+    }
+
+    @Test
     fun bbsNavigationInterceptsThreadLinksBeforeLegacyListHandler() {
         val script = PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS
         val nativeNavigationIndex = script.indexOf("BBS_THREAD_NAVIGATION_JS")
