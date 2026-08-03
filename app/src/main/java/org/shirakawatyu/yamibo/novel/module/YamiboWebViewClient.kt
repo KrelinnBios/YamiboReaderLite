@@ -259,9 +259,8 @@ open class YamiboWebViewClient : WebViewClient() {
     protected fun applyHideCss(view: WebView?, currentUrl: String?) {
         val url = currentUrl ?: view?.url ?: ""
 
-        // 隐藏底部栏
-        var css =
-            ".foot.flex-box:not(.foot_reply) { display: none !important; } .foot_height { display: none !important; }"
+        // 隐藏论坛全局底栏；保留私信会话里的输入栏和占位，确保可以发送消息。
+        var css = PageJsScripts.getForumChromeHideCss()
 
         // 隐藏顶部栏（仅在自己的主页 mycenter=1 时生效）
         if (url.contains("mycenter=1")) {
