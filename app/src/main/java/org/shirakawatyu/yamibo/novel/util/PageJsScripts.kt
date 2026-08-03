@@ -6,6 +6,17 @@ import org.shirakawatyu.yamibo.novel.util.theme.MemberSpaceGuard
 
 object PageJsScripts {
 
+    /**
+     * 隐藏论坛自带的全局底栏，避免与应用底栏重复；私信会话的发送栏同样使用
+     * `.foot` / `.foot_height`，必须单独保留，否则只能查看消息而无法回复。
+     */
+    fun getForumChromeHideCss(): String = """
+        .foot.flex-box:not(.foot_reply):not(.msg_post) { display: none !important; }
+        .foot_height { display: none !important; }
+        #pmform .foot_height { display: block !important; }
+        #pmform .foot.msg_post { display: flex !important; }
+    """.trimIndent().replace("\n", " ")
+
     private fun combineJs(vararg namedScripts: Pair<String, String>): String {
         return namedScripts.joinToString("\n;\n") { (name, script) ->
             """
