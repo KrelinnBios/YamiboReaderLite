@@ -337,8 +337,8 @@ open class YamiboWebViewClient : WebViewClient() {
      * 五个论坛 WebView（论坛/我的/其他帖子/小说原帖/漫画兜底）共用的链接跳转预处理，按顺序：
      * 1) 非 http(s) 协议与站外链接交给系统（浏览器/对应应用）打开；
      * 2) 电脑版专属页（标签页）改写 mobile=no，避免手机版会话下落到「提示信息→首页」；
-     * 3) 手机版会话下为无版本参数的常规论坛跳转补 mobile=2；用户主动切到电脑版后，
-     *    后续跳转尊重电脑版会话，标签页和电脑版个人空间也继续沿用现有特殊流程。
+     * 3) 常规论坛跳转统一保持用户当前选择的模板：手机版补 mobile=2，电脑版补 mobile=no；
+     *    标签页和电脑版个人空间继续沿用现有特殊流程。
      * 返回非 null 表示已消费该跳转，调用方直接 return；返回 null 表示继续调用方自己的逻辑。
      */
     protected fun handleCommonUrlOverride(view: WebView?, url: String?): Boolean? {
@@ -358,7 +358,17 @@ open class YamiboWebViewClient : WebViewClient() {
             view?.loadUrl(rewritten)
             return true
         }
-        YamiboPostLinkUtil.forceMobileForumPageUrl(safeUrl, userSelectedDesktopTemplate)?.let { rewritten ->
+        val desktopSession = userSelectedDesktopTemplate ||
+                YamiboPostLinkUtil.isDesktopSessionCookie(
+                    runCatching {
+                        CookieManager.getInstance().getCookie("https://bbs.yamibo.com")
+                    }.getOrNull()
+                )
+        YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+            safeUrl,
+            desktopSession,
+            view?.url
+        )?.let { rewritten ->
             view?.loadUrl(rewritten)
             return true
         }
