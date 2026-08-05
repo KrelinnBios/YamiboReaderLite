@@ -747,12 +747,25 @@ fun BBSPage(
     }
     val searchNavApi = remember {
         object {
-            @JavascriptInterface
-            fun navigateToPost(url: String) {
+            private fun postNavigation(url: String) {
                 Handler(Looper.getMainLooper()).post {
                     GlobalData.pendingClipboardUrl.value = url
                     GlobalData.lastClipboardUrl = url
                 }
+            }
+
+            @JavascriptInterface
+            fun navigateToPost(url: String) {
+                postNavigation(url)
+            }
+
+            @JavascriptInterface
+            fun navigateToPostWithTemplate(url: String, desktopTemplate: Boolean) {
+                val targetUrl = YamiboPostLinkUtil.normalizePostUrlForTemplate(
+                    url = url,
+                    desktopTemplate = desktopTemplate
+                ) ?: return
+                postNavigation(targetUrl)
             }
         }
     }

@@ -23,7 +23,9 @@ class PageJsScriptsTest {
 
         assertTrue(nativeNavigationIndex >= 0)
         assertTrue(legacyListHandlerIndex > nativeNavigationIndex)
-        assertTrue(script.contains("window.AndroidSearchNav.navigateToPost(link.href)"))
+        assertTrue(script.contains("document.getElementById('toptb')"))
+        assertTrue(script.contains("navigateToPostWithTemplate(link.href, desktopTemplate)"))
+        assertTrue(script.contains("navigateToPost(link.href)"))
         assertTrue(script.contains("event.stopImmediatePropagation()"))
     }
 

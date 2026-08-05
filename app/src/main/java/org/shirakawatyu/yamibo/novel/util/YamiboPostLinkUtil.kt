@@ -36,6 +36,19 @@ object YamiboPostLinkUtil {
         return extractPostUrl(url)
     }
 
+    /**
+     * 论坛页内点击帖子时沿用当前页面模板。页面脚本可直接根据 DOM 判断电脑版，
+     * 避免无 mobile 参数的电脑版 SEO 链接先被直达流程补成 mobile=2。
+     */
+    fun normalizePostUrlForTemplate(url: String?, desktopTemplate: Boolean): String? {
+        val normalized = normalizePostUrl(url) ?: return null
+        if (!desktopTemplate) return normalized
+        return normalizeForumPageTemplateUrl(
+            url = normalized,
+            desktopSession = true
+        ) ?: normalized
+    }
+
     private fun normalizeCandidate(candidate: String): String? {
         val trimmed = candidate.trimEnd { it in trailingPunctuation }
         val withScheme = if (trimmed.startsWith("http", ignoreCase = true)) {

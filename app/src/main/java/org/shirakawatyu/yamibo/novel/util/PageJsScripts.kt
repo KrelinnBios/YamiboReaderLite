@@ -319,6 +319,14 @@ object PageJsScripts {
                          (path === 'forum.php' && url.searchParams.get('mod') === 'viewthread' && /^\d+${'$'}/.test(url.searchParams.get('tid') || '')));
                 } catch (e) { return false; }
             }
+            function navigateToPost(link) {
+                var desktopTemplate = !!document.getElementById('toptb');
+                if (window.AndroidSearchNav.navigateToPostWithTemplate) {
+                    window.AndroidSearchNav.navigateToPostWithTemplate(link.href, desktopTemplate);
+                } else {
+                    window.AndroidSearchNav.navigateToPost(link.href);
+                }
+            }
             document.addEventListener('click', function(event) {
                 if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
@@ -332,7 +340,7 @@ object PageJsScripts {
                 if (!isThread(link)) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                window.AndroidSearchNav.navigateToPost(link.href);
+                navigateToPost(link);
             }, true);
         })();
     """.trimIndent()

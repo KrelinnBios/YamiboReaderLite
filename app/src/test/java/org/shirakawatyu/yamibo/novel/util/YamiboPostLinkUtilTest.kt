@@ -324,6 +324,23 @@ class YamiboPostLinkUtilTest {
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=44&mobile=no"
             )
         )
+        // 列表点击实际先走 AndroidSearchNav；桥接后还会再经过一次直达归一化。
+        val bridgedUrl = YamiboPostLinkUtil.normalizePostUrlForTemplate(
+            "https://bbs.yamibo.com/thread-574592-1-1.html",
+            desktopTemplate = true
+        )
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
+            bridgedUrl
+        )
+        assertEquals(bridgedUrl, YamiboPostLinkUtil.normalizePostUrl(bridgedUrl))
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=2",
+            YamiboPostLinkUtil.normalizePostUrlForTemplate(
+                "https://bbs.yamibo.com/thread-574592-1-1.html",
+                desktopTemplate = false
+            )
+        )
     }
 
     @Test
