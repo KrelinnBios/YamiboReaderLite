@@ -70,21 +70,21 @@ class YamiboPostLinkUtilTest {
         // 手机版会话中，无版本参数的帖子与楼层跳转必须补 mobile=2
         assertEquals(
             "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162",
                 desktopSession = false
             )
         )
         assertEquals(
             "https://bbs.yamibo.com/thread-520058-1-1.html?mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-520058-1-1.html",
                 desktopSession = false
             )
         )
         assertEquals(
             "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541&mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541",
                 desktopSession = false
             )
@@ -92,21 +92,21 @@ class YamiboPostLinkUtilTest {
         // 版块下一页同样补参数，m 子域名顺便归一到主论坛域名
         assertEquals(
             "https://bbs.yamibo.com/forum-30-2.html?mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum-30-2.html",
                 desktopSession = false
             )
         )
         assertEquals(
             "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&page=2&mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&page=2",
                 desktopSession = false
             )
         )
         assertEquals(
             "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://m.yamibo.com/thread-520058-2-1.html",
                 desktopSession = false
             )
@@ -150,8 +150,7 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/?mobile=yes"
             )
         )
-        assertEquals(
-            false,
+        assertNull(
             YamiboPostLinkUtil.explicitDesktopTemplateSelection(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2"
             )
@@ -177,6 +176,13 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162"
             )
         )
+        assertEquals(
+            false,
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no"
+            )
+        )
         // 分页、标签页携带 mobile 参数不代表用户切换了全局模板
         assertNull(
             YamiboPostLinkUtil.explicitDesktopTemplateSelection(
@@ -197,68 +203,87 @@ class YamiboPostLinkUtilTest {
     }
 
     @Test
-    fun forceMobileRespectsExplicitTemplateAndDesktopSession() {
-        // 链接已经明确指定模板时视为用户切换，不再改写
+    fun normalizesForumLinksForSelectedTemplate() {
+        // 当前模板已经匹配时不再改写
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
                 desktopSession = false
             )
         )
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mobile=no",
                 desktopSession = false
             )
         )
         assertEquals(
             "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&page=2&mobile=2",
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&page=2&mobile=no",
                 desktopSession = false
             )
         )
-        // 用户已经点过电脑版后，无参数的版块和帖子跳转也继续保持电脑版
-        assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+        // 用户已经点过电脑版后，无参数或错误带 mobile=2 的普通链接都继续使用电脑版
+        assertEquals(
+            "https://bbs.yamibo.com/forum-30-2.html?mobile=no",
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum-30-2.html",
                 desktopSession = true
             )
         )
+        assertEquals(
+            "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no",
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
+            )
+        )
+        assertEquals(
+            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=no",
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
+            )
+        )
+        // 同页 mobile=2 才是明确点击「手机版」，不拦截改写
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
-                "https://bbs.yamibo.com/thread-520058-2-1.html",
-                desktopSession = true
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=2",
+                desktopSession = false,
+                currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
             )
         )
         // 电脑版专属标签页、明确进入的电脑版空间页仍保留电脑版
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/misc.php?mod=tag&id=20563&mobile=no",
                 desktopSession = false
             )
         )
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/home.php?mod=space&uid=399468&mobile=no",
                 desktopSession = false
             )
         )
         // 非常规论坛 HTML 页面、附件和站外链接不改写
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/search.php?mod=forum&mobile=no",
                 desktopSession = false
             )
         )
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/data/attachment/forum/example.jpg",
                 desktopSession = false
             )
         )
         assertNull(
-            YamiboPostLinkUtil.forceMobileForumPageUrl(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://example.com/forum.php?mod=viewthread&tid=1",
                 desktopSession = false
             )
