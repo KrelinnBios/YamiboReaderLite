@@ -111,24 +111,27 @@ object YamiboPostLinkUtil {
     }
 
     /**
-     * App 默认保持当前模板：尚未主动切到电脑版时，Discuz 的分页或跳转链接如果没有
-     * mobile 参数，就补上 mobile=2，避免版块/帖子下一页因 cookie 或链接缺失突然变成电脑版。
-     * 只有明确的论坛模板切换入口才改变用户选择；普通分页即使错误带有 mobile=no，在用户
-     * 尚未切换前也会纠正为手机版。当前已经是电脑版会话时，后续跳转保持电脑版。
+     * App 默认保持用户当前选择的模板：手机版会话统一使用 mobile=2，电脑版会话统一使用
+     * mobile=no。Discuz 的电脑版列表仍可能给普通帖子链接附带 mobile=2，不能因此把它
+     * 当成用户主动切回手机版；只有明确的同页/论坛首页模板切换入口才改变用户选择。
      *
      * 标签页和明确进入的个人空间沿用现有电脑版流程；静态资源、附件、搜索等也不属于
      * 常规论坛页面。无需改写时返回 null，避免 loadUrl 循环。
      */
-    fun forceMobileForumPageUrl(url: String?, desktopSession: Boolean): String? {
+    fun normalizeForumPageTemplateUrl(
+        url: String?,
+        desktopSession: Boolean,
+        currentUrl: String? = null
+    ): String? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
         if (!isMobileForumPage(parsed)) return null
-        if (explicitDesktopTemplateSelection(url) != null) return null
-        if (desktopSession) return null
+        if (explicitDesktopTemplateSelection(url, currentUrl) != null) return null
+        val expectedMobile = if (desktopSession) "no" else "2"
         val mobileValues = parsed.queryParameterValues("mobile")
         if (mobileValues.size == 1 &&
-            (mobileValues.single().equals("2", ignoreCase = true) ||
-                    mobileValues.single().equals("yes", ignoreCase = true))
+            (mobileValues.single().equals(expectedMobile, ignoreCase = true) ||
+                    !desktopSession && mobileValues.single().equals("yes", ignoreCase = true))
         ) {
             return null
         }
@@ -136,48 +139,43 @@ object YamiboPostLinkUtil {
             .scheme("https")
             .host("bbs.yamibo.com")
             .removeAllQueryParameters("mobile")
-            .addQueryParameter("mobile", "2")
+            .addQueryParameter("mobile", expectedMobile)
             .build()
             .toString()
     }
 
     /**
-     * 识别明确的模板选择。任何 mobile=2/yes 页面都能确认当前已回到手机版；论坛首页的
-     * 纯 mobile=no，或手机版当前页面仅改为 mobile=no，均是用户点击模板切换入口。
-     * 其它分页或特殊页面单独携带的 mobile=no 不算全局模板选择。
+     * 识别明确的模板选择。论坛首页只有 mobile 参数，或目标与当前页面仅 mobile 参数不同，
+     * 才是用户点击模板切换入口。其它页面单独携带 mobile=2/no 可能只是站点生成的普通链接，
+     * 不能据此改变用户选择。
      */
     fun explicitDesktopTemplateSelection(url: String?, currentUrl: String? = null): Boolean? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
         val values = parsed.queryParameterValues("mobile")
         if (values.size != 1) return null
-        return when (values.single()?.lowercase()) {
+        val selected = when (values.single()?.lowercase()) {
             "2", "yes" -> false
-            "no" -> {
-                val isForumHome =
-                    parsed.encodedPath.lowercase() in setOf("/", "/index.php", "/forum.php")
-                val hasOnlyMobile =
-                    parsed.queryParameterNames.all { it.equals("mobile", ignoreCase = true) }
-                true.takeIf {
-                    isForumHome && hasOnlyMobile ||
-                            isSamePageTemplateSwitch(parsed, currentUrl?.toHttpUrlOrNull())
-                }
-            }
-            else -> null
+            "no" -> true
+            else -> return null
+        }
+        val isForumHome =
+            parsed.encodedPath.lowercase() in setOf("/", "/index.php", "/forum.php")
+        val hasOnlyMobile =
+            parsed.queryParameterNames.all { it.equals("mobile", ignoreCase = true) }
+        return selected.takeIf {
+            isForumHome && hasOnlyMobile ||
+                    isSamePageTemplateSwitch(parsed, currentUrl?.toHttpUrlOrNull())
         }
     }
 
     private fun isSamePageTemplateSwitch(target: HttpUrl, current: HttpUrl?): Boolean {
         if (current == null || current.host.lowercase() !in validHosts) return false
         val currentMobile = current.queryParameterValues("mobile")
-        if (currentMobile.size > 1 ||
-            currentMobile.singleOrNull()?.let { value ->
-                !value.equals("2", ignoreCase = true) &&
-                        !value.equals("yes", ignoreCase = true)
-            } == true
-        ) {
-            return false
-        }
+        if (currentMobile.size > 1) return false
+        val targetMobile = target.queryParameter("mobile") ?: return false
+        val currentValue = currentMobile.singleOrNull()
+        if (currentValue != null && currentValue.equals(targetMobile, ignoreCase = true)) return false
         return withoutMobile(target) == withoutMobile(current)
     }
 
