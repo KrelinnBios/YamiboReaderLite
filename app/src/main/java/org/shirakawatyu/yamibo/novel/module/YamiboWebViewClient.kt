@@ -140,6 +140,7 @@ open class YamiboWebViewClient : WebViewClient() {
     private var themeFlashRevealRunnable: Runnable? = null
     private var isSuppressingThemeFlash = false
     private var suppressedThemeFlashUrl: String? = null
+    @Volatile private var currentPageUsesDesktopTemplate = false
 
     init {
         scope.launch {
@@ -304,6 +305,7 @@ open class YamiboWebViewClient : WebViewClient() {
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         YamiboPostLinkUtil.explicitDesktopTemplateSelection(url)?.let { selected ->
             userSelectedDesktopTemplate = selected
+            currentPageUsesDesktopTemplate = selected
         }
         suppressThemeFlashIfNeeded(view, url)
         val targetCookie = currentCookie.ifBlank {
@@ -325,6 +327,7 @@ open class YamiboWebViewClient : WebViewClient() {
     }
 
     override fun onPageCommitVisible(view: WebView?, url: String?) {
+        updateRenderedForumTemplate(view, url)
         applyHideCss(view, url)
         injectCurrentTheme(view, url) {
             injectCurrentLanguage(view, url)
@@ -353,12 +356,14 @@ open class YamiboWebViewClient : WebViewClient() {
         }
         YamiboPostLinkUtil.explicitDesktopTemplateSelection(safeUrl, view?.url)?.let { selected ->
             userSelectedDesktopTemplate = selected
+            currentPageUsesDesktopTemplate = selected
         }
         YamiboPostLinkUtil.normalizePcOnlyPageUrl(safeUrl)?.let { rewritten ->
             view?.loadUrl(rewritten)
             return true
         }
         val desktopSession = userSelectedDesktopTemplate ||
+                currentPageUsesDesktopTemplate ||
                 YamiboPostLinkUtil.isDesktopSessionCookie(
                     runCatching {
                         CookieManager.getInstance().getCookie("https://bbs.yamibo.com")
@@ -373,6 +378,22 @@ open class YamiboWebViewClient : WebViewClient() {
             return true
         }
         return null
+    }
+
+    /**
+     * 电脑版 SEO 页面（如 forum-33-1.html）本身可能不带 mobile=no，Cookie 也可能仍是
+     * mobile=2。以页面实际 DOM 中电脑版特有的 #toptb 为准，确保后续无参数帖子链接
+     * 继续使用电脑版模板。
+     */
+    private fun updateRenderedForumTemplate(view: WebView?, url: String?) {
+        val isPcOnlyTagPage = url?.contains("misc.php", ignoreCase = true) == true &&
+                url.contains("mod=tag", ignoreCase = true)
+        view?.evaluateJavascript(
+            "(function(){return !!document.getElementById('toptb');})()"
+        ) { result ->
+            currentPageUsesDesktopTemplate = !isPcOnlyTagPage &&
+                    result.equals("true", ignoreCase = true)
+        }
     }
 
     private fun openExternalUrl(view: WebView?, url: String): Boolean {
@@ -420,6 +441,7 @@ open class YamiboWebViewClient : WebViewClient() {
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
+        updateRenderedForumTemplate(view, url)
         restoreMobileCookieAfterPcOnlyPage(url)
         url?.let {
             if (it.contains(RequestConfig.BASE_URL)) {
