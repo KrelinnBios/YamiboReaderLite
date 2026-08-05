@@ -145,13 +145,19 @@ object YamiboPostLinkUtil {
     }
 
     /**
-     * 识别明确的模板选择。论坛首页只有 mobile 参数，或目标与当前页面仅 mobile 参数不同，
-     * 才是用户点击模板切换入口。其它页面单独携带 mobile=2/no 可能只是站点生成的普通链接，
-     * 不能据此改变用户选择。
+     * 识别明确的模板选择。电脑版页脚的 showmobile=yes、论坛首页只有 mobile 参数，或目标
+     * 与当前页面仅 mobile 参数不同，才是用户点击模板切换入口。其它页面单独携带
+     * mobile=2/no 可能只是站点生成的普通链接，不能据此改变用户选择。
      */
     fun explicitDesktopTemplateSelection(url: String?, currentUrl: String? = null): Boolean? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
+        val showMobileValues = parsed.queryParameterValues("showmobile")
+        if (showMobileValues.size == 1 &&
+            showMobileValues.single().equals("yes", ignoreCase = true)
+        ) {
+            return false
+        }
         val values = parsed.queryParameterValues("mobile")
         if (values.size != 1) return null
         val selected = when (values.single()?.lowercase()) {
