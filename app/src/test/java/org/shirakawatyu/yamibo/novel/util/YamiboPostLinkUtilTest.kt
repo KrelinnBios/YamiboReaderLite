@@ -150,6 +150,12 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/?mobile=yes"
             )
         )
+        assertEquals(
+            false,
+            YamiboPostLinkUtil.explicitDesktopTemplateSelection(
+                "https://bbs.yamibo.com/forum.php?showmobile=yes"
+            )
+        )
         assertNull(
             YamiboPostLinkUtil.explicitDesktopTemplateSelection(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2"
@@ -256,6 +262,14 @@ class YamiboPostLinkUtilTest {
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
             )
         )
+        // 真实电脑版页脚使用 showmobile=yes 切回手机版，同样不得补回 mobile=no
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?showmobile=yes",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/forum-33-1.html"
+            )
+        )
         // 电脑版专属标签页、明确进入的电脑版空间页仍保留电脑版
         assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
@@ -286,6 +300,28 @@ class YamiboPostLinkUtilTest {
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://example.com/forum.php?mod=viewthread&tid=1",
                 desktopSession = false
+            )
+        )
+    }
+
+    @Test
+    fun desktopMhtListThreadLinksStayDesktop() {
+        // 「海域區」真实样本：列表和帖子都是无 mobile 参数的 SEO URL。
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/thread-574592-1-1.html",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/forum-33-1.html"
+            )
+        )
+        // 「遊戲區」真实样本：列表显式 mobile=no，帖子链接仍没有版本参数。
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574285-1-1.html?mobile=no",
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/thread-574285-1-1.html",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=44&mobile=no"
             )
         )
     }
