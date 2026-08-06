@@ -22,6 +22,7 @@ import org.shirakawatyu.yamibo.novel.bean.Favorite
 import org.shirakawatyu.yamibo.novel.bean.MangaUpdateCheckProfile
 import org.shirakawatyu.yamibo.novel.bean.MangaUpdateCheckStrategy
 import org.shirakawatyu.yamibo.novel.bean.NovelUpdateCheckProfile
+import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.global.YamiboRetrofit
 import org.shirakawatyu.yamibo.novel.network.FavoriteApi
 import org.shirakawatyu.yamibo.novel.network.NovelApi
@@ -30,6 +31,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.CacheMaintenance
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
 import org.shirakawatyu.yamibo.novel.util.CurrentUserUtil
+import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteAddUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteDeleteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.TombstoneQueueUtil
@@ -1096,6 +1098,59 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
                 withContext(Dispatchers.Main) {
                     updateUiList()
                     onToast("网络异常，删除失败")
+                }
+            }
+        }
+    }
+
+    /**
+     * 阅读器收藏按钮：未收藏则添加当前帖子，已收藏则取消收藏。
+     * 以本地收藏数据（DataStore）为准判断当前状态，避免收藏页未打开时 allFavorites 为空导致误判。
+     */
+    fun toggleFavorite(url: String, title: String, tid: String, onToast: (String) -> Unit) {
+        if (GlobalData.currentUid.isBlank()) {
+            onToast("请先登录后再收藏")
+            return
+        }
+        val normalizedUrl = FavoriteUtil.normalizeUrl(url)
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = FavoriteUtil.getFavoriteMapSuspend()[normalizedUrl]
+            withContext(Dispatchers.Main) {
+                if (existing != null) {
+                    deleteFavorite(existing, onToast)
+                } else {
+                    addFavoriteInternal(normalizedUrl, title, tid, onToast)
+                }
+            }
+        }
+    }
+
+    /**
+     * 添加收藏：先调论坛接口收藏帖子，成功后写入本地收藏，再后台静默同步补齐 favId 等远端元数据
+     * （取消收藏依赖 favId）。
+     */
+    private fun addFavoriteInternal(
+        normalizedUrl: String,
+        title: String,
+        tid: String,
+        onToast: (String) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val success = FavoriteAddUtil.addThreadFavorite(tid)
+            withContext(Dispatchers.Main) {
+                if (success) {
+                    stateMutex.withLock {
+                        if (allFavorites.none { it.url == normalizedUrl }) {
+                            allFavorites = listOf(Favorite(title, normalizedUrl)) + allFavorites
+                            FavoriteUtil.saveFavoriteOrder(allFavorites)
+                        }
+                    }
+                    updateUiList()
+                    onToast("收藏成功")
+                    // 后台静默同步，补齐 favId/标题等远端元数据
+                    refreshList(showLoading = false)
+                } else {
+                    onToast("收藏失败，请稍后重试")
                 }
             }
         }

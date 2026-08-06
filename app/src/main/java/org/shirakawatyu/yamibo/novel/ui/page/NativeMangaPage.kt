@@ -45,7 +45,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -57,6 +59,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -131,11 +134,13 @@ import org.shirakawatyu.yamibo.novel.ui.vm.MangaDirectoryVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
+import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaChapter
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaChapterPanel
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaSettingsPanel
 import org.shirakawatyu.yamibo.novel.util.HapticUtil
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
+import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
@@ -168,6 +173,9 @@ fun NativeMangaPage(
         factory = ViewModelFactory(context.applicationContext)
     )
     val bottomNavBarVM: BottomNavBarVM = viewModel(viewModelStoreOwner = context)
+
+    // 收藏流：用于阅读器顶栏展示当前章节是否已收藏（收藏/取消后自动刷新）
+    val favoritesState = FavoriteUtil.getFavoriteFlow().collectAsState(initial = emptyList())
 
     val initialMangaSettings = remember(context) { MangaSettings.getSettings(context) }
     var readMode by rememberSaveable { mutableIntStateOf(initialMangaSettings.readMode) }
@@ -552,6 +560,12 @@ fun NativeMangaPage(
             }
 
             val currentItem = pagesSnapshot.getOrNull(currentIndex)
+
+            // 当前章节帖子是否已收藏（收藏/取消后由收藏流自动刷新）
+            val isCurrentFavorited = remember(currentItem?.chapterUrl, favoritesState.value) {
+                val chapterUrl = currentItem?.chapterUrl ?: return@remember false
+                favoritesState.value.any { it.url == FavoriteUtil.normalizeUrl(chapterUrl) }
+            }
 
             LaunchedEffect(currentItem?.chapterUrl) {
                 currentPostUrlForOriginal = currentItem?.chapterUrl ?: url
@@ -1311,6 +1325,23 @@ fun NativeMangaPage(
                     val currentDirectory = mangaDirVM.currentDirectory
                     val currentChapter =
                         currentDirectory?.chapters?.find { it.tid == currentItem?.tid }
+                    val onToggleFavorite: () -> Unit =
+                        remember(favoriteVM, currentItem?.chapterUrl, currentChapter?.rawTitle) {
+                            {
+                                val chapterUrl = currentItem?.chapterUrl
+                                val tid = chapterUrl?.let(MangaTitleCleaner::extractTidFromUrl)
+                                if (chapterUrl == null || tid == null) {
+                                    YamiboToast.show(message = "无法识别帖子链接，请从原帖页面收藏")
+                                } else {
+                                    val title = currentChapter?.rawTitle
+                                        ?.takeIf(String::isNotBlank)
+                                        ?: currentItem?.chapterTitle ?: chapterUrl
+                                    favoriteVM.toggleFavorite(chapterUrl, title, tid) { msg ->
+                                        YamiboToast.show(message = msg)
+                                    }
+                                }
+                            }
+                        }
                     val chapterTitle = currentChapter?.let { chapter ->
                         val displayNumber = getDisplayChapterNum(
                             chapter.rawTitle,
@@ -1333,7 +1364,7 @@ fun NativeMangaPage(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .fillMaxWidth()
-                            .padding(horizontal = 72.dp)
+                            .padding(start = 72.dp, end = 136.dp)
                     )
                     IconButton(
                         onClick = performExit,
@@ -1345,16 +1376,35 @@ fun NativeMangaPage(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    TextButton(
-                        onClick = returnToOriginalPost,
-                        modifier = Modifier.align(Alignment.CenterEnd)
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "原帖",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        IconButton(onClick = onToggleFavorite) {
+                            Icon(
+                                imageVector = if (isCurrentFavorited) {
+                                    Icons.Filled.Favorite
+                                } else {
+                                    Icons.Outlined.FavoriteBorder
+                                },
+                                contentDescription = if (isCurrentFavorited) "取消收藏" else "收藏",
+                                tint = if (isCurrentFavorited) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                        TextButton(
+                            onClick = returnToOriginalPost
+                        ) {
+                            Text(
+                                "原帖",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

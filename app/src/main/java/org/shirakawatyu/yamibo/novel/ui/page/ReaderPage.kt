@@ -55,9 +55,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -147,10 +149,12 @@ import org.shirakawatyu.yamibo.novel.ui.vm.ReaderVM
 import org.shirakawatyu.yamibo.novel.ui.vm.ViewModelFactory
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
+import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.ContentViewer
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.CustomStatusBar
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
+import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderSpacingOptions
 import org.shirakawatyu.yamibo.novel.util.reader.rememberScreenCorner
@@ -511,6 +515,29 @@ fun ReaderPage(
                     }
                 }
             }
+        val onToggleFavorite: () -> Unit = remember(readerVM, favoriteVM, bookTitle, readerIdentityUrl) {
+            {
+                if (uiState.isFavorited) {
+                    val favorite = favoritesState.value.find { it.url == readerIdentityUrl }
+                    if (favorite != null) {
+                        favoriteVM.deleteFavorite(favorite) { msg -> YamiboToast.show(message = msg) }
+                    }
+                } else {
+                    val tid = MangaTitleCleaner.extractTidFromUrl(readerIdentityUrl)
+                    if (tid == null) {
+                        YamiboToast.show(message = "无法识别帖子链接，请从原帖页面收藏")
+                    } else {
+                        val title = readerVM.currentThreadTitle?.takeIf(String::isNotBlank)
+                            ?: bookTitle
+                        favoriteVM.toggleFavorite(
+                            url = readerIdentityUrl,
+                            title = title,
+                            tid = tid
+                        ) { msg -> YamiboToast.show(message = msg) }
+                    }
+                }
+            }
+        }
         BackHandler(enabled = drawerState.isOpen || showSettings) {
             if (drawerState.isOpen) {
                 scope.launch {
@@ -938,6 +965,21 @@ fun ReaderPage(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
+                            }
+                            IconButton(onClick = onToggleFavorite) {
+                                Icon(
+                                    imageVector = if (uiState.isFavorited) {
+                                        Icons.Filled.Favorite
+                                    } else {
+                                        Icons.Outlined.FavoriteBorder
+                                    },
+                                    contentDescription = if (uiState.isFavorited) "取消收藏" else "收藏",
+                                    tint = if (uiState.isFavorited) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
                             }
                             TextButton(
                                 onClick = {
