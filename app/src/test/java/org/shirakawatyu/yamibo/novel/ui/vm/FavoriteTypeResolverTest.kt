@@ -40,4 +40,52 @@ class FavoriteTypeResolverTest {
 
         assertEquals(2, FavoriteTypeResolver.reliableType(favorite))
     }
+
+    @Test
+    fun novelFidIsNovelFavorite() {
+        val favorite = Favorite(
+            title = "小说",
+            url = "forum.php?mod=viewthread&tid=4",
+            type = 0,
+            sourceFid = "49"
+        )
+
+        assertEquals(true, FavoriteTypeResolver.isNovelFavorite(favorite))
+    }
+
+    @Test
+    fun novelTypeWithoutFidIsNovelFavorite() {
+        val favorite = Favorite(
+            title = "小说",
+            url = "forum.php?mod=viewthread&tid=5",
+            type = 1,
+            sourceFid = null
+        )
+
+        assertEquals(true, FavoriteTypeResolver.isNovelFavorite(favorite))
+    }
+
+    @Test
+    fun mangaFavoriteIsNotNovel() {
+        val favorite = Favorite(
+            title = "漫画",
+            url = "forum.php?mod=viewthread&tid=6",
+            type = 2,
+            sourceFid = "30"
+        )
+
+        assertEquals(false, FavoriteTypeResolver.isNovelFavorite(favorite))
+    }
+
+    @Test
+    fun unknownTypeIsNotNovel() {
+        val favorite = Favorite(
+            title = "未识别收藏",
+            url = "forum.php?mod=viewthread&tid=7",
+            type = 0,
+            sourceFid = null
+        )
+
+        assertEquals(false, FavoriteTypeResolver.isNovelFavorite(favorite))
+    }
 }
