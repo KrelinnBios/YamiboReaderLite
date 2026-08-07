@@ -24,4 +24,14 @@ internal object FavoriteTypeResolver {
         // 没有版区依据的旧 type=3 可能是历史误判，需要重新探测一次。
         else -> 0
     }
+
+    /**
+     * 是否为明确的小说收藏（漫画列表/搜索页做收藏标记时应排除，避免同名小说干扰漫画标记）。
+     * 未知类型（type=0 / sourceFid 为空）不视为小说，保守参与漫画匹配。
+     */
+    fun isNovelFavorite(favorite: Favorite): Boolean = when {
+        favorite.sourceFid in NOVEL_FIDS -> true
+        favorite.type == 1 -> true
+        else -> false
+    }
 }

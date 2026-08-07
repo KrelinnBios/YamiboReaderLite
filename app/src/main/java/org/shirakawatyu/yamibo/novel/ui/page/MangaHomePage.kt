@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -74,12 +76,15 @@ import kotlinx.coroutines.launch
 import org.shirakawatyu.yamibo.novel.bean.MangaHomeItem
 import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.ui.vm.BottomNavBarVM
+import org.shirakawatyu.yamibo.novel.ui.vm.FavoriteTypeResolver
 import org.shirakawatyu.yamibo.novel.ui.vm.MangaHomeVM
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingOverlay
 import org.shirakawatyu.yamibo.novel.ui.widget.OnboardingStep
 import org.shirakawatyu.yamibo.novel.util.DarkThemeColors
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
+import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaProber
+import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import java.net.URLEncoder
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -97,6 +102,16 @@ fun MangaHomePage(
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scope = rememberCoroutineScope()
     var openingTid by remember { mutableStateOf<String?>(null) }
+
+    // 收藏流：构建“已收藏漫画”的去集数标题集合，用于卡片右下角收藏标记。
+    // 收藏流由 DataStore 驱动，收藏页同步、收藏/取消收藏后都会自动触发集合重建。
+    val favoritesState = FavoriteUtil.getFavoriteFlow().collectAsState(initial = emptyList())
+    val favoritedCleanTitles = remember(favoritesState.value) {
+        favoritesState.value
+            .asSequence()
+            .filterNot(FavoriteTypeResolver::isNovelFavorite)
+            .mapTo(HashSet()) { MangaTitleCleaner.getCleanBookName(it.title) }
+    }
 
     OnboardingOverlay(
         page = OnboardingUtil.Page.MANGA_HOME,
@@ -368,6 +383,7 @@ fun MangaHomePage(
                                 item = item,
                                 alternate = index % 2 == 1,
                                 isOpening = openingTid == item.tid,
+                                isFavorited = MangaTitleCleaner.getCleanBookName(item.title) in favoritedCleanTitles,
                                 onClick = {
                                     if (openingTid == null) {
                                         openingTid = item.tid
@@ -440,6 +456,7 @@ private fun MangaHomeRow(
     item: MangaHomeItem,
     alternate: Boolean,
     isOpening: Boolean,
+    isFavorited: Boolean,
     onClick: () -> Unit
 ) {
     val rowColor = if (alternate) {
@@ -447,65 +464,88 @@ private fun MangaHomeRow(
     } else {
         MaterialTheme.colorScheme.surface
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(rowColor)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .width(70.dp)
-                .height(94.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+                .fillMaxWidth()
+                .background(rowColor)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (item.coverUrl != null) {
-                AsyncImage(
-                    model = item.coverUrl,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                )
-            } else {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Surface(
+                modifier = Modifier
+                    .width(70.dp)
+                    .height(94.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                if (item.coverUrl != null) {
+                    AsyncImage(
+                        model = item.coverUrl,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp))
                     )
+                } else {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = listOf(item.authorName, item.date)
+                        .filter(String::isNotBlank)
+                        .joinToString("  "),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (isOpening) {
+                Spacer(Modifier.width(8.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            }
         }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = listOf(item.authorName, item.date)
-                    .filter(String::isNotBlank)
-                    .joinToString("  "),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (isOpening) {
-            Spacer(Modifier.width(8.dp))
-            CircularProgressIndicator(
-                modifier = Modifier.size(22.dp),
-                strokeWidth = 2.dp
-            )
+        // 收藏标记叠加在卡片右下角，不参与布局尺寸，避免卡片结构变化
+        if (isFavorited) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = 8.dp)
+                    .size(22.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = "已收藏",
+                    modifier = Modifier.size(14.dp),
+                    tint = Color(0xFFE53935)
+                )
+            }
         }
     }
 }

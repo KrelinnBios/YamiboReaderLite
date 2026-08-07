@@ -159,7 +159,8 @@ class ReaderVM(private val applicationContext: Context) : ViewModel() {
 
     private val rawContentList = ArrayList<Content>()
     private var latestPage: Int = 0
-    private var currentThreadTitle: String? = null
+    var currentThreadTitle: String? = null
+        private set
     private var currentThreadAuthor: String = ""
     private var currentThreadSection: String = ""
     private var currentAuthorId: String? = null
