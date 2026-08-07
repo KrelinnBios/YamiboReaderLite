@@ -140,6 +140,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaChapterPanel
 import org.shirakawatyu.yamibo.novel.ui.widget.manga.MangaSettingsPanel
 import org.shirakawatyu.yamibo.novel.util.HapticUtil
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
+import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaImagePipeline
@@ -1391,7 +1392,10 @@ fun NativeMangaPage(
                                 tint = if (isCurrentFavorited) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                    darkModeColor(
+                                        light = MaterialTheme.colorScheme.outline,
+                                        dark = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             )
                         }
