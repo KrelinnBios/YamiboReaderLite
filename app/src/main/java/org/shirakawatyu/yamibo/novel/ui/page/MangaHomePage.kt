@@ -526,26 +526,17 @@ private fun MangaHomeRow(
                 )
             }
         }
-        // 收藏标记叠加在卡片右下角，不参与布局尺寸，避免卡片结构变化
+        // 收藏心形标记叠加在卡片右下角，不参与布局尺寸，避免卡片结构变化
         if (isFavorited) {
-            Box(
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = "已收藏",
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 8.dp, bottom = 8.dp)
-                    .size(22.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Favorite,
-                    contentDescription = "已收藏",
-                    modifier = Modifier.size(14.dp),
-                    tint = Color(0xFFE53935)
-                )
-            }
+                    .size(14.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
