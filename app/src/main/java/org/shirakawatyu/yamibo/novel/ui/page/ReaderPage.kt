@@ -153,6 +153,7 @@ import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.ContentViewer
 import org.shirakawatyu.yamibo.novel.ui.widget.reader.CustomStatusBar
 import org.shirakawatyu.yamibo.novel.util.OnboardingUtil
+import org.shirakawatyu.yamibo.novel.util.darkModeColor
 import org.shirakawatyu.yamibo.novel.util.favorite.FavoriteUtil
 import org.shirakawatyu.yamibo.novel.util.manga.MangaTitleCleaner
 import org.shirakawatyu.yamibo.novel.util.reader.ReaderReturnBridge
@@ -977,7 +978,10 @@ fun ReaderPage(
                                     tint = if (uiState.isFavorited) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                        darkModeColor(
+                                            light = MaterialTheme.colorScheme.outline,
+                                            dark = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 )
                             }
