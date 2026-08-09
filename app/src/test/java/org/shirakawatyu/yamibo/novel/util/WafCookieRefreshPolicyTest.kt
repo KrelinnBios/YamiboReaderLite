@@ -5,6 +5,11 @@ import org.junit.Test
 
 class WafCookieRefreshPolicyTest {
     @Test
+    fun initialChallenge_isDeferredUntilVisiblePageStartsLoading() {
+        assertEquals(1_500L, WafCookieRefreshPolicy.INITIAL_REFRESH_DELAY_MS)
+    }
+
+    @Test
     fun successfulChallenge_refreshesBeforeThirtyMinuteExpiry() {
         assertEquals(25 * 60 * 1000L, WafCookieRefreshPolicy.nextDelayMs(succeeded = true))
     }
@@ -20,5 +25,16 @@ class WafCookieRefreshPolicyTest {
 
         assertEquals(true, WafCookieRefreshPolicy.hasRecentSuccess(lastSuccess, 114_999L))
         assertEquals(false, WafCookieRefreshPolicy.hasRecentSuccess(lastSuccess, 115_001L))
+    }
+
+    @Test
+    fun rejectedGet_triggersChallengeForBothKnownWafStatuses() {
+        assertEquals(true, WafCookieRefreshPolicy.shouldRefreshForResponse(444, "GET"))
+        assertEquals(true, WafCookieRefreshPolicy.shouldRefreshForResponse(405, "GET"))
+    }
+
+    @Test
+    fun methodNotAllowedPost_isNotAutomaticallyReplayed() {
+        assertEquals(false, WafCookieRefreshPolicy.shouldRefreshForResponse(405, "POST"))
     }
 }
