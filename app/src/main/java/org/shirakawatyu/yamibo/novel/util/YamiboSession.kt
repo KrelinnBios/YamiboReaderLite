@@ -74,6 +74,14 @@ object YamiboSession {
         }
     }
 
+    fun persistWebViewCookies(url: String): String {
+        val cookie = cookieFor(url)
+        if (cookie.isNotBlank()) {
+            CookieUtil.saveCookie(cookie)
+        }
+        return cookie
+    }
+
     internal fun mergeCookieHeaders(headers: List<String>): String {
         val cookies = linkedMapOf<String, String>()
         headers.forEach { header ->
