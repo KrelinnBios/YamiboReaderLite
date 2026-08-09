@@ -14,6 +14,7 @@ import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshManager
+import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshPolicy
 import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
@@ -216,11 +217,9 @@ class YamiboRetrofit {
                     return@addInterceptor chain.proceed(original)
                 }
 
-                // 若请求已携带 Cookie，
-                // 优先使用它而非 GlobalData 中的缓存值，确保登录/登出后 cookie 及时生效
-                // WebView 负责执行百度 WAF 的 JavaScript 挑战。首批/定时续期尚未完成时先短暂等待，
-                // 随后总是从 CookieManager 合并最新值，不能继续发送 GlobalData 中的旧快照。
-                WafCookieRefreshManager.awaitRefreshIfRunning()
+                // 正常请求不等待后台 WAF 挑战，避免论坛、图片和原生页面被同一个最长 18 秒的
+                // 就绪信号整体阻塞；只有真正收到 444 的请求才在下方触发挑战并重试。
+                // Cookie 仍从 CookieManager 合并最新值，不能继续发送 GlobalData 中的旧快照。
                 val cookie = original.header("Cookie")
                     ?: YamiboSession.cookieFor(original.url.toString())
                 val existingUa = original.header("User-Agent")
@@ -355,9 +354,12 @@ class YamiboRetrofit {
                             request.method == "GET" &&
                             isRateLimitedResponse(response)
                     if (!canRetryResponse) {
-                        val refreshed = request.method == "GET" &&
-                                isRateLimitedResponse(response) &&
-                                WafCookieRefreshManager.refreshAndWait()
+                        val refreshed =
+                            WafCookieRefreshPolicy.shouldRefreshForResponse(
+                                response.code,
+                                request.method
+                            ) &&
+                            WafCookieRefreshManager.refreshAndWait()
                         if (!refreshed) return response
 
                         response.close()
