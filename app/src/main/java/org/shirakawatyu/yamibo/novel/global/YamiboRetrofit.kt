@@ -13,6 +13,8 @@ import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
+import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshManager
+import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.TtlDnsCache
@@ -216,7 +218,11 @@ class YamiboRetrofit {
 
                 // 若请求已携带 Cookie，
                 // 优先使用它而非 GlobalData 中的缓存值，确保登录/登出后 cookie 及时生效
-                val cookie = original.header("Cookie") ?: GlobalData.currentCookie
+                // WebView 负责执行百度 WAF 的 JavaScript 挑战。首批/定时续期尚未完成时先短暂等待，
+                // 随后总是从 CookieManager 合并最新值，不能继续发送 GlobalData 中的旧快照。
+                WafCookieRefreshManager.awaitRefreshIfRunning()
+                val cookie = original.header("Cookie")
+                    ?: YamiboSession.cookieFor(original.url.toString())
                 val existingUa = original.header("User-Agent")
                 val isPcPseudoRequest =
                     existingUa?.contains("Windows NT") == true || existingUa?.contains("Macintosh") == true
@@ -348,7 +354,19 @@ class YamiboRetrofit {
                     val canRetryResponse = attempt < 2 &&
                             request.method == "GET" &&
                             isRateLimitedResponse(response)
-                    if (!canRetryResponse) return response
+                    if (!canRetryResponse) {
+                        val refreshed = request.method == "GET" &&
+                                isRateLimitedResponse(response) &&
+                                WafCookieRefreshManager.refreshAndWait()
+                        if (!refreshed) return response
+
+                        response.close()
+                        sharedConnectionPool.evictAll()
+                        val retriedRequest = request.newBuilder()
+                            .header("Cookie", YamiboSession.cookieFor(request.url.toString()))
+                            .build()
+                        return chain.proceed(retriedRequest)
+                    }
                     // 444 没有可用响应体，丢弃后退避换连接重试。
                     response.close()
                     sharedConnectionPool.evictAll()
