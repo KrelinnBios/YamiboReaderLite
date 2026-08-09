@@ -132,6 +132,7 @@ import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.SignTrigger
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
+import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshManager
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.network.NetworkMonitor
 import java.net.URLDecoder
@@ -244,6 +245,10 @@ class MainActivity : ComponentActivity() {
             bbsWebViewState = createBbsWebView(this, customWebChromeClient)
         }
 
+        // 百度 WAF 的 JS 挑战 Cookie 约 30 分钟过期。先启动屏幕外挑战页，再挂载原生首页，
+        // 让首批 OkHttp 请求可以等待新 Cookie，避免过期瞬间直接落入错误页。
+        WafCookieRefreshManager.start(this)
+
         handleDeepLink(intent)
 
         setContent {
@@ -268,6 +273,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        WafCookieRefreshManager.start(this)
 
         // 长时间后台时，backgroundStopJob 的 delay 可能因为进程进入 cached/doze 而没有按时执行。
         // 因此回到前台时必须再次用 elapsedRealtime 判断，必要时主动丢弃旧 WebView。
@@ -301,6 +307,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        WafCookieRefreshManager.stop(this)
         BBSPageState.markAppStopped()
         bbsWebViewState?.onPause()
 
