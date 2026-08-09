@@ -18,6 +18,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 internal object WafCookieRefreshPolicy {
+    const val INITIAL_REFRESH_DELAY_MS = 1_500L
     const val REFRESH_INTERVAL_MS = 25 * 60 * 1000L
     const val RETRY_INTERVAL_MS = 2 * 60 * 1000L
     const val CHALLENGE_TIMEOUT_MS = 18_000L
@@ -28,13 +29,17 @@ internal object WafCookieRefreshPolicy {
 
     fun hasRecentSuccess(lastSuccessMs: Long, nowMs: Long): Boolean =
         lastSuccessMs > 0L && nowMs - lastSuccessMs in 0..RECENT_SUCCESS_GRACE_MS
+
+    fun shouldRefreshForResponse(statusCode: Int, method: String): Boolean =
+        method.equals("GET", ignoreCase = true) && (statusCode == 444 || statusCode == 405)
 }
 
 /**
- * 在应用前台保留一个屏幕外 WebView，让论坛注入的百度 WAF JavaScript 组件持续刷新挑战 Cookie。
+ * 在应用前台按需创建屏幕外 WebView，让论坛注入的百度 WAF JavaScript 组件刷新挑战 Cookie。
  *
  * WebView CookieManager 是进程内共享的，因此这里拿到的新 Cookie 会同时供可见论坛页和原生
- * OkHttp 请求使用。隐藏页只加载主框架与脚本，图片被禁用；应用进入后台后立即销毁。
+ * OkHttp 请求使用。隐藏页只加载主框架与脚本、禁用图片，并在挑战完成后立即销毁，避免常驻
+ * WebView 和 JavaScript 定时器拖慢其它页面；应用进入后台时也会取消待执行的刷新。
  */
 object WafCookieRefreshManager {
     private const val FORUM_CHALLENGE_URL = "https://bbs.yamibo.com/forum.php?mobile=2"
@@ -80,23 +85,77 @@ object WafCookieRefreshManager {
     @Volatile
     private var activeSignal: RefreshSignal? = null
 
-    @SuppressLint("SetJavaScriptEnabled")
     fun start(activity: Activity) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             mainHandler.post { start(activity) }
             return
         }
 
-        if (started && ownerRef?.get() === activity && webView != null) return
+        if (started && ownerRef?.get() === activity) return
         stopInternal()
 
         started = true
         ownerRef = WeakReference(activity)
+        // 先让当前可见页面发起自己的首批请求，避免冷启动时与完整论坛主框架争抢网络和渲染资源。
+        // Cookie 已经过期时，444 恢复路径会提前触发同一次挑战，无需等满 1.5 秒。
+        scheduleNextRefresh(WafCookieRefreshPolicy.INITIAL_REFRESH_DELAY_MS)
+    }
+
+    fun stop(activity: Activity) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { stop(activity) }
+            return
+        }
+        if (ownerRef?.get() !== activity) return
+        stopInternal()
+    }
+
+    /** 收到 WAF 444 后立刻重新挑战；多个并发请求会合并为同一次隐藏页刷新。 */
+    fun refreshAndWait(timeoutMs: Long = WafCookieRefreshPolicy.CHALLENGE_TIMEOUT_MS): Boolean {
+        if (Looper.myLooper() == Looper.getMainLooper()) return false
+        if (WafCookieRefreshPolicy.hasRecentSuccess(
+                lastSuccessfulRefreshMs,
+                SystemClock.elapsedRealtime()
+            )
+        ) {
+            return true
+        }
+        val owner = ownerRef?.get()
+        if (!started || owner == null || owner.isFinishing || owner.isDestroyed) return false
+
+        val signal = synchronized(signalLock) {
+            activeSignal ?: RefreshSignal().also {
+                activeSignal = it
+                mainHandler.post { beginRefresh(it) }
+            }
+        }
+        return awaitSignal(signal, timeoutMs)
+    }
+
+    private fun awaitSignal(signal: RefreshSignal, timeoutMs: Long): Boolean {
+        return try {
+            signal.latch.await(timeoutMs, TimeUnit.MILLISECONDS) && signal.succeeded
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+    }
+
+    private fun newSignal(): RefreshSignal = synchronized(signalLock) {
+        activeSignal ?: RefreshSignal().also { activeSignal = it }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun createHiddenWebView(): WebView? {
+        val activity = ownerRef?.get()
+            ?.takeUnless { it.isFinishing || it.isDestroyed }
+            ?: return null
         val challengeUserAgent = runCatching {
             WebSettings.getDefaultUserAgent(activity)
         }.getOrDefault(RequestConfig.UA)
         YamiboApplication.systemUserAgent = challengeUserAgent
-        val hiddenWebView = WebView(activity).apply {
+
+        return WebView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(1, 1).apply {
                 leftMargin = -10_000
                 topMargin = -10_000
@@ -136,61 +195,10 @@ object WafCookieRefreshManager {
                     return true
                 }
             }
+        }.also { hiddenWebView ->
+            webView = hiddenWebView
+            (activity.window.decorView as? ViewGroup)?.addView(hiddenWebView)
         }
-
-        webView = hiddenWebView
-        (activity.window.decorView as? ViewGroup)?.addView(hiddenWebView)
-        beginRefresh(newSignal())
-    }
-
-    fun stop(activity: Activity) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { stop(activity) }
-            return
-        }
-        if (ownerRef?.get() !== activity) return
-        stopInternal()
-    }
-
-    /** 等待正在进行的首次/定时挑战，避免原生请求比新 Cookie 更早发出。 */
-    fun awaitRefreshIfRunning(timeoutMs: Long = WafCookieRefreshPolicy.CHALLENGE_TIMEOUT_MS): Boolean {
-        if (Looper.myLooper() == Looper.getMainLooper()) return false
-        val signal = activeSignal ?: return true
-        return awaitSignal(signal, timeoutMs)
-    }
-
-    /** 收到 WAF 444 后立刻重新挑战；多个并发请求会合并为同一次隐藏页刷新。 */
-    fun refreshAndWait(timeoutMs: Long = WafCookieRefreshPolicy.CHALLENGE_TIMEOUT_MS): Boolean {
-        if (Looper.myLooper() == Looper.getMainLooper()) return false
-        if (WafCookieRefreshPolicy.hasRecentSuccess(
-                lastSuccessfulRefreshMs,
-                SystemClock.elapsedRealtime()
-            )
-        ) {
-            return true
-        }
-        if (!started || webView == null) return false
-
-        val signal = synchronized(signalLock) {
-            activeSignal ?: RefreshSignal().also {
-                activeSignal = it
-                mainHandler.post { beginRefresh(it) }
-            }
-        }
-        return awaitSignal(signal, timeoutMs)
-    }
-
-    private fun awaitSignal(signal: RefreshSignal, timeoutMs: Long): Boolean {
-        return try {
-            signal.latch.await(timeoutMs, TimeUnit.MILLISECONDS) && signal.succeeded
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
-        }
-    }
-
-    private fun newSignal(): RefreshSignal = synchronized(signalLock) {
-        activeSignal ?: RefreshSignal().also { activeSignal = it }
     }
 
     private fun beginRefresh(signal: RefreshSignal) {
@@ -198,7 +206,9 @@ object WafCookieRefreshManager {
             completeRefresh(signal, succeeded = false)
             return
         }
-        val target = webView ?: run {
+        periodicRunnable?.let(mainHandler::removeCallbacks)
+        periodicRunnable = null
+        val target = webView ?: createHiddenWebView() ?: run {
             completeRefresh(signal, succeeded = false)
             return
         }
@@ -207,7 +217,6 @@ object WafCookieRefreshManager {
         YamiboSession.syncToWebView(FORUM_CHALLENGE_URL)
         runCatching {
             target.onResume()
-            target.resumeTimers()
             target.loadUrl(
                 FORUM_CHALLENGE_URL,
                 mapOf("Cache-Control" to "no-cache")
@@ -265,6 +274,7 @@ object WafCookieRefreshManager {
         }
         cancelRefreshCallbacks()
         signal.latch.countDown()
+        destroyHiddenWebView()
         scheduleNextRefresh(WafCookieRefreshPolicy.nextDelayMs(succeeded))
     }
 
@@ -273,10 +283,8 @@ object WafCookieRefreshManager {
         if (!started) return
         periodicRunnable = Runnable {
             if (!started) return@Runnable
-            if (webView != null) {
+            if (activeSignal == null) {
                 beginRefresh(newSignal())
-            } else {
-                ownerRef?.get()?.takeUnless { it.isFinishing || it.isDestroyed }?.let(::start)
             }
         }.also { mainHandler.postDelayed(it, delayMs) }
     }
@@ -302,16 +310,20 @@ object WafCookieRefreshManager {
             it.latch.countDown()
         }
 
-        webView?.let { target ->
-            runCatching {
-                target.stopLoading()
-                (target.parent as? ViewGroup)?.removeView(target)
-                target.removeAllViews()
-                target.destroy()
-            }
-        }
-        webView = null
+        destroyHiddenWebView()
         ownerRef = null
+        pageGeneration = 0
+    }
+
+    private fun destroyHiddenWebView() {
+        val target = webView ?: return
+        webView = null
+        runCatching {
+            target.stopLoading()
+            (target.parent as? ViewGroup)?.removeView(target)
+            target.removeAllViews()
+            target.destroy()
+        }
         pageGeneration = 0
     }
 }
