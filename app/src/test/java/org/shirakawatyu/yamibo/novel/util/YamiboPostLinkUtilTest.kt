@@ -35,6 +35,12 @@ class YamiboPostLinkUtilTest {
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541"
             )
         )
+        assertEquals(
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=569207&pid=&mobile=2",
+            YamiboPostLinkUtil.extractPostUrl(
+                "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=569207&pid="
+            )
+        )
     }
 
     @Test
