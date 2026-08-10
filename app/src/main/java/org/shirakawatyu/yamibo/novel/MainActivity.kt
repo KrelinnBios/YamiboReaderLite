@@ -132,7 +132,6 @@ import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.SignTrigger
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
-import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshManager
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.network.NetworkMonitor
 import java.net.URLDecoder
@@ -245,9 +244,6 @@ class MainActivity : ComponentActivity() {
             bbsWebViewState = createBbsWebView(this, customWebChromeClient)
         }
 
-        // 仅登记当前前台 Activity；真正收到 WAF 444/405 时才按需创建短生命周期挑战页。
-        WafCookieRefreshManager.start(this)
-
         handleDeepLink(intent)
 
         setContent {
@@ -272,8 +268,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        WafCookieRefreshManager.start(this)
-
         // 长时间后台时，backgroundStopJob 的 delay 可能因为进程进入 cached/doze 而没有按时执行。
         // 因此回到前台时必须再次用 elapsedRealtime 判断，必要时主动丢弃旧 WebView。
         val shouldRecreateBbsWebView =
@@ -306,7 +300,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        WafCookieRefreshManager.stop(this)
         BBSPageState.markAppStopped()
         bbsWebViewState?.onPause()
 

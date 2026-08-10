@@ -13,12 +13,12 @@ import org.shirakawatyu.yamibo.novel.YamiboApplication
 import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
-import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshManager
-import org.shirakawatyu.yamibo.novel.util.WafCookieRefreshPolicy
 import org.shirakawatyu.yamibo.novel.util.YamiboSession
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.TtlDnsCache
+import org.shirakawatyu.yamibo.novel.util.network.WafCookieHandshakeInterceptor
+import org.shirakawatyu.yamibo.novel.util.network.WafCookieStore
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
@@ -138,6 +138,9 @@ class YamiboRetrofit {
             return LanguageModeUtil.acceptLanguageHeader(GlobalData.languageMode.value)
         }
 
+        private fun isYamiboHost(host: String): Boolean =
+            host == "yamibo.com" || host.endsWith(".yamibo.com")
+
         // keepalive 必须短于论坛服务器的空闲超时（nginx 通常 60~75 秒），
         // 否则切回 App 时会复用已被服务器掐掉的半死连接，
         // 表现为 stream was reset: PROTOCOL_ERROR / 断联需手动刷新。
@@ -156,6 +159,9 @@ class YamiboRetrofit {
         private val sharedDns by lazy {
             TtlDnsCache(delegate = DynamicDns(sharedBootstrapClient))
         }
+
+        // 两个 OkHttp 客户端及其 Coil 派生客户端共享同一个进程内 WAF Cookie。
+        private val sharedWafCookieStore = WafCookieStore()
 
         // 基础客户端
         val okHttpClient: OkHttpClient by lazy {
@@ -213,15 +219,18 @@ class YamiboRetrofit {
             // 1. 应用拦截器
             builder.addInterceptor { chain ->
                 val original = chain.request()
-                if (!original.url.host.contains("yamibo.com")) {
+                if (!isYamiboHost(original.url.host)) {
                     return@addInterceptor chain.proceed(original)
                 }
 
-                // 正常请求不等待后台 WAF 挑战，避免论坛、图片和原生页面被同一个最长 18 秒的
-                // 就绪信号整体阻塞；只有真正收到 444 的请求才在下方触发挑战并重试。
-                // Cookie 仍从 CookieManager 合并最新值，不能继续发送 GlobalData 中的旧快照。
-                val cookie = original.header("Cookie")
-                    ?: YamiboSession.cookieFor(original.url.toString())
+                // 显式 Cookie（如电脑版模板）保持优先，同时补上 CookieManager 中仅运行期存在的
+                // nox_* 等 WAF Cookie；持久化快照只兜底缺失的登录/会话字段。
+                val cookie = YamiboSession.mergeCookieHeaders(
+                    listOf(
+                        original.header("Cookie").orEmpty(),
+                        YamiboSession.cookieFor(original.url.toString())
+                    )
+                )
                 val existingUa = original.header("User-Agent")
                 val isPcPseudoRequest =
                     existingUa?.contains("Windows NT") == true || existingUa?.contains("Macintosh") == true
@@ -239,7 +248,7 @@ class YamiboRetrofit {
                     .header("Cookie", cookie)
 
                 if (
-                    original.url.host.contains("yamibo.com") &&
+                    isYamiboHost(original.url.host) &&
                     original.header("Referer").isNullOrBlank()
                 ) {
                     requestBuilder.header("Referer", "https://bbs.yamibo.com/")
@@ -299,6 +308,10 @@ class YamiboRetrofit {
                 checkedResponse
             }
 
+            // 必须放在图片校验拦截器内侧：先从 302 响应保存 abymg_id，再由 OkHttp 自动跟随；
+            // 下一次网络请求会在保留登录 Cookie 的同时补上该 WAF Cookie。
+            builder.addNetworkInterceptor(WafCookieHandshakeInterceptor(sharedWafCookieStore))
+
             return builder.build()
         }
 
@@ -353,22 +366,7 @@ class YamiboRetrofit {
                     val canRetryResponse = attempt < 2 &&
                             request.method == "GET" &&
                             isRateLimitedResponse(response)
-                    if (!canRetryResponse) {
-                        val refreshed =
-                            WafCookieRefreshPolicy.shouldRefreshForResponse(
-                                response.code,
-                                request.method
-                            ) &&
-                            WafCookieRefreshManager.refreshAndWait()
-                        if (!refreshed) return response
-
-                        response.close()
-                        sharedConnectionPool.evictAll()
-                        val retriedRequest = request.newBuilder()
-                            .header("Cookie", YamiboSession.cookieFor(request.url.toString()))
-                            .build()
-                        return chain.proceed(retriedRequest)
-                    }
+                    if (!canRetryResponse) return response
                     // 444 没有可用响应体，丢弃后退避换连接重试。
                     response.close()
                     sharedConnectionPool.evictAll()

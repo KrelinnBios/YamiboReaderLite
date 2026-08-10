@@ -451,7 +451,7 @@ open class YamiboWebViewClient : WebViewClient() {
                 val cookie = cookieManager.getCookie(url)
                 if (cookie != null) {
                     CookieUtil.saveCookie(cookie)
-                    currentCookie = cookie
+                    currentCookie = CookieUtil.persistentCookieHeader(cookie)
                 }
             }
         }

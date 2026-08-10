@@ -19,6 +19,10 @@ object ImageCheckerUtil {
 
     @Throws(IOException::class)
     fun interceptAndCheckImageStream(response: Response, url: String): Response {
+        // 论坛图片 WAF 会先返回同地址 302 并下发 abymg_id。此时必须把响应交给 OkHttp
+        // 的重定向层，不能把空的 HTML/重定向响应提前判成坏图；最终 200 图片仍会正常校验。
+        if (!response.isSuccessful) return response
+
         val isForumAttachment = url.contains("attachment/forum", ignoreCase = true)
         val hasImageExtension = url.contains(Regex("\\.(jpg|jpeg|png|webp|gif)", RegexOption.IGNORE_CASE))
 

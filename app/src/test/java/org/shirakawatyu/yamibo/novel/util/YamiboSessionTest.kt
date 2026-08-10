@@ -20,13 +20,13 @@ class YamiboSessionTest {
     fun mergeCookieHeaders_prefersFreshWafCookieOverPersistedSnapshot() {
         val merged = YamiboSession.mergeCookieHeaders(
             listOf(
-                "waf_token=fresh; EeqY_2132_auth=secret",
-                "waf_token=expired; EeqY_2132_sid=abc"
+                "nox_jst_v1=fresh; EeqY_2132_auth=secret",
+                "nox_jst_v1=expired; EeqY_2132_sid=abc"
             )
         )
 
         assertEquals(
-            "waf_token=fresh; EeqY_2132_auth=secret; EeqY_2132_sid=abc",
+            "nox_jst_v1=fresh; EeqY_2132_auth=secret; EeqY_2132_sid=abc",
             merged
         )
     }
