@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.util.theme
 
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class DarkClassicCssTest {
@@ -39,5 +40,12 @@ class DarkClassicCssTest {
         assertTrue(css.contains("#nv_misc.pg_invite #friends li"))
         assertTrue(css.contains("#nv_misc.pg_invite #inviteform"))
         assertTrue(css.contains("#nv_misc.pg_invite #ct .pn.pnc"))
+    }
+
+    @Test
+    fun privateMessageSpacerUsesPageBackgroundInsteadOfComposerPanel() {
+        assertTrue(css.contains("#pmform { background: transparent !important"))
+        assertTrue(css.contains("#pmform .foot_height { background: #0d141d !important; }"))
+        assertFalse(css.contains("#pmform, #pmform .tedt"))
     }
 }
