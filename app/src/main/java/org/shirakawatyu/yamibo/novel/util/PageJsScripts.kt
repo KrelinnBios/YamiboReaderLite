@@ -307,8 +307,8 @@ object PageJsScripts {
 
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV2) return;
-            window.__yamiboBbsThreadNavigationV2 = true;
+            if (window.__yamiboBbsThreadNavigationV4) return;
+            window.__yamiboBbsThreadNavigationV4 = true;
             function isThread(link) {
                 if (!link || !link.href) return false;
                 try {
@@ -318,11 +318,14 @@ object PageJsScripts {
                     var goto = String(url.searchParams.get('goto') || '').toLowerCase();
                     var tid = url.searchParams.get('tid') || '';
                     var pid = url.searchParams.get('pid') || '';
+                    var ptid = url.searchParams.get('ptid') || '';
                     return url.hostname === 'bbs.yamibo.com' &&
                         (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
                          (path === 'forum.php' &&
                           ((mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid)) ||
-                           ((mod === 'redirect' || goto === 'findpost') && /^[1-9]\d*${'$'}/.test(pid)))));
+                           (mod === 'redirect' && /^[1-9]\d*${'$'}/.test(pid)) ||
+                           (goto === 'findpost' &&
+                            (/^[1-9]\d*${'$'}/.test(pid) || /^[1-9]\d*${'$'}/.test(ptid))))));
                 } catch (e) { return false; }
             }
             function navigateToPost(link) {
@@ -336,10 +339,15 @@ object PageJsScripts {
             document.addEventListener('click', function(event) {
                 if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
-                if (link && !isThread(link)) return;
-                var item = event.target.closest ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]') : null;
-                if (!item) return;
-                if (!link && item) {
+                if (link) {
+                    // 个人帖子电脑版会把回复摘要放在无 id 的独立 tbody/tr 中；只要点击的
+                    // 锚点本身是帖子链接，就不应再依赖论坛列表容器选择器。
+                    if (!isThread(link)) return;
+                } else {
+                    var item = event.target.closest
+                        ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
+                        : null;
+                    if (!item) return;
                     var links = item.querySelectorAll('a[href]');
                     for (var i = 0; i < links.length && !link; i++) if (isThread(links[i])) link = links[i];
                 }
