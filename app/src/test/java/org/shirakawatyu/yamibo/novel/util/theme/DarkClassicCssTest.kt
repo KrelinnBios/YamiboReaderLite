@@ -44,8 +44,8 @@ class DarkClassicCssTest {
 
     @Test
     fun privateMessageSpacerUsesPageBackgroundInsteadOfComposerPanel() {
-        assertTrue(css.contains("#pmform { background: transparent !important"))
-        assertTrue(css.contains("#pmform .foot_height { background: #0d141d !important; }"))
+        assertTrue(css.contains("#pmform { background-color: transparent !important"))
+        assertTrue(css.contains("#pmform .foot_height { background-color: #0d141d !important; }"))
         assertFalse(css.contains("#pmform, #pmform .tedt"))
     }
 }
