@@ -307,16 +307,22 @@ object PageJsScripts {
 
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV1) return;
-            window.__yamiboBbsThreadNavigationV1 = true;
+            if (window.__yamiboBbsThreadNavigationV2) return;
+            window.__yamiboBbsThreadNavigationV2 = true;
             function isThread(link) {
                 if (!link || !link.href) return false;
                 try {
                     var url = new URL(link.href, document.baseURI);
                     var path = url.pathname.replace(/^\/+/, '').toLowerCase();
+                    var mod = String(url.searchParams.get('mod') || '').toLowerCase();
+                    var goto = String(url.searchParams.get('goto') || '').toLowerCase();
+                    var tid = url.searchParams.get('tid') || '';
+                    var pid = url.searchParams.get('pid') || '';
                     return url.hostname === 'bbs.yamibo.com' &&
                         (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
-                         (path === 'forum.php' && url.searchParams.get('mod') === 'viewthread' && /^\d+${'$'}/.test(url.searchParams.get('tid') || '')));
+                         (path === 'forum.php' &&
+                          ((mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid)) ||
+                           ((mod === 'redirect' || goto === 'findpost') && /^[1-9]\d*${'$'}/.test(pid)))));
                 } catch (e) { return false; }
             }
             function navigateToPost(link) {
@@ -2743,6 +2749,7 @@ $styleString
     val MINE_COMMIT_BOOTSTRAP_JS by lazy {
         combineJs(
             "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
@@ -2754,6 +2761,7 @@ $styleString
     val MINE_MANGA_REINJECT_JS by lazy {
         combineJs(
             "MINE_INJECT_PSWP_AND_MANGA_JS" to MINE_INJECT_PSWP_AND_MANGA_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
             "PRESERVE_RATE_POSITION_JS" to PRESERVE_RATE_POSITION_JS,
