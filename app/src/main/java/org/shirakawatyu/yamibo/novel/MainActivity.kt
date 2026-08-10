@@ -245,8 +245,7 @@ class MainActivity : ComponentActivity() {
             bbsWebViewState = createBbsWebView(this, customWebChromeClient)
         }
 
-        // 百度 WAF 的 JS 挑战 Cookie 约 30 分钟过期。先启动屏幕外挑战页，再挂载原生首页，
-        // 让首批 OkHttp 请求可以等待新 Cookie，避免过期瞬间直接落入错误页。
+        // 仅登记当前前台 Activity；真正收到 WAF 444/405 时才按需创建短生命周期挑战页。
         WafCookieRefreshManager.start(this)
 
         handleDeepLink(intent)
