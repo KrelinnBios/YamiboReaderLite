@@ -42,11 +42,20 @@ object YamiboPostLinkUtil {
      */
     fun normalizePostUrlForTemplate(url: String?, desktopTemplate: Boolean): String? {
         val normalized = normalizePostUrl(url) ?: return null
-        if (!desktopTemplate) return normalized
-        return normalizeForumPageTemplateUrl(
-            url = normalized,
-            desktopSession = true
-        ) ?: normalized
+        val parsed = normalized.toHttpUrlOrNull() ?: return normalized
+        val expectedMobile = if (desktopTemplate) "no" else "2"
+        if (parsed.queryParameterValues("mobile").singleOrNull()
+                ?.equals(expectedMobile, ignoreCase = true) == true
+        ) {
+            return normalized
+        }
+        // 这里发生在页面脚本触发正式导航之前，只生成一次最终目标 URL；不要复用
+        // normalizeForumPageTemplateUrl，后者专门用于 shouldOverrideUrlLoading，必须放行帖子。
+        return parsed.newBuilder()
+            .removeAllQueryParameters("mobile")
+            .addQueryParameter("mobile", expectedMobile)
+            .build()
+            .toString()
     }
 
     private fun normalizeCandidate(candidate: String): String? {
