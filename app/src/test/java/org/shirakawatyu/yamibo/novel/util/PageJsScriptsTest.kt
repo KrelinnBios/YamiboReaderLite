@@ -26,14 +26,17 @@ class PageJsScriptsTest {
         assertTrue(script.contains("document.getElementById('toptb')"))
         assertTrue(script.contains("navigateToPostWithTemplate(link.href, desktopTemplate)"))
         assertTrue(script.contains("navigateToPost(link.href)"))
-        assertTrue(script.contains("mod === 'redirect' || goto === 'findpost'"))
+        assertTrue(script.contains("goto === 'findpost'"))
         assertTrue(script.contains("/^[1-9]\\d*${'$'}/.test(pid)"))
+        assertTrue(script.contains("/^[1-9]\\d*${'$'}/.test(ptid)"))
+        assertTrue(script.contains("if (link) {"))
+        assertTrue(script.contains("if (!isThread(link)) return;"))
         assertTrue(script.contains("event.stopImmediatePropagation()"))
     }
 
     @Test
     fun threadNavigationIsInjectedIntoBbsAndMineWebViewsOnly() {
-        val marker = "__yamiboBbsThreadNavigationV2"
+        val marker = "__yamiboBbsThreadNavigationV4"
 
         assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
