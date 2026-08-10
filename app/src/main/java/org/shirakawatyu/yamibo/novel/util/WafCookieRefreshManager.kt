@@ -18,14 +18,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 internal object WafCookieRefreshPolicy {
-    const val INITIAL_REFRESH_DELAY_MS = 1_500L
-    const val REFRESH_INTERVAL_MS = 25 * 60 * 1000L
-    const val RETRY_INTERVAL_MS = 2 * 60 * 1000L
+    // 不携带 mobile 参数，避免挑战页把用户当前的论坛模板 Cookie 强制改成手机版。
+    const val CHALLENGE_URL = "https://bbs.yamibo.com/forum.php"
     const val CHALLENGE_TIMEOUT_MS = 18_000L
     const val RECENT_SUCCESS_GRACE_MS = 15_000L
-
-    fun nextDelayMs(succeeded: Boolean): Long =
-        if (succeeded) REFRESH_INTERVAL_MS else RETRY_INTERVAL_MS
 
     fun hasRecentSuccess(lastSuccessMs: Long, nowMs: Long): Boolean =
         lastSuccessMs > 0L && nowMs - lastSuccessMs in 0..RECENT_SUCCESS_GRACE_MS
@@ -42,7 +38,6 @@ internal object WafCookieRefreshPolicy {
  * WebView 和 JavaScript 定时器拖慢其它页面；应用进入后台时也会取消待执行的刷新。
  */
 object WafCookieRefreshManager {
-    private const val FORUM_CHALLENGE_URL = "https://bbs.yamibo.com/forum.php?mobile=2"
     private const val READY_POLL_INTERVAL_MS = 500L
 
     private const val FORUM_READY_JS = """
@@ -72,7 +67,6 @@ object WafCookieRefreshManager {
     private var ownerRef: WeakReference<Activity>? = null
     @Volatile
     private var webView: WebView? = null
-    private var periodicRunnable: Runnable? = null
     private var readinessRunnable: Runnable? = null
     private var timeoutRunnable: Runnable? = null
     private var pageGeneration = 0
@@ -96,9 +90,6 @@ object WafCookieRefreshManager {
 
         started = true
         ownerRef = WeakReference(activity)
-        // 先让当前可见页面发起自己的首批请求，避免冷启动时与完整论坛主框架争抢网络和渲染资源。
-        // Cookie 已经过期时，444 恢复路径会提前触发同一次挑战，无需等满 1.5 秒。
-        scheduleNextRefresh(WafCookieRefreshPolicy.INITIAL_REFRESH_DELAY_MS)
     }
 
     fun stop(activity: Activity) {
@@ -139,10 +130,6 @@ object WafCookieRefreshManager {
             Thread.currentThread().interrupt()
             false
         }
-    }
-
-    private fun newSignal(): RefreshSignal = synchronized(signalLock) {
-        activeSignal ?: RefreshSignal().also { activeSignal = it }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -206,19 +193,17 @@ object WafCookieRefreshManager {
             completeRefresh(signal, succeeded = false)
             return
         }
-        periodicRunnable?.let(mainHandler::removeCallbacks)
-        periodicRunnable = null
         val target = webView ?: createHiddenWebView() ?: run {
             completeRefresh(signal, succeeded = false)
             return
         }
 
         cancelRefreshCallbacks()
-        YamiboSession.syncToWebView(FORUM_CHALLENGE_URL)
+        YamiboSession.syncToWebView(WafCookieRefreshPolicy.CHALLENGE_URL)
         runCatching {
             target.onResume()
             target.loadUrl(
-                FORUM_CHALLENGE_URL,
+                WafCookieRefreshPolicy.CHALLENGE_URL,
                 mapOf("Cache-Control" to "no-cache")
             )
         }.onFailure {
@@ -248,7 +233,7 @@ object WafCookieRefreshManager {
                 target.evaluateJavascript(FORUM_READY_JS) { result ->
                     if (signal !== activeSignal || target !== webView) return@evaluateJavascript
                     if (result.equals("true", ignoreCase = true)) {
-                        YamiboSession.persistWebViewCookies(FORUM_CHALLENGE_URL)
+                        YamiboSession.persistWebViewCookies(WafCookieRefreshPolicy.CHALLENGE_URL)
                         completeRefresh(signal, succeeded = true)
                     } else {
                         pollUntilForumPageReady(pageGeneration)
@@ -275,18 +260,6 @@ object WafCookieRefreshManager {
         cancelRefreshCallbacks()
         signal.latch.countDown()
         destroyHiddenWebView()
-        scheduleNextRefresh(WafCookieRefreshPolicy.nextDelayMs(succeeded))
-    }
-
-    private fun scheduleNextRefresh(delayMs: Long) {
-        periodicRunnable?.let(mainHandler::removeCallbacks)
-        if (!started) return
-        periodicRunnable = Runnable {
-            if (!started) return@Runnable
-            if (activeSignal == null) {
-                beginRefresh(newSignal())
-            }
-        }.also { mainHandler.postDelayed(it, delayMs) }
     }
 
     private fun cancelRefreshCallbacks() {
@@ -298,8 +271,6 @@ object WafCookieRefreshManager {
 
     private fun stopInternal() {
         started = false
-        periodicRunnable?.let(mainHandler::removeCallbacks)
-        periodicRunnable = null
         cancelRefreshCallbacks()
 
         val signal = synchronized(signalLock) {
