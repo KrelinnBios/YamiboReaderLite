@@ -128,8 +128,9 @@ object YamiboPostLinkUtil {
      * mobile=no。Discuz 的电脑版列表仍可能给普通帖子链接附带 mobile=2，不能因此把它
      * 当成用户主动切回手机版；只有明确的同页/论坛首页模板切换入口才改变用户选择。
      *
-     * 标签页和明确进入的个人空间沿用现有电脑版流程；静态资源、附件、搜索等也不属于
-     * 常规论坛页面。无需改写时返回 null，避免 loadUrl 循环。
+     * 帖子导航由列表单次导航桥接或 WebView 原生处理，不在 shouldOverrideUrlLoading 中
+     * 二次 loadUrl。标签页和明确进入的个人空间沿用现有电脑版流程；静态资源、附件、
+     * 搜索等也不属于常规论坛页面。无需改写时返回 null，避免 loadUrl 循环。
      */
     fun normalizeForumPageTemplateUrl(
         url: String?,
@@ -138,14 +139,11 @@ object YamiboPostLinkUtil {
     ): String? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
-        // 「Ta 的回复」摘要先进入 findpost 中转，再由服务器 302 到帖子和具体楼层。
-        // 这里若为了补 mobile 参数先用 loadUrl 消费点击，会与 WebView 的原生重定向竞争，
-        // 表现为首次点击闪回列表、第二次才进入原帖。中转链接必须保持原样交给 WebView。
-        if (parsed.queryParameter("mod").equals("redirect", ignoreCase = true) ||
-            parsed.queryParameter("goto").equals("findpost", ignoreCase = true)
-        ) {
-            return null
-        }
+        // 帖子点击必须只发起一次导航。若在 shouldOverrideUrlLoading 中为了补 mobile 参数
+        // 再同步调用 loadUrl，部分 OriginOS WebView 会让原导航与改写导航竞争，表现为首次
+        // 进入帖子后立刻退回、第二次才成功。BBS 列表已有单次导航桥接，其余 WebView 直接
+        // 交给原生导航；viewthread、SEO 帖子和 findpost 楼层中转都不在这里二次改写。
+        if (isPostUrl(parsed)) return null
         if (!isMobileForumPage(parsed)) return null
         if (explicitDesktopTemplateSelection(url, currentUrl) != null) return null
         val expectedMobile = if (desktopSession) "no" else "2"
@@ -237,10 +235,12 @@ object YamiboPostLinkUtil {
         if (!url.encodedPath.equals("/forum.php", ignoreCase = true)) return false
 
         val mod = url.queryParameter("mod").orEmpty()
+        val goto = url.queryParameter("goto").orEmpty()
         val tid = url.queryParameter("tid")
         val pid = url.queryParameter("pid")
         return mod.equals("viewthread", ignoreCase = true) && tid.isPositiveId() ||
-                mod.equals("redirect", ignoreCase = true) && pid.isPositiveId()
+                (mod.equals("redirect", ignoreCase = true) ||
+                        goto.equals("findpost", ignoreCase = true)) && pid.isPositiveId()
     }
 
     private fun String?.isPositiveId(): Boolean {
