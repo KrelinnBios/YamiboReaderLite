@@ -138,6 +138,14 @@ object YamiboPostLinkUtil {
     ): String? {
         val parsed = url?.toHttpUrlOrNull() ?: return null
         if (parsed.host.lowercase() !in validHosts) return null
+        // 「Ta 的回复」摘要先进入 findpost 中转，再由服务器 302 到帖子和具体楼层。
+        // 这里若为了补 mobile 参数先用 loadUrl 消费点击，会与 WebView 的原生重定向竞争，
+        // 表现为首次点击闪回列表、第二次才进入原帖。中转链接必须保持原样交给 WebView。
+        if (parsed.queryParameter("mod").equals("redirect", ignoreCase = true) ||
+            parsed.queryParameter("goto").equals("findpost", ignoreCase = true)
+        ) {
+            return null
+        }
         if (!isMobileForumPage(parsed)) return null
         if (explicitDesktopTemplateSelection(url, currentUrl) != null) return null
         val expectedMobile = if (desktopSession) "no" else "2"
