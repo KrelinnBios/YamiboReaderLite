@@ -333,6 +333,20 @@ class YamiboPostLinkUtilTest {
                 desktopTemplate = false
             )
         )
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
+            YamiboPostLinkUtil.normalizePostUrlForTemplate(
+                "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=2",
+                desktopTemplate = true
+            )
+        )
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=2",
+            YamiboPostLinkUtil.normalizePostUrlForTemplate(
+                "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
+                desktopTemplate = false
+            )
+        )
     }
 
     @Test
