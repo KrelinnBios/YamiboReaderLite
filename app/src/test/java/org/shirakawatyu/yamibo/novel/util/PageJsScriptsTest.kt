@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -72,6 +73,46 @@ class PageJsScriptsTest {
         assertTrue(script.contains("td.by > cite > a[c]"))
         assertTrue(script.contains("document.querySelectorAll('p > em')"))
         assertTrue(script.contains("getBlockedUser(map, authorUid, authorName)"))
+    }
+
+    @Test
+    fun forumBlockerDoesNotRewriteStableButtonsOnEveryMutationSync() {
+        val script = PageJsScripts.getForumBlockerJs(
+            enabled = true,
+            itemsJson = "[]",
+            isDark = true
+        )
+
+        assertTrue(script.contains("if (icon && label && label.textContent === '屏蔽') return;"))
+        assertTrue(script.contains("if (action.textContent !== nextLabel) action.textContent = nextLabel;"))
+    }
+
+    @Test
+    fun compactsHugeMobileForumPageSelectorBeforeRendering() {
+        val options = (1..3_638).joinToString("") { page ->
+            val selected = if (page == 1_800) " selected=\"selected\"" else ""
+            "<option value=\"forum.php?page=$page\"$selected>第${page}页</option>"
+        }
+        val html = "<html><body><select id=\"dumppage\">$options</select></body></html>"
+
+        val compacted = PageJsScripts.compactMobileForumPageSelector(html)
+        val optionCount = Regex("<option\\b", RegexOption.IGNORE_CASE).findAll(compacted).count()
+
+        assertEquals(83, optionCount)
+        assertTrue(compacted.contains("page=1\""))
+        assertTrue(compacted.contains("page=1800\" selected=\"selected\""))
+        assertTrue(compacted.contains("page=3638\""))
+        assertFalse(compacted.contains("page=1000\""))
+    }
+
+    @Test
+    fun leavesShortMobileForumPageSelectorUnchanged() {
+        val options = (1..20).joinToString("") { page ->
+            "<option value=\"forum.php?page=$page\">第${page}页</option>"
+        }
+        val html = "<select id='dumppage'>$options</select>"
+
+        assertEquals(html, PageJsScripts.compactMobileForumPageSelector(html))
     }
 
     @Test
