@@ -24,26 +24,18 @@ class PageJsScriptsTest {
         assertTrue(nativeNavigationIndex >= 0)
         assertTrue(legacyListHandlerIndex > nativeNavigationIndex)
         assertTrue(script.contains("document.getElementById('toptb')"))
-        assertTrue(script.contains("kind === 'viewthread'"))
-        assertTrue(script.contains("window.location.assign(navigationTarget(link))"))
         assertTrue(script.contains("navigateToPostWithTemplate(link.href, desktopTemplate)"))
-        assertTrue(script.contains("return 'findpost'"))
-        assertTrue(script.contains("goto === 'findpost'"))
-        assertTrue(script.contains("/^[1-9]\\d*${'$'}/.test(pid)"))
-        assertTrue(script.contains("/^[1-9]\\d*${'$'}/.test(ptid)"))
-        assertTrue(script.contains("if (link) {"))
-        assertTrue(script.contains("if (!threadKind(link)) return;"))
+        assertTrue(script.contains("navigateToPost(link.href)"))
         assertTrue(script.contains("event.stopImmediatePropagation()"))
     }
 
     @Test
-    fun threadNavigationIsInjectedIntoBbsAndMineWebViewsOnly() {
-        val marker = "__yamiboBbsThreadNavigationV5"
+    fun bbsThreadNavigationIsNotInjectedIntoOtherWebViews() {
+        val marker = "__yamiboBbsThreadNavigationV1"
 
         assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
-        assertTrue(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS.contains(marker))
-        assertTrue(PageJsScripts.MINE_MANGA_REINJECT_JS.contains(marker))
+        assertFalse(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertFalse(PageJsScripts.OTHER_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertFalse(PageJsScripts.MANGA_BOOTSTRAP_JS.contains(marker))
     }
