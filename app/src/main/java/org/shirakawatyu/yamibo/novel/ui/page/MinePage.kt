@@ -137,7 +137,6 @@ import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
 import org.shirakawatyu.yamibo.novel.util.WebViewPool
-import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
@@ -498,24 +497,11 @@ fun MinePage(
     var pendingSearchUrl by remember { mutableStateOf<String?>(null) }
     val searchNavApi = remember {
         object {
-            private fun postNavigation(url: String) {
+            @JavascriptInterface
+            fun navigateToPost(url: String) {
                 Handler(Looper.getMainLooper()).post {
                     pendingSearchUrl = url
                 }
-            }
-
-            @JavascriptInterface
-            fun navigateToPost(url: String) {
-                postNavigation(url)
-            }
-
-            @JavascriptInterface
-            fun navigateToPostWithTemplate(url: String, desktopTemplate: Boolean) {
-                val targetUrl = YamiboPostLinkUtil.normalizePostUrlForTemplate(
-                    url = url,
-                    desktopTemplate = desktopTemplate
-                ) ?: return
-                postNavigation(targetUrl)
             }
         }
     }
