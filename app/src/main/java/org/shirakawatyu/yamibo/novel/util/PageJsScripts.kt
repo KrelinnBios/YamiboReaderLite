@@ -307,10 +307,10 @@ object PageJsScripts {
 
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV4) return;
-            window.__yamiboBbsThreadNavigationV4 = true;
-            function isThread(link) {
-                if (!link || !link.href) return false;
+            if (window.__yamiboBbsThreadNavigationV5) return;
+            window.__yamiboBbsThreadNavigationV5 = true;
+            function threadKind(link) {
+                if (!link || !link.href) return '';
                 try {
                     var url = new URL(link.href, document.baseURI);
                     var path = url.pathname.replace(/^\/+/, '').toLowerCase();
@@ -319,14 +319,26 @@ object PageJsScripts {
                     var tid = url.searchParams.get('tid') || '';
                     var pid = url.searchParams.get('pid') || '';
                     var ptid = url.searchParams.get('ptid') || '';
-                    return url.hostname === 'bbs.yamibo.com' &&
-                        (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
-                         (path === 'forum.php' &&
-                          ((mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid)) ||
-                           (mod === 'redirect' && /^[1-9]\d*${'$'}/.test(pid)) ||
-                           (goto === 'findpost' &&
-                            (/^[1-9]\d*${'$'}/.test(pid) || /^[1-9]\d*${'$'}/.test(ptid))))));
-                } catch (e) { return false; }
+                    if (url.hostname !== 'bbs.yamibo.com') return '';
+                    if (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
+                        (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
+                        return 'viewthread';
+                    }
+                    if (path === 'forum.php' &&
+                        ((mod === 'redirect' && /^[1-9]\d*${'$'}/.test(pid)) ||
+                         (goto === 'findpost' &&
+                          (/^[1-9]\d*${'$'}/.test(pid) || /^[1-9]\d*${'$'}/.test(ptid))))) {
+                        return 'findpost';
+                    }
+                    return '';
+                } catch (e) { return ''; }
+            }
+            function navigationTarget(link) {
+                var url = new URL(link.href, document.baseURI);
+                var expectedMobile = document.getElementById('toptb') ? 'no' : '2';
+                url.searchParams.delete('mobile');
+                url.searchParams.append('mobile', expectedMobile);
+                return url.href;
             }
             function navigateToPost(link) {
                 var desktopTemplate = !!document.getElementById('toptb');
@@ -337,24 +349,31 @@ object PageJsScripts {
                 }
             }
             document.addEventListener('click', function(event) {
-                if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
                 if (link) {
                     // 个人帖子电脑版会把回复摘要放在无 id 的独立 tbody/tr 中；只要点击的
                     // 锚点本身是帖子链接，就不应再依赖论坛列表容器选择器。
-                    if (!isThread(link)) return;
+                    if (!threadKind(link)) return;
                 } else {
                     var item = event.target.closest
                         ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
                         : null;
                     if (!item) return;
                     var links = item.querySelectorAll('a[href]');
-                    for (var i = 0; i < links.length && !link; i++) if (isThread(links[i])) link = links[i];
+                    for (var i = 0; i < links.length && !link; i++) if (threadKind(links[i])) link = links[i];
                 }
-                if (!isThread(link)) return;
+                var kind = threadKind(link);
+                if (!kind) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                navigateToPost(link);
+                if (kind === 'viewthread') {
+                    // 主题列表链接已是当前页导航。保持跳转完全发生在 WebView 内，避免再绕到
+                    // JS interface、Compose 状态和 stopLoading/loadUrl 后与本次点击竞争。
+                    window.location.assign(navigationTarget(link));
+                } else if (window.AndroidSearchNav && window.AndroidSearchNav.navigateToPost) {
+                    // findpost 回复跳转已有稳定行为，继续沿用原来的原生导航路径。
+                    navigateToPost(link);
+                }
             }, true);
         })();
     """.trimIndent()
