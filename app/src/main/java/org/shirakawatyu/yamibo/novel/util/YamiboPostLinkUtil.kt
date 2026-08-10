@@ -247,9 +247,11 @@ object YamiboPostLinkUtil {
         val goto = url.queryParameter("goto").orEmpty()
         val tid = url.queryParameter("tid")
         val pid = url.queryParameter("pid")
+        val ptid = url.queryParameter("ptid")
         return mod.equals("viewthread", ignoreCase = true) && tid.isPositiveId() ||
-                (mod.equals("redirect", ignoreCase = true) ||
-                        goto.equals("findpost", ignoreCase = true)) && pid.isPositiveId()
+                mod.equals("redirect", ignoreCase = true) && pid.isPositiveId() ||
+                goto.equals("findpost", ignoreCase = true) &&
+                (pid.isPositiveId() || ptid.isPositiveId())
     }
 
     private fun String?.isPositiveId(): Boolean {
