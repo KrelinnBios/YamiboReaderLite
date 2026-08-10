@@ -66,23 +66,20 @@ class YamiboPostLinkUtilTest {
     }
 
     @Test
-    fun forcesMobileTemplateBeforeDesktopIsSelected() {
-        // 手机版会话中，无版本参数的帖子与楼层跳转必须补 mobile=2
-        assertEquals(
-            "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
+    fun normalizesOnlyNonPostPagesBeforeDesktopIsSelected() {
+        // 帖子链接不能在 shouldOverrideUrlLoading 中二次 loadUrl，避免首次点击导航竞争
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162",
                 desktopSession = false
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/thread-520058-1-1.html?mobile=2",
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-520058-1-1.html",
                 desktopSession = false
             )
         )
-        // findpost 必须保留给 WebView 原生跟随 302；预先 loadUrl 改写会吞掉首次点击
         assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541",
@@ -104,8 +101,7 @@ class YamiboPostLinkUtilTest {
                 desktopSession = false
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://m.yamibo.com/thread-520058-2-1.html",
                 desktopSession = false
@@ -230,7 +226,7 @@ class YamiboPostLinkUtilTest {
                 desktopSession = false
             )
         )
-        // 用户已经点过电脑版后，无参数或错误带 mobile=2 的普通链接都继续使用电脑版
+        // 用户已经点过电脑版后，非帖子页面继续使用电脑版
         assertEquals(
             "https://bbs.yamibo.com/forum-30-2.html?mobile=no",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
@@ -238,16 +234,15 @@ class YamiboPostLinkUtilTest {
                 desktopSession = true
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no",
+        // 直接帖子即使模板参数不同也不在 WebViewClient 内重写
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
                 desktopSession = true,
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=no",
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
                 desktopSession = true,
@@ -306,25 +301,22 @@ class YamiboPostLinkUtilTest {
 
     @Test
     fun desktopMhtListThreadLinksStayDesktop() {
-        // 「海域區」真实样本：列表和帖子都是无 mobile 参数的 SEO URL。
-        assertEquals(
-            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
+        // WebViewClient 不再二次改写真实帖子链接。
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-574592-1-1.html",
                 desktopSession = true,
                 currentUrl = "https://bbs.yamibo.com/forum-33-1.html"
             )
         )
-        // 「遊戲區」真实样本：列表显式 mobile=no，帖子链接仍没有版本参数。
-        assertEquals(
-            "https://bbs.yamibo.com/thread-574285-1-1.html?mobile=no",
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-574285-1-1.html",
                 desktopSession = true,
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=44&mobile=no"
             )
         )
-        // 列表点击实际先走 AndroidSearchNav；桥接后还会再经过一次直达归一化。
+        // BBS 列表仍在导航前按当前 DOM 模板生成唯一目标 URL。
         val bridgedUrl = YamiboPostLinkUtil.normalizePostUrlForTemplate(
             "https://bbs.yamibo.com/thread-574592-1-1.html",
             desktopTemplate = true
@@ -344,7 +336,19 @@ class YamiboPostLinkUtilTest {
     }
 
     @Test
-    fun findPostRedirectAlwaysBypassesTemplateRewrite() {
+    fun everyPostNavigationBypassesWebViewTemplateRewrite() {
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=572320",
+                desktopSession = false
+            )
+        )
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/thread-572320-2-1.html?mobile=2",
+                desktopSession = true
+            )
+        )
         assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541&mobile=2",
