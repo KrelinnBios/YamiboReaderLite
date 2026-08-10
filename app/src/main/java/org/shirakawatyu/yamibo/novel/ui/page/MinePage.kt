@@ -136,7 +136,6 @@ import org.shirakawatyu.yamibo.novel.ui.widget.YamiboToast
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
 import org.shirakawatyu.yamibo.novel.util.SettingsUtil
 import org.shirakawatyu.yamibo.novel.util.StaticAssetProxy
-import org.shirakawatyu.yamibo.novel.util.WebViewPool
 import org.shirakawatyu.yamibo.novel.util.darkThemeColor
 import org.shirakawatyu.yamibo.novel.util.forum.ForumBlocklistManager
 import org.shirakawatyu.yamibo.novel.util.history.HistoryUtil
@@ -308,6 +307,8 @@ fun MinePage(
     var mineDialog by remember { mutableStateOf<MineDialogState>(MineDialogState.None) }
     var manualUpdateInfo by remember { mutableStateOf<AppUpdateInfo?>(null) }
     var manualUpdateFailure by remember { mutableStateOf<String?>(null) }
+    var webViewGeneration by remember { mutableIntStateOf(0) }
+    var rendererRecoveryUrl by remember { mutableStateOf<String?>(null) }
 
     val canConvertToReader = remember(currentUrl, pageTitle) {
         ReaderModeDetector.canConvertToReaderMode(currentUrl, pageTitle)
@@ -508,7 +509,7 @@ fun MinePage(
     val forumBlocklistApi = remember { ForumBlocklistJSInterface() }
     val pullRefreshBridge = remember { WebViewPullRefreshBridge() }
 
-    val mineWebView = remember(fromHistory, historyTargetUrl) {
+    val mineWebView = remember(fromHistory, historyTargetUrl, webViewGeneration) {
         val isNew = minePageVM.cachedWebView == null
         val webView = minePageVM.getOrAcquireWebView(context)
 
@@ -660,7 +661,11 @@ fun MinePage(
     }
 
     LaunchedEffect(mineWebView, isSelected, initUrl) {
-        if (fromHistory && historyTargetUrl != null) {
+        val recoveryUrl = rendererRecoveryUrl
+        if (recoveryUrl != null) {
+            rendererRecoveryUrl = null
+            startLoading(mineWebView, recoveryUrl)
+        } else if (fromHistory && historyTargetUrl != null) {
             activeHistoryTargetUrl = historyTargetUrl
 
             val currentWebViewUrl = mineWebView.url ?: ""
@@ -723,13 +728,13 @@ fun MinePage(
                     } catch (e: Exception) {
                         Log.w("MinePage", "Cleanup history WebView failed", e)
                     }
-                    minePageVM.scheduleRelease(delayMs = 0L)
+                    minePageVM.scheduleRelease(mineWebView, delayMs = 0L)
                 } else {
                     // 去原生漫画 / 阅读器时保留几分钟，返回详情页可以恢复原 WebView。
-                    minePageVM.scheduleRelease()
+                    minePageVM.scheduleRelease(mineWebView)
                 }
             } else {
-                minePageVM.scheduleRelease()
+                minePageVM.scheduleRelease(mineWebView)
             }
         }
     }
@@ -900,7 +905,9 @@ fun MinePage(
         }
     }
 
-    LaunchedEffect(mineWebView, isSelected) {
+    // WebViewClient 必须在上面的初始 loadUrl 协程真正执行前同步安装。历史页经常命中缓存，
+    // 若仍用 LaunchedEffect 安装，onPageFinished 可能先被池中的空客户端接走，加载遮罩便不会撤下。
+    DisposableEffect(mineWebView, isSelected) {
         mineWebView.webViewClient = object : YamiboWebViewClient() {
             val contentImageCount = AtomicInteger(0)
             private fun isHomepageUrl(url: String): Boolean {
@@ -1245,13 +1252,19 @@ fun MinePage(
                 view: WebView?,
                 detail: android.webkit.RenderProcessGoneDetail?
             ): Boolean {
-                view?.let { WebViewPool.discard(it) }
-
                 timeoutJob?.cancel()
-                hasError = true
-                isLoading = false
+                Log.e("MinePage", "WebView renderer gone; crashed=${detail?.didCrash()}")
+                val deadView = view ?: mineWebView
+                rendererRecoveryUrl = runCatching { deadView.url }
+                    .getOrNull()
+                    ?.takeUnless { it == "about:blank" || it.contains("warmup=true") }
+                    ?: historyTargetUrl
+                minePageVM.discard(deadView)
+                hasError = false
+                isLoading = true
                 isPullRefreshing = false
-                showLoadError = true
+                showLoadError = false
+                webViewGeneration++
 
                 return true
             }
@@ -1267,7 +1280,7 @@ fun MinePage(
                 }
             }
         }
-
+        onDispose { }
     }
 
     DisposableEffect(mineWebView, isSelected) {
@@ -1536,7 +1549,12 @@ fun MinePage(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                         .then(blockModifier)
-                )
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             if (autoOpenMangaMode) {

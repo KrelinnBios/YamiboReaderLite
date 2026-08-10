@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -147,6 +148,7 @@ class MainActivity : ComponentActivity() {
     var bbsWebViewState by mutableStateOf<WebView?>(null)
         private set
     private var backgroundStopJob: Job? = null
+    private var bbsRendererRecoveryGeneration = 0
     private val mainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private val fileChooserLauncher = registerForActivityResult(
@@ -292,8 +294,14 @@ class MainActivity : ComponentActivity() {
             }
 
             else -> {
-                bbsWebViewState?.onResume()
-                bbsWebViewState?.resumeTimers()
+                val currentWebView = bbsWebViewState
+                runCatching {
+                    currentWebView?.onResume()
+                    currentWebView?.resumeTimers()
+                }.onFailure { error ->
+                    Log.e("MainActivity", "Resume BBS WebView failed; recreating", error)
+                    recreateBbsWebViewAfterRendererGone(currentWebView)
+                }
             }
         }
     }
@@ -301,7 +309,13 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         BBSPageState.markAppStopped()
-        bbsWebViewState?.onPause()
+        val currentWebView = bbsWebViewState
+        runCatching { currentWebView?.onPause() }
+            .onFailure { error ->
+                Log.e("MainActivity", "Pause BBS WebView failed; discarding", error)
+                destroyBbsWebView(currentWebView)
+                BBSPageState.resetForNewBbsWebView()
+            }
 
         backgroundStopJob?.cancel()
         backgroundStopJob = mainScope.launch {
@@ -321,7 +335,32 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        recreateBbsWebViewForRecovery(clearErrorState = false)
+        val recoveryUrl = BBSPageState.bestRecoveryUrl(
+            deadView ?: bbsWebViewState,
+            BBSGlobalWebViewClient.MOBILE_INDEX_URL
+        )
+        val recoveryGeneration = ++bbsRendererRecoveryGeneration
+
+        // onRenderProcessGone 仍处在旧 WebView 的回调栈内：先同步移除失效实例，
+        // 新实例延后一轮主线程消息再创建，避免 WebView provider 重入导致整个 Activity 闪退。
+        destroyBbsWebView(deadView ?: bbsWebViewState)
+        BBSPageState.resetForNewBbsWebView()
+        window.decorView.post {
+            if (recoveryGeneration != bbsRendererRecoveryGeneration || isFinishing || isDestroyed) {
+                return@post
+            }
+
+            runCatching { createBbsWebView(this, customWebChromeClient) }
+                .onSuccess { replacement ->
+                    bbsWebViewState = replacement
+                    BBSPageState.currentUrl = recoveryUrl
+                    BBSPageState.requestRecoveryBeforeShowingError()
+                }
+                .onFailure { error ->
+                    Log.e("MainActivity", "Recreate BBS WebView after renderer gone failed", error)
+                    BBSPageState.failRecoveryBeforeShowingError()
+                }
+        }
     }
 
     private fun recreateBbsWebViewAfterLongBackground() {

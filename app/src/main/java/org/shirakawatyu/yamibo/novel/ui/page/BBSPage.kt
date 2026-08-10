@@ -432,6 +432,7 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
         view: WebView?,
         detail: android.webkit.RenderProcessGoneDetail?
     ): Boolean {
+        Log.e("BBSPage", "WebView renderer gone; crashed=${detail?.didCrash()}")
         handleErrorState()
         (context as? org.shirakawatyu.yamibo.novel.MainActivity)
             ?.recreateBbsWebViewAfterRendererGone(view)

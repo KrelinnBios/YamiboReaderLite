@@ -1,6 +1,7 @@
 package org.shirakawatyu.yamibo.novel.util
 
 import android.app.Activity
+import android.util.Log
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
@@ -90,13 +91,23 @@ fun ActivityWebViewLifecycleObserver(webView: WebView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    webView.onResume()
-                    webView.resumeTimers()
+                    runCatching {
+                        webView.onResume()
+                        webView.resumeTimers()
+                    }.onFailure {
+                        // renderer gone 后重组尚未完成时，旧观察者可能收到最后一次生命周期事件。
+                        // 已销毁 WebView 的调用不能再升级成主线程闪退。
+                        Log.w("WebViewLifecycle", "Resume ignored for unavailable WebView", it)
+                    }
                 }
 
                 Lifecycle.Event.ON_PAUSE -> {
-                    webView.onPause()
-                    webView.pauseTimers()
+                    runCatching {
+                        webView.onPause()
+                        webView.pauseTimers()
+                    }.onFailure {
+                        Log.w("WebViewLifecycle", "Pause ignored for unavailable WebView", it)
+                    }
                 }
 
                 else -> {}
