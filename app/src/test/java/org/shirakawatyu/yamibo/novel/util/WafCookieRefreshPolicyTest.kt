@@ -5,18 +5,8 @@ import org.junit.Test
 
 class WafCookieRefreshPolicyTest {
     @Test
-    fun initialChallenge_isDeferredUntilVisiblePageStartsLoading() {
-        assertEquals(1_500L, WafCookieRefreshPolicy.INITIAL_REFRESH_DELAY_MS)
-    }
-
-    @Test
-    fun successfulChallenge_refreshesBeforeThirtyMinuteExpiry() {
-        assertEquals(25 * 60 * 1000L, WafCookieRefreshPolicy.nextDelayMs(succeeded = true))
-    }
-
-    @Test
-    fun failedChallenge_retriesSooner() {
-        assertEquals(2 * 60 * 1000L, WafCookieRefreshPolicy.nextDelayMs(succeeded = false))
+    fun challengeUrl_doesNotForceForumTemplate() {
+        assertEquals("https://bbs.yamibo.com/forum.php", WafCookieRefreshPolicy.CHALLENGE_URL)
     }
 
     @Test
