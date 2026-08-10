@@ -82,8 +82,8 @@ class YamiboPostLinkUtilTest {
                 desktopSession = false
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541&mobile=2",
+        // findpost 必须保留给 WebView 原生跟随 302；预先 loadUrl 改写会吞掉首次点击
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541",
                 desktopSession = false
@@ -339,6 +339,23 @@ class YamiboPostLinkUtilTest {
             YamiboPostLinkUtil.normalizePostUrlForTemplate(
                 "https://bbs.yamibo.com/thread-574592-1-1.html",
                 desktopTemplate = false
+            )
+        )
+    }
+
+    @Test
+    fun findPostRedirectAlwaysBypassesTemplateRewrite() {
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541&mobile=2",
+                desktopSession = true,
+                currentUrl = "https://bbs.yamibo.com/home.php?mod=space&uid=399468&do=thread&view=me&mobile=no"
+            )
+        )
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?goto=findpost&ptid=572320&pid=41559541",
+                desktopSession = false
             )
         )
     }
