@@ -605,6 +605,15 @@ object MangaImagePipeline {
             .memoryCacheKey(MemoryCache.Key(key))
             .memoryCachePolicy(if (memory) CachePolicy.ENABLED else CachePolicy.DISABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
+            .apply {
+                if (!memory) {
+                    // WebView 接管和冷预取只需要 Coil 把原始响应写入磁盘缓存，最终图片
+                    // 仍由 WebView/阅读器自行解码。限制这次无目标请求的解码尺寸，避免
+                    // 多图长帖并发下载时先在 App 进程解码多张原图、随后又由 WebView
+                    // 重复解码，从而把瞬时内存峰值放大到触发闪退。
+                    size(1, 1)
+                }
+            }
             .applyDefaultHeaders(url = url, explicitCookie = explicitCookie, headers = headers)
             .build()
 
