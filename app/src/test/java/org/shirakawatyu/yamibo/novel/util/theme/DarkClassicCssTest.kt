@@ -20,10 +20,10 @@ class DarkClassicCssTest {
     }
 
     @Test
-    fun mobileBlogPaginationWrapperStaysTransparent() {
+    fun mobileBlogPaginationWrapperUsesPanelBackground() {
         assertTrue(
             css.contains(
-                "body.pg_space .threadlist_box .pgs { background-color: transparent !important; }"
+                "body.pg_space .threadlist_box .pgs { background-color: #182332 !important; }"
             )
         )
     }
