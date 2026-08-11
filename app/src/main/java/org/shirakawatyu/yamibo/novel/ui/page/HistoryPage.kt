@@ -537,16 +537,16 @@ fun HistoryPage(navController: NavController) {
         enabled = GlobalData.currentUid.isNotBlank(),
         steps = listOf(
             OnboardingStep(
-                title = "浏览历史小提示",
-                description = "搜索框支持组合查询：多个关键词用空格隔开，标题、作者或版块里包含全部关键词的记录才会显示。"
+                title = "浏览历史",
+                description = "搜索时可以用空格分隔多个关键词，只有包含全部关键词的记录才会显示。"
             ),
             OnboardingStep(
-                title = "浏览历史小提示",
-                description = "点击搜索框右侧的日历图标可以按日期筛选：左右箭头只切换到有浏览记录的月份，颜色越深表示当天记录越多，只能点选有记录的日期。点一个日期筛选当天，再点另一个日期即为范围，重复点击已选日期可以取消。筛选生效后上方会出现日期标签，点击标签可以清除。"
+                title = "浏览历史",
+                description = "点击日历可以按单日或日期范围筛选；日期颜色越深，表示当天的浏览记录越多。"
             ),
             OnboardingStep(
-                title = "浏览历史小提示",
-                description = "点击右上角「管理」图标进入多选模式，可以全选并批量删除；右上角垃圾桶图标可以一键清空全部历史（有二次确认）。"
+                title = "浏览历史",
+                description = "点击「管理」可以批量删除记录；点击垃圾桶可以清空全部历史。"
             )
         )
     )
