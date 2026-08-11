@@ -307,17 +307,38 @@ object PageJsScripts {
 
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV1) return;
-            window.__yamiboBbsThreadNavigationV1 = true;
-            function isThread(link) {
-                if (!link || !link.href) return false;
+            if (window.__yamiboBbsThreadNavigationV6) return;
+            window.__yamiboBbsThreadNavigationV6 = true;
+            function threadKind(link) {
+                if (!link || !link.href) return '';
                 try {
                     var url = new URL(link.href, document.baseURI);
                     var path = url.pathname.replace(/^\/+/, '').toLowerCase();
-                    return url.hostname === 'bbs.yamibo.com' &&
-                        (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
-                         (path === 'forum.php' && url.searchParams.get('mod') === 'viewthread' && /^\d+${'$'}/.test(url.searchParams.get('tid') || '')));
-                } catch (e) { return false; }
+                    var mod = String(url.searchParams.get('mod') || '').toLowerCase();
+                    var goto = String(url.searchParams.get('goto') || '').toLowerCase();
+                    var tid = url.searchParams.get('tid') || '';
+                    var pid = url.searchParams.get('pid') || '';
+                    var ptid = url.searchParams.get('ptid') || '';
+                    if (url.hostname !== 'bbs.yamibo.com') return '';
+                    if (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
+                        (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
+                        return 'viewthread';
+                    }
+                    if (path === 'forum.php' &&
+                        ((mod === 'redirect' && /^[1-9]\d*${'$'}/.test(pid)) ||
+                         (goto === 'findpost' &&
+                          (/^[1-9]\d*${'$'}/.test(pid) || /^[1-9]\d*${'$'}/.test(ptid))))) {
+                        return 'findpost';
+                    }
+                    return '';
+                } catch (e) { return ''; }
+            }
+            function navigationTarget(link) {
+                var url = new URL(link.href, document.baseURI);
+                var expectedMobile = document.getElementById('toptb') ? 'no' : '2';
+                url.searchParams.delete('mobile');
+                url.searchParams.append('mobile', expectedMobile);
+                return url.href;
             }
             function navigateToPost(link) {
                 var desktopTemplate = !!document.getElementById('toptb');
@@ -328,19 +349,28 @@ object PageJsScripts {
                 }
             }
             document.addEventListener('click', function(event) {
-                if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
-                if (link && !isThread(link)) return;
-                var item = event.target.closest ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]') : null;
-                if (!item) return;
-                if (!link && item) {
+                if (link) {
+                    if (!threadKind(link)) return;
+                } else {
+                    var item = event.target.closest
+                        ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
+                        : null;
+                    if (!item) return;
                     var links = item.querySelectorAll('a[href]');
-                    for (var i = 0; i < links.length && !link; i++) if (isThread(links[i])) link = links[i];
+                    for (var i = 0; i < links.length && !link; i++) if (threadKind(links[i])) link = links[i];
                 }
-                if (!isThread(link)) return;
+                var kind = threadKind(link);
+                if (!kind) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                navigateToPost(link);
+                if (kind === 'viewthread') {
+                    // 大区主题列表只在当前 WebView 内发起一次导航，避免再绕过 Compose 状态后
+                    // 调用 loadUrl，与当前点击产生加载竞态。
+                    window.location.assign(navigationTarget(link));
+                } else if (window.AndroidSearchNav && window.AndroidSearchNav.navigateToPost) {
+                    navigateToPost(link);
+                }
             }, true);
         })();
     """.trimIndent()
