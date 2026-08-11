@@ -25,6 +25,9 @@ class PageJsScriptsTest {
         assertTrue(nativeNavigationIndex >= 0)
         assertTrue(legacyListHandlerIndex > nativeNavigationIndex)
         assertTrue(script.contains("document.getElementById('toptb')"))
+        assertTrue(script.contains("if (kind === 'viewthread')"))
+        assertTrue(script.contains("window.location.assign(navigationTarget(link))"))
+        assertTrue(script.contains("} else if (window.AndroidSearchNav && window.AndroidSearchNav.navigateToPost)"))
         assertTrue(script.contains("navigateToPostWithTemplate(link.href, desktopTemplate)"))
         assertTrue(script.contains("navigateToPost(link.href)"))
         assertTrue(script.contains("event.stopImmediatePropagation()"))
@@ -32,7 +35,7 @@ class PageJsScriptsTest {
 
     @Test
     fun bbsThreadNavigationIsNotInjectedIntoOtherWebViews() {
-        val marker = "__yamiboBbsThreadNavigationV1"
+        val marker = "__yamiboBbsThreadNavigationV6"
 
         assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
         assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
