@@ -117,20 +117,20 @@ jobs:
             exit 1
           fi
           "$apksigner" verify --verbose --print-certs \
-            "app/build/outputs/apk/release/300 Lite.apk"
+            "app/build/outputs/apk/release/300-Lite.apk"
 
       - name: Prepare APK
         shell: bash
         run: |
           mkdir -p release
-          cp "app/build/outputs/apk/release/300 Lite.apk" \
-            "release/300 Lite.apk"
+          cp "app/build/outputs/apk/release/300-Lite.apk" \
+            "release/300-Lite.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
           name: 300 Lite-${{ github.run_number }}
-          path: release/300 Lite.apk
+          path: release/300-Lite.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -139,4 +139,4 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: release/300 Lite.apk
+          files: release/300-Lite.apk
