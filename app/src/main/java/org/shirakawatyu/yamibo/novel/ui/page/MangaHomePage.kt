@@ -382,6 +382,11 @@ fun MangaHomePage(
                             MangaHomeRow(
                                 item = item,
                                 alternate = index % 2 == 1,
+                                alternateRowColor = if (isDarkMode) {
+                                    classicDarkColors.surfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f)
+                                },
                                 isOpening = openingTid == item.tid,
                                 isFavorited = MangaTitleCleaner.getCleanBookName(item.title) in favoritedCleanTitles,
                                 onClick = {
@@ -455,12 +460,13 @@ fun MangaHomePage(
 private fun MangaHomeRow(
     item: MangaHomeItem,
     alternate: Boolean,
+    alternateRowColor: Color,
     isOpening: Boolean,
     isFavorited: Boolean,
     onClick: () -> Unit
 ) {
     val rowColor = if (alternate) {
-        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f)
+        alternateRowColor
     } else {
         MaterialTheme.colorScheme.surface
     }
