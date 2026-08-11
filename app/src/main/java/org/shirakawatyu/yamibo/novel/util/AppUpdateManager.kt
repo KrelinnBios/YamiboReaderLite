@@ -56,7 +56,7 @@ object AppUpdateManager {
         "https://api.github.com/repos/KrelinnBios/YamiboReaderLite/releases?per_page=20"
 
     // 下载源回退顺序：先 GitHub 直链，连不上再依次试镜像。镜像是「前缀代理」——把完整
-    // GitHub 直链接在镜像域名后即可（如 https://gh.llkk.cc/https://github.com/.../300.Lite.apk）。
+    // GitHub 直链接在镜像域名后即可（如 https://gh.llkk.cc/https://github.com/.../300-Lite.apk）。
     // 某镜像失效时改这里即可，无需动下载逻辑。
     internal val DOWNLOAD_MIRROR_PREFIXES = listOf(
         "https://ghproxy.net/",
@@ -291,12 +291,17 @@ object AppUpdateManager {
         }
 
         updateDir.listFiles()
-            ?.filter { it.name.startsWith("300 Lite-") || it.name == "300 Lite.apk" }
+            ?.filter {
+                it.name.startsWith("300-Lite-") ||
+                    it.name == "300-Lite.apk" ||
+                    it.name.startsWith("300 Lite-") ||
+                    it.name == "300 Lite.apk"
+            }
             ?.forEach { it.delete() }
 
         val safeVersionName = info.versionName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        // 缓存文件名内嵌版本号，便于排查“缓存里到底是哪一版”。GitHub 发布资产仍叫 300 Lite.apk。
-        val targetFile = File(updateDir, "300 Lite-$safeVersionName.apk")
+        // 缓存文件名内嵌版本号，便于排查“缓存里到底是哪一版”。GitHub 发布资产叫 300-Lite.apk。
+        val targetFile = File(updateDir, "300-Lite-$safeVersionName.apk")
         val tempFile = File(updateDir, "${targetFile.name}.download")
         tempFile.delete()
         targetFile.delete()
