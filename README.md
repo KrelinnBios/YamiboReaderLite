@@ -55,7 +55,7 @@ YamiboReaderLite 是面向百合会论坛的非官方 Android 阅读客户端。
 
 ### 安装使用
 
-从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 `300 Lite.apk` 后安装。
+从 [Releases](https://github.com/KrelinnBios/YamiboReaderLite/releases) 下载 `300-Lite.apk` 后安装。
 
 ### 系统要求
 
