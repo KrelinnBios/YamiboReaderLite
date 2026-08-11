@@ -1274,6 +1274,13 @@ fun MinePage(
                 request: WebResourceRequest?,
                 errorResponse: WebResourceResponse?
             ) {
+                if (tryRecoverWaf405(view, request, errorResponse)) {
+                    timeoutJob?.cancel()
+                    hasError = false
+                    isLoading = true
+                    showLoadError = false
+                    return
+                }
                 super.onReceivedHttpError(view, request, errorResponse)
                 if (request?.isForMainFrame == true) {
                     markMainFrameErrorIfExpected(request.url?.toString())

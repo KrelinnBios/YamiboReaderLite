@@ -921,6 +921,12 @@ fun ReaderWebPage(
                 request: WebResourceRequest?,
                 errorResponse: WebResourceResponse?
             ) {
+                if (tryRecoverWaf405(view, request, errorResponse)) {
+                    timeoutJob?.cancel()
+                    isLoading = true
+                    showLoadError = false
+                    return
+                }
                 if (request?.isForMainFrame == true) {
                     val errorUrl = request.url?.toString() ?: ""
                     val currentUrl = view?.url ?: ""

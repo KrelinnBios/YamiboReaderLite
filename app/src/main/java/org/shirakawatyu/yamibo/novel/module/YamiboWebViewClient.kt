@@ -27,6 +27,8 @@ import org.shirakawatyu.yamibo.novel.global.GlobalData
 import org.shirakawatyu.yamibo.novel.util.CookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.PageJsScripts
+import org.shirakawatyu.yamibo.novel.util.Waf405RecoveryManager
+import org.shirakawatyu.yamibo.novel.util.Waf405RecoveryPolicy
 import org.shirakawatyu.yamibo.novel.util.YamiboPostLinkUtil
 import org.shirakawatyu.yamibo.novel.util.blog.BlogReactionJsBridge
 import org.shirakawatyu.yamibo.novel.util.blog.MobileBlogJsScripts
@@ -378,6 +380,29 @@ open class YamiboWebViewClient : WebViewClient() {
             return true
         }
         return null
+    }
+
+    /**
+     * 论坛主文档被 WAF 以 405 拒绝时，静默刷新个人主页 Cookie 并重试原页面一次。
+     * 子类必须在把 405 交给自身错误页状态机之前调用。
+     */
+    protected fun tryRecoverWaf405(
+        view: WebView?,
+        request: WebResourceRequest?,
+        errorResponse: WebResourceResponse?
+    ): Boolean {
+        val failedUrl = request?.url?.toString().orEmpty()
+        if (view == null || !Waf405RecoveryPolicy.shouldRecover(
+                statusCode = errorResponse?.statusCode ?: 0,
+                method = request?.method.orEmpty(),
+                isMainFrame = request?.isForMainFrame == true,
+                isYamiboUrl = isYamiboForumUrl(failedUrl)
+            )
+        ) {
+            return false
+        }
+        revealThemeFlashSuppression(view, delayMs = 0L)
+        return Waf405RecoveryManager.recoverWebView(view, failedUrl)
     }
 
     /**

@@ -505,6 +505,14 @@ class BBSGlobalWebViewClient(private val context: Context) : YamiboWebViewClient
         request: WebResourceRequest?,
         errorResponse: WebResourceResponse?
     ) {
+        if (tryRecoverWaf405(view, request, errorResponse)) {
+            cancelMainFrameTimeout()
+            cancelCommitVisibleFallback()
+            BBSPageState.isLoading = true
+            BBSPageState.isErrorState = false
+            BBSPageState.showLoadError = false
+            return
+        }
         super.onReceivedHttpError(view, request, errorResponse)
         if (request?.isForMainFrame == true) {
             cancelMainFrameTimeout()

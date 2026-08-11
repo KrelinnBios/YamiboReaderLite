@@ -14,6 +14,8 @@ import org.shirakawatyu.yamibo.novel.constant.RequestConfig
 import org.shirakawatyu.yamibo.novel.util.ForumRedirectCookieUtil
 import org.shirakawatyu.yamibo.novel.util.LanguageModeUtil
 import org.shirakawatyu.yamibo.novel.util.YamiboSession
+import org.shirakawatyu.yamibo.novel.util.Waf405RecoveryManager
+import org.shirakawatyu.yamibo.novel.util.Waf405RecoveryPolicy
 import org.shirakawatyu.yamibo.novel.util.manga.ImageCheckerUtil
 import org.shirakawatyu.yamibo.novel.util.network.RateLimitInterceptor
 import org.shirakawatyu.yamibo.novel.util.network.TtlDnsCache
@@ -366,7 +368,20 @@ class YamiboRetrofit {
                     val canRetryResponse = attempt < 2 &&
                             request.method == "GET" &&
                             isRateLimitedResponse(response)
-                    if (!canRetryResponse) return response
+                    if (!canRetryResponse) {
+                        val refreshed = Waf405RecoveryPolicy.shouldRefreshForResponse(
+                            response.code,
+                            request.method
+                        ) && Waf405RecoveryManager.refreshAndWait()
+                        if (!refreshed) return response
+
+                        response.close()
+                        sharedConnectionPool.evictAll()
+                        val retriedRequest = request.newBuilder()
+                            .header("Cookie", YamiboSession.cookieFor(request.url.toString()))
+                            .build()
+                        return chain.proceed(retriedRequest)
+                    }
                     // 444 没有可用响应体，丢弃后退避换连接重试。
                     response.close()
                     sharedConnectionPool.evictAll()

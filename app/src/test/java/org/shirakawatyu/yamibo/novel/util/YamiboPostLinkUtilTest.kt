@@ -71,7 +71,7 @@ class YamiboPostLinkUtilTest {
         assertEquals(
             "https://bbs.yamibo.com/forum-30-2.html?mobile=2",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
-                "https://bbs.yamibo.com/forum-30-2.html",
+                "https://m.yamibo.com/forum-30-2.html",
                 desktopSession = false
             )
         )
@@ -82,8 +82,8 @@ class YamiboPostLinkUtilTest {
                 desktopSession = false
             )
         )
-        assertEquals(
-            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
+        // 帖子 URL 由页面脚本或 WebView 原生导航独占处理，不能在共享拦截层二次 loadUrl。
+        assertNull(
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://m.yamibo.com/thread-520058-2-1.html",
                 desktopSession = false
