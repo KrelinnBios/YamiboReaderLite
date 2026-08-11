@@ -770,16 +770,12 @@ fun App(bbsWebView: WebView?, webChromeClient: WebChromeClient, isRestoring: Boo
                             enabled = GlobalData.currentUid.isNotBlank() && bottomNavBarVM.showBottomNavBar,
                             steps = listOf(
                                 OnboardingStep(
-                                    title = "底栏操作小提示",
-                                    description = "单击底栏图标：切换到对应板块；已在该板块时单击不会重新加载。"
+                                    title = "底栏操作",
+                                    description = "单击底栏图标可以切换到对应板块；已经在当前板块时，不会重复加载页面。"
                                 ),
                                 OnboardingStep(
-                                    title = "底栏操作小提示",
-                                    description = "长按底栏图标：直接回到该板块主页（论坛首页/个人资料/漫画首页/收藏首页）。"
-                                ),
-                                OnboardingStep(
-                                    title = "底栏操作小提示",
-                                    description = "下拉页面：刷新当前内容，长按已不再用于刷新。"
+                                    title = "底栏操作",
+                                    description = "长按底栏图标可以返回该板块主页；下拉页面可以刷新当前内容。"
                                 )
                             )
                         )
