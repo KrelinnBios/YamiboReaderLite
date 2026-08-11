@@ -7,7 +7,7 @@
 - **YamiboReaderLite（300 Lite）**：面向百合会论坛（bbs.yamibo.com）的非官方 Android 阅读客户端，基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改而来。
 - Kotlin + Jetpack Compose + Material 3；minSdk 24 / targetSdk 34 / compileSdk 34 / JDK 17。
 - 包名 `org.shirakawatyu.yamibo.novel`，applicationId `com.krelinnbios.yamiboreaderlite`。
-- 仅构建 `arm64-v8a` 和 `armeabi-v7a`；APK 固定命名为 `300 Lite.apk`。
+- 仅构建 `arm64-v8a` 和 `armeabi-v7a`；APK 固定命名为 `300-Lite.apk`。
 - 应用内更新绑定 GitHub Releases（KrelinnBios/YamiboReaderLite）。
 
 ## 当前功能
@@ -33,7 +33,7 @@
 ```powershell
 .\gradlew.bat compileDebugKotlin   # Kotlin 改动后的最低检查，必须执行
 .\gradlew.bat testDebugUnitTest    # 运行本地单元测试
-.\gradlew.bat assembleDebug        # 生成 app\build\outputs\apk\debug\300 Lite.apk
+.\gradlew.bat assembleDebug        # 生成 app\build\outputs\apk\debug\300-Lite.apk
 .\gradlew.bat clean assembleDebug  # 增量构建出现 TaskOutputsBackup/IOException 等损坏时使用
 ```
 
@@ -170,7 +170,7 @@
 - workflow 只构建 release 签名包（`assembleRelease`），四个签名 secrets 缺一即失败。
 - release 触发时版本号从 tag 推导：`APP_VERSION_NAME` 为 tag 去掉 `v` 前缀，`APP_VERSION_CODE` 为 `github.run_number`；tag 必须符合 `v数字.数字…` 格式，否则构建直接失败。发布包不得回落到 `build.gradle.kts` 的默认版本号，否则会导致应用内更新循环。
 - GitHub Actions 固定使用 Node 24 兼容版本：checkout@v5、setup-java@v5、setup-gradle@v5、setup-android@v4、upload-artifact@v5，并设置 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`。不要降级。
-- 发布产物路径和名称固定为 `app/build/outputs/apk/release/300 Lite.apk` / `300 Lite.apk`。
+- 发布产物路径和名称固定为 `app/build/outputs/apk/release/300-Lite.apk` / `300-Lite.apk`。
 
 ## 测试与修改原则
 
