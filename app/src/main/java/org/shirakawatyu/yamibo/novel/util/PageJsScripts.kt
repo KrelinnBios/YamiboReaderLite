@@ -305,60 +305,43 @@ object PageJsScripts {
         })();
     """.trimIndent()
 
-    /**
-     * 论坛主 WebView 的帖子导航前置脚本：先确定当前页面模板，再只发起一次最终 URL 导航。
-     * YamiboWebViewClient 会放行帖子 URL，不能在 shouldOverrideUrlLoading 中再次 loadUrl。
-     */
+    /** 论坛列表进帖沿用 v1.6.67 的原生桥接路径，避免 WebView 内直接跳转造成闪退。 */
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV8) return;
-            window.__yamiboBbsThreadNavigationV8 = true;
-            function threadKind(link) {
-                if (!link || !link.href) return '';
+            if (window.__yamiboBbsThreadNavigationV9) return;
+            window.__yamiboBbsThreadNavigationV9 = true;
+            function isThread(link) {
+                if (!link || !link.href) return false;
                 try {
                     var url = new URL(link.href, document.baseURI);
                     var path = url.pathname.replace(/^\/+/, '').toLowerCase();
-                    var mod = String(url.searchParams.get('mod') || '').toLowerCase();
-                    var tid = url.searchParams.get('tid') || '';
-                    var pid = url.searchParams.get('pid') || '';
-                    var ptid = url.searchParams.get('ptid') || '';
-                    if (url.hostname !== 'bbs.yamibo.com') return '';
-                    if (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
-                        (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
-                        return 'viewthread';
-                    }
-                    if (path === 'forum.php' && mod === 'redirect' &&
-                        (/^[1-9]\d*${'$'}/.test(tid) ||
-                         /^[1-9]\d*${'$'}/.test(pid) ||
-                         /^[1-9]\d*${'$'}/.test(ptid))) {
-                        return 'redirect';
-                    }
-                    return '';
-                } catch (e) { return ''; }
+                    return url.hostname === 'bbs.yamibo.com' &&
+                        (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
+                         (path === 'forum.php' && url.searchParams.get('mod') === 'viewthread' && /^\d+${'$'}/.test(url.searchParams.get('tid') || '')));
+                } catch (e) { return false; }
             }
-            function navigationTarget(link) {
-                var url = new URL(link.href, document.baseURI);
-                var expectedMobile = document.getElementById('toptb') ? 'no' : '2';
-                url.searchParams.delete('mobile');
-                url.searchParams.append('mobile', expectedMobile);
-                return url.href;
+            function navigateToPost(link) {
+                var desktopTemplate = !!document.getElementById('toptb');
+                if (window.AndroidSearchNav.navigateToPostWithTemplate) {
+                    window.AndroidSearchNav.navigateToPostWithTemplate(link.href, desktopTemplate);
+                } else {
+                    window.AndroidSearchNav.navigateToPost(link.href);
+                }
             }
             document.addEventListener('click', function(event) {
+                if (!window.AndroidSearchNav || !window.AndroidSearchNav.navigateToPost) return;
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
-                if (link) {
-                    if (!threadKind(link)) return;
-                } else {
-                    var item = event.target.closest
-                        ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
-                        : null;
-                    if (!item) return;
+                if (link && !isThread(link)) return;
+                var item = event.target.closest ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]') : null;
+                if (!item) return;
+                if (!link && item) {
                     var links = item.querySelectorAll('a[href]');
-                    for (var i = 0; i < links.length && !link; i++) if (threadKind(links[i])) link = links[i];
+                    for (var i = 0; i < links.length && !link; i++) if (isThread(links[i])) link = links[i];
                 }
-                if (!threadKind(link)) return;
+                if (!isThread(link)) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                window.location.assign(navigationTarget(link));
+                navigateToPost(link);
             }, true);
         })();
     """.trimIndent()
@@ -2429,10 +2412,10 @@ $styleString
                     url = keyword;
                 }
 
-                if (url) {
+                if (url && window.AndroidSearchNav) {
                     e.preventDefault();
                     e.stopPropagation();
-                    window.location.assign(url);
+                    window.AndroidSearchNav.navigateToPost(url);
                 }
             }, true);
         })();
