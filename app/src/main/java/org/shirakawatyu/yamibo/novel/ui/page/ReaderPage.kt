@@ -232,16 +232,12 @@ fun ReaderPage(
         enabled = GlobalData.currentUid.isNotBlank(),
         steps = listOf(
             OnboardingStep(
-                title = "小说阅读小提示",
-                description = "点击正文可呼出菜单，菜单里能调节字号、行距、页边距和横向/纵向翻页方式。"
+                title = "小说阅读",
+                description = "点击正文可以显示或收起菜单，并在菜单中调节字号、行距、页边距和翻页方式。"
             ),
             OnboardingStep(
-                title = "小说阅读小提示",
-                description = "菜单里的目录支持跨论坛页聚合全书章节，可按序号或章节号搜索、正倒序排列。"
-            ),
-            OnboardingStep(
-                title = "小说阅读小提示",
-                description = "阅读进度会自动记录，下次打开同一本书会跳回上次的位置。"
+                title = "小说阅读",
+                description = "目录支持跨论坛页汇总章节、搜索和排序；阅读进度会自动记录。"
             )
         )
     )
