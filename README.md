@@ -15,6 +15,9 @@
   <img src="https://img.shields.io/badge/许可-AGPL--3.0-1f5f9c?style=flat-square" alt="AGPL-3.0 License">
 </p>
 
+> [!WARNING]
+> YamiboReaderLite 已停止维护，不再发布更新。后续开发仅在 [YamiboPlus](https://github.com/KrelinnBios/YamiboPlus) 进行，请前往新项目关注后续版本。
+
 > [!IMPORTANT]
 > YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，同时延续 [flben233/YamiboReader](https://github.com/flben233/YamiboReader) 的上游代码，并非从零开发的独立项目。完整上游归属见 [NOTICE](./NOTICE)。感谢原作者及所有上游贡献者。
 
