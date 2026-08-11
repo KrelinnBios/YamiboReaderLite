@@ -38,8 +38,29 @@ class YamiboPostLinkUtilTest {
     }
 
     @Test
+    fun acceptsPostRedirectsWithoutPid() {
+        assertEquals(
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=lastpost&tid=574170&mobile=2",
+            YamiboPostLinkUtil.normalizePostUrl(
+                "https://bbs.yamibo.com/forum.php?mod=redirect&goto=lastpost&tid=574170"
+            )
+        )
+        assertEquals(
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&mobile=2",
+            YamiboPostLinkUtil.normalizePostUrl(
+                "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320"
+            )
+        )
+    }
+
+    @Test
     fun rejectsNonPostAndImageLinks() {
         assertNull(YamiboPostLinkUtil.extractPostUrl("https://bbs.yamibo.com/forum.php"))
+        assertNull(
+            YamiboPostLinkUtil.extractPostUrl(
+                "https://bbs.yamibo.com/forum.php?mod=redirect&goto=register"
+            )
+        )
         assertNull(
             YamiboPostLinkUtil.extractPostUrl(
                 "https://bbs.yamibo.com/data/attachment/forum/example.jpg"
@@ -290,7 +311,9 @@ class YamiboPostLinkUtilTest {
             "https://bbs.yamibo.com/thread-572407-2-1.html",
             "https://bbs.yamibo.com/thread-520058-2-1.html",
             "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=no",
-            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541"
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320&pid=41559541",
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=findpost&ptid=572320",
+            "https://bbs.yamibo.com/forum.php?mod=redirect&goto=lastpost&tid=574170"
         )
 
         postUrls.forEach { url ->
