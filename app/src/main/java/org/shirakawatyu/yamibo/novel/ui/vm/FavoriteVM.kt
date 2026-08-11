@@ -355,11 +355,13 @@ class FavoriteVM(private val applicationContext: Context) : ViewModel() {
         return updatedFavorite != null
     }
 
-    private fun cleanNovelProbeTitle(rawTitle: String): String =
-        rawTitle.replace(
+    private fun cleanNovelProbeTitle(rawTitle: String): String {
+        val threadTitle = rawTitle.replace(
             Regex("\\s+[-—–_]+\\s+.*?(文學區|轻小说/译文区|TXT小说区|百合会|论坛).*$"),
             ""
         ).trim().ifBlank { rawTitle }
+        return MangaTitleCleaner.getCleanBookName(threadTitle).ifBlank { threadTitle }
+    }
 
     private fun mirrorUpdateCheckingUrls(actualCheckingUrls: Set<String>) {
         val now = System.currentTimeMillis()

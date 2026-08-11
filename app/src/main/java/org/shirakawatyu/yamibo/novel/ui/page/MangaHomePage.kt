@@ -383,7 +383,8 @@ fun MangaHomePage(
                                 item = item,
                                 alternate = index % 2 == 1,
                                 alternateRowColor = if (isDarkMode) {
-                                    classicDarkColors.surfaceVariant
+                                    // 与亮色模式一样只保留轻微分层，避免不透明面板色形成强烈斑马纹。
+                                    classicDarkColors.surfaceVariant.copy(alpha = 0.42f)
                                 } else {
                                     MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f)
                                 },

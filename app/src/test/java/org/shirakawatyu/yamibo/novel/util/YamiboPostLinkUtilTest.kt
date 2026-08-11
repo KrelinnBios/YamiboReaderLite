@@ -103,8 +103,9 @@ class YamiboPostLinkUtilTest {
                 desktopSession = false
             )
         )
-        // 帖子 URL 由页面脚本或 WebView 原生导航独占处理，不能在共享拦截层二次 loadUrl。
-        assertNull(
+        // 帖子同样由共享 WebViewClient 生成唯一目标，并归一到主论坛域名。
+        assertEquals(
+            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://m.yamibo.com/thread-520058-2-1.html",
                 desktopSession = false
@@ -237,14 +238,16 @@ class YamiboPostLinkUtilTest {
                 desktopSession = true
             )
         )
-        assertNull(
+        assertEquals(
+            "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=no",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
                 desktopSession = true,
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=30&mobile=no"
             )
         )
-        assertNull(
+        assertEquals(
+            "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=no",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=2",
                 desktopSession = true,
@@ -302,7 +305,7 @@ class YamiboPostLinkUtilTest {
     }
 
     @Test
-    fun everyPostNavigationBypassesWebViewTemplateRewrite() {
+    fun everyPostNavigationGetsOneFinalTemplateUrl() {
         val postUrls = listOf(
             // 帖子底部分页选择器会生成这种无 mobile 参数的 viewthread URL。
             "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&page=2",
@@ -317,19 +320,30 @@ class YamiboPostLinkUtilTest {
         )
 
         postUrls.forEach { url ->
-            assertNull(
-                YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
-                    url,
-                    desktopSession = false
-                )
+            val mobileUrl = YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                url,
+                desktopSession = false
             )
-            assertNull(
-                YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
-                    url,
-                    desktopSession = true
-                )
+            val desktopUrl = YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                url,
+                desktopSession = true
             )
+            assertTrue(mobileUrl?.contains("mobile=2") == true || url.contains("mobile=2"))
+            assertTrue(desktopUrl?.contains("mobile=no") == true || url.contains("mobile=no"))
         }
+
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/forum.php?mod=viewthread&tid=573162&mobile=2",
+                desktopSession = false
+            )
+        )
+        assertNull(
+            YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
+                "https://bbs.yamibo.com/thread-520058-2-1.html?mobile=no",
+                desktopSession = true
+            )
+        )
     }
 
     @Test
@@ -356,7 +370,8 @@ class YamiboPostLinkUtilTest {
     @Test
     fun desktopMhtListThreadLinksStayDesktop() {
         // 「海域區」真实样本：列表和帖子都是无 mobile 参数的 SEO URL。
-        assertNull(
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574592-1-1.html?mobile=no",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-574592-1-1.html",
                 desktopSession = true,
@@ -364,14 +379,15 @@ class YamiboPostLinkUtilTest {
             )
         )
         // 「遊戲區」真实样本：列表显式 mobile=no，帖子链接仍没有版本参数。
-        assertNull(
+        assertEquals(
+            "https://bbs.yamibo.com/thread-574285-1-1.html?mobile=no",
             YamiboPostLinkUtil.normalizeForumPageTemplateUrl(
                 "https://bbs.yamibo.com/thread-574285-1-1.html",
                 desktopSession = true,
                 currentUrl = "https://bbs.yamibo.com/forum.php?mod=forumdisplay&fid=44&mobile=no"
             )
         )
-        // 列表点击实际先走 AndroidSearchNav；桥接层独立生成唯一的电脑版目标 URL。
+        // 直达桥接层同样生成相同的电脑版目标 URL。
         val bridgedUrl = YamiboPostLinkUtil.normalizePostUrlForTemplate(
             "https://bbs.yamibo.com/thread-574592-1-1.html",
             desktopTemplate = true

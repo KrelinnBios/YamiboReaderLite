@@ -65,13 +65,48 @@ class MangaTitleCleaner {
         }
 
         /**
+         * 论坛标题的前置方括号通常是分类、作者或发布组，但也有作品名本身被包住的旧帖，
+         * 例如「[轻小说][自翻][作者][作品名] 3【完结】」和「【作品名】第12话」。
+         * 仅当某个前置括号段之后只剩明确章节/卷号时，才把该段保留为作品名；其余情况
+         * 仍沿用原有元数据清理，避免把作者或汉化组误并入书名。
+         */
+        private fun unwrapLeadingWorkTitle(value: String): String? {
+            val leadingBracket = Regex("^\\s*(?:\\[([^\\]]{1,60})]|【([^】]{1,60})】)\\s*")
+            var working = value
+            while (true) {
+                val match = leadingBracket.find(working) ?: return null
+                val marker = match.groupValues.drop(1).firstOrNull(String::isNotBlank)?.trim().orEmpty()
+                val remainder = working.substring(match.range.last + 1).trim()
+                val suffix = remainder.replace(
+                    Regex("\\s*(?:\\[|【|[（(])?\\s*(?:完|完结|完結|end)\\s*(?:]|】|[）)])?\\s*$", RegexOption.IGNORE_CASE),
+                    ""
+                ).trim()
+                val onlyChapterOrVolume = suffix.isBlank() || suffix.matches(
+                    Regex(
+                        "(?i)(?:0*[1-9]\\d?|" +
+                                "(?:第\\s*)?[零〇一二两兩三四五六七八九十百千\\d]+(?:\\.\\d+)?" +
+                                "(?:\\s*(?:-|~|～|—|–|至)\\s*(?:第\\s*)?\\d+(?:\\.\\d+)?)?" +
+                                "\\s*[话話回章节幕折更卷](?:\\s*[-—:：#]?\\s*.{1,48})?|" +
+                                "vol(?:ume)?\\.?\\s*\\d+)"
+                    )
+                )
+                if (marker.length >= 2 && onlyChapterOrVolume) {
+                    return "$marker $remainder".trim()
+                }
+                working = remainder
+            }
+        }
+
+        /**
          * Extract cleaned book title for directory and search matching.
          */
         fun getCleanBookName(rawTitle: String): String {
             var clean = getCleanThreadTitle(rawTitle)
 
             clean = clean.replace(Regex("\\s+-\\s+.*?(中文百合漫画区|百合会|论坛).*$"), "")
-            clean = clean.replace(Regex("【.*?】|\\[.*?\\]"), "")
+            val wrappedWorkTitle = unwrapLeadingWorkTitle(clean)
+            clean = wrappedWorkTitle
+                ?: clean.replace(Regex("【.*?】|\\[.*?\\]"), "")
             clean = clean.replace(Regex("(?i)[\\(（]?c\\d+[\\)）]?"), "")
             clean = stripLeadingParenAnnotations(clean)
             clean = clean.replace(Regex("\\s*[|｜].*$"), "")
@@ -89,7 +124,7 @@ class MangaTitleCleaner {
             // 3. 截断章节标记及其后面的所有内容
             val chapterMarkerPattern = Regex(
                 "(?i)(" +
-                        "第\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+|" +
+                        "第\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+\\s*[话話织回章节幕折更卷]|" +
                         "\\s*(?:第\\s*)?(?<!\\d)[\\d０-９]+(?:[\\.．][\\d０-９]+)?\\s*[+＋]\\s*[\\d０-９]+(?:[\\.．][\\d０-９]+)?\\s*(?:[话話织回章节幕折更])?\\s*(?=[：:—\\-「【\\[(（《]|\\s|$)|" +
                         "[-—\\s]*[#＃]\\s*\\d+|" +
                         "[-—\\s]*S\\d+(\\s*EP\\d+)?|" +
@@ -100,10 +135,13 @@ class MangaTitleCleaner {
                         "(前篇|上篇|中篇|后篇|下篇)|" +
                         "[-—\\s]+(上|中|下)|" +
                         "[-—\\s]*[(（]\\s*[\\d\\.\\-零一二两三四五六七八九十百千]+\\s*[)）]|" +
-                        "\\s*(?<!\\d)\\d+(?:\\.\\d+)?\\s*(?:[话話织回章节幕折更])?\\s*(?=[：:—\\-「【\\[(（《]|\\s|$)" +
+                        "\\s*(?<![\\d第])\\d+(?:\\.\\d+)?\\s*(?:[话話织回章节幕折更])?\\s*(?=[：:—\\-「【\\[(（《]|\\s|$)" +
                         ")"
             )
-            val markerMatch = chapterMarkerPattern.find(clean)
+            var markerMatch = chapterMarkerPattern.find(clean)
+            if (wrappedWorkTitle != null && markerMatch?.range?.first == 0) {
+                markerMatch = chapterMarkerPattern.find(clean, markerMatch.range.last + 1)
+            }
             if (markerMatch != null) {
                 clean = clean.substring(0, markerMatch.range.first)
             }

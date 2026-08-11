@@ -50,6 +50,38 @@ class MangaTitleCleanerTest {
     }
 
     @Test
+    fun getCleanBookName_preservesBracketWrappedWorkTitles() {
+        assertEquals(
+            "作品名",
+            MangaTitleCleaner.getCleanBookName("【作品名】第12话")
+        )
+        assertEquals(
+            "作品名",
+            MangaTitleCleaner.getCleanBookName("[轻小说] [自翻][kiki][作品名] 3 【完结】")
+        )
+        assertEquals(
+            "最终话",
+            MangaTitleCleaner.getCleanBookName("[最终话]第1话")
+        )
+    }
+
+    @Test
+    fun getCleanBookName_onlyCutsExplicitChineseChapterMarkers() {
+        assertEquals(
+            "圣少女默示录 DEATHPAIR",
+            MangaTitleCleaner.getCleanBookName("[中村汚濁]圣少女默示录 DEATHPAIR 第17幕 抱着布偶的少女")
+        )
+        assertEquals(
+            "第七王子与魔法少女",
+            MangaTitleCleaner.getCleanBookName("第七王子与魔法少女")
+        )
+        assertEquals(
+            "第十二夜的回忆",
+            MangaTitleCleaner.getCleanBookName("第十二夜的回忆")
+        )
+    }
+
+    @Test
     fun isTruncatedCleanBookName_detectsMissingCollectionSuffix() {
         assertTrue(
             MangaTitleCleaner.isTruncatedCleanBookName(

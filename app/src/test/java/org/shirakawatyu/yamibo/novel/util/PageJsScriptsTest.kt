@@ -17,32 +17,15 @@ class PageJsScriptsTest {
     }
 
     @Test
-    fun bbsNavigationInterceptsThreadLinksBeforeLegacyListHandler() {
+    fun threadNavigationUsesSharedWebViewClientInsteadOfPageScript() {
         val script = PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS
-        val nativeNavigationIndex = script.indexOf("BBS_THREAD_NAVIGATION_JS")
-        val legacyListHandlerIndex = script.indexOf("THREAD_LIST_CLICK_FIX_JS")
 
-        assertTrue(nativeNavigationIndex >= 0)
-        assertTrue(legacyListHandlerIndex > nativeNavigationIndex)
-        assertTrue(script.contains("document.getElementById('toptb')"))
-        assertTrue(script.contains("return 'redirect'"))
-        assertTrue(script.contains("test(tid)"))
-        assertTrue(script.contains("test(pid)"))
-        assertTrue(script.contains("test(ptid)"))
-        assertTrue(script.contains("window.location.assign(navigationTarget(link))"))
-        assertFalse(script.contains("navigateToPostWithTemplate(link.href, desktopTemplate)"))
-        assertTrue(script.contains("event.stopImmediatePropagation()"))
-    }
-
-    @Test
-    fun bbsThreadNavigationIsNotInjectedIntoOtherWebViews() {
-        val marker = "__yamiboBbsThreadNavigationV7"
-
-        assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
-        assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
-        assertFalse(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS.contains(marker))
-        assertFalse(PageJsScripts.OTHER_COMMIT_BOOTSTRAP_JS.contains(marker))
-        assertFalse(PageJsScripts.MANGA_BOOTSTRAP_JS.contains(marker))
+        assertTrue(script.contains("THREAD_LIST_CLICK_FIX_JS"))
+        assertFalse(script.contains("BBS_THREAD_NAVIGATION_JS"))
+        assertFalse(script.contains("__yamiboBbsThreadNavigation"))
+        assertFalse(script.contains("window.location.assign(navigationTarget(link))"))
+        assertTrue(PageJsScripts.SEARCH_DIRECT_NAV_JS.contains("window.location.assign(url)"))
+        assertFalse(PageJsScripts.SEARCH_DIRECT_NAV_JS.contains("AndroidSearchNav.navigateToPost"))
     }
 
     @Test

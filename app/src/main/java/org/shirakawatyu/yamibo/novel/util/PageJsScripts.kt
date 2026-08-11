@@ -252,8 +252,8 @@ object PageJsScripts {
 
     val THREAD_LIST_CLICK_FIX_JS = """
         (function() {
-            if (window.__threadListClickFixV3) return;
-            window.__threadListClickFixV3 = true;
+            if (window.__threadListClickFixV4) return;
+            window.__threadListClickFixV4 = true;
 
             function closest(el, selector) {
                 while (el && el !== document && el.nodeType === 1) {
@@ -280,19 +280,19 @@ object PageJsScripts {
             if (!document.getElementById('yamibo-thread-list-click-style')) {
                 var style = document.createElement('style');
                 style.id = 'yamibo-thread-list-click-style';
-                style.textContent = 'li.list { cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.08); }';
+                style.textContent = 'li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"] { cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.08); }';
                 document.head.appendChild(style);
             }
 
             document.addEventListener('click', function(e) {
-                var li = closest(e.target, 'li.list');
-                if (!li) return;
+                var item = closest(e.target, 'li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]');
+                if (!item) return;
 
                 if (closest(e.target, 'a[href], button, input, textarea, select, label, .pswp')) return;
 
                 var threadLink =
-                    li.querySelector('a[href*="mod=viewthread"]') ||
-                    li.querySelector('a[href^="thread-"]');
+                    item.querySelector('a[href*="mod=viewthread"]') ||
+                    item.querySelector('a[href^="thread-"]');
 
                 if (!threadLink || !threadLink.href) return;
                 if (!isSafeThreadUrl(threadLink.getAttribute('href'))) return;
@@ -301,64 +301,6 @@ object PageJsScripts {
                 e.stopPropagation();
 
                 location.href = threadLink.href;
-            }, true);
-        })();
-    """.trimIndent()
-
-    val BBS_THREAD_NAVIGATION_JS = """
-        (function() {
-            if (window.__yamiboBbsThreadNavigationV7) return;
-            window.__yamiboBbsThreadNavigationV7 = true;
-            function threadKind(link) {
-                if (!link || !link.href) return '';
-                try {
-                    var url = new URL(link.href, document.baseURI);
-                    var path = url.pathname.replace(/^\/+/, '').toLowerCase();
-                    var mod = String(url.searchParams.get('mod') || '').toLowerCase();
-                    var tid = url.searchParams.get('tid') || '';
-                    var pid = url.searchParams.get('pid') || '';
-                    var ptid = url.searchParams.get('ptid') || '';
-                    if (url.hostname !== 'bbs.yamibo.com') return '';
-                    if (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
-                        (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
-                        return 'viewthread';
-                    }
-                    if (path === 'forum.php' && mod === 'redirect' &&
-                        (/^[1-9]\d*${'$'}/.test(tid) ||
-                         /^[1-9]\d*${'$'}/.test(pid) ||
-                         /^[1-9]\d*${'$'}/.test(ptid))) {
-                        return 'redirect';
-                    }
-                    return '';
-                } catch (e) { return ''; }
-            }
-            function navigationTarget(link) {
-                var url = new URL(link.href, document.baseURI);
-                var expectedMobile = document.getElementById('toptb') ? 'no' : '2';
-                url.searchParams.delete('mobile');
-                url.searchParams.append('mobile', expectedMobile);
-                return url.href;
-            }
-            document.addEventListener('click', function(event) {
-                var link = event.target.closest ? event.target.closest('a[href]') : null;
-                if (link) {
-                    if (!threadKind(link)) return;
-                } else {
-                    var item = event.target.closest
-                        ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
-                        : null;
-                    if (!item) return;
-                    var links = item.querySelectorAll('a[href]');
-                    for (var i = 0; i < links.length && !link; i++) if (threadKind(links[i])) link = links[i];
-                }
-                var kind = threadKind(link);
-                if (!kind) return;
-                event.preventDefault();
-                event.stopImmediatePropagation();
-                // Direct threads, last-post redirects and floor redirects all stay in this WebView.
-                // The shared WebViewClient recognizes these as post navigation and will not call
-                // loadUrl a second time.
-                window.location.assign(navigationTarget(link));
             }, true);
         })();
     """.trimIndent()
@@ -2429,10 +2371,10 @@ $styleString
                     url = keyword;
                 }
 
-                if (url && window.AndroidSearchNav) {
+                if (url) {
                     e.preventDefault();
                     e.stopPropagation();
-                    window.AndroidSearchNav.navigateToPost(url);
+                    window.location.assign(url);
                 }
             }, true);
         })();
@@ -2781,7 +2723,6 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
-            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
@@ -2795,7 +2736,6 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
-            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
