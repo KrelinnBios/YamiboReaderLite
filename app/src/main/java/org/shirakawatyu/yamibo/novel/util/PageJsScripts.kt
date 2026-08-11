@@ -307,15 +307,14 @@ object PageJsScripts {
 
     val BBS_THREAD_NAVIGATION_JS = """
         (function() {
-            if (window.__yamiboBbsThreadNavigationV6) return;
-            window.__yamiboBbsThreadNavigationV6 = true;
+            if (window.__yamiboBbsThreadNavigationV7) return;
+            window.__yamiboBbsThreadNavigationV7 = true;
             function threadKind(link) {
                 if (!link || !link.href) return '';
                 try {
                     var url = new URL(link.href, document.baseURI);
                     var path = url.pathname.replace(/^\/+/, '').toLowerCase();
                     var mod = String(url.searchParams.get('mod') || '').toLowerCase();
-                    var goto = String(url.searchParams.get('goto') || '').toLowerCase();
                     var tid = url.searchParams.get('tid') || '';
                     var pid = url.searchParams.get('pid') || '';
                     var ptid = url.searchParams.get('ptid') || '';
@@ -324,11 +323,11 @@ object PageJsScripts {
                         (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
                         return 'viewthread';
                     }
-                    if (path === 'forum.php' &&
-                        ((mod === 'redirect' && /^[1-9]\d*${'$'}/.test(pid)) ||
-                         (goto === 'findpost' &&
-                          (/^[1-9]\d*${'$'}/.test(pid) || /^[1-9]\d*${'$'}/.test(ptid))))) {
-                        return 'findpost';
+                    if (path === 'forum.php' && mod === 'redirect' &&
+                        (/^[1-9]\d*${'$'}/.test(tid) ||
+                         /^[1-9]\d*${'$'}/.test(pid) ||
+                         /^[1-9]\d*${'$'}/.test(ptid))) {
+                        return 'redirect';
                     }
                     return '';
                 } catch (e) { return ''; }
@@ -339,14 +338,6 @@ object PageJsScripts {
                 url.searchParams.delete('mobile');
                 url.searchParams.append('mobile', expectedMobile);
                 return url.href;
-            }
-            function navigateToPost(link) {
-                var desktopTemplate = !!document.getElementById('toptb');
-                if (window.AndroidSearchNav.navigateToPostWithTemplate) {
-                    window.AndroidSearchNav.navigateToPostWithTemplate(link.href, desktopTemplate);
-                } else {
-                    window.AndroidSearchNav.navigateToPost(link.href);
-                }
             }
             document.addEventListener('click', function(event) {
                 var link = event.target.closest ? event.target.closest('a[href]') : null;
@@ -364,13 +355,10 @@ object PageJsScripts {
                 if (!kind) return;
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                if (kind === 'viewthread') {
-                    // 大区主题列表只在当前 WebView 内发起一次导航，避免再绕过 Compose 状态后
-                    // 调用 loadUrl，与当前点击产生加载竞态。
-                    window.location.assign(navigationTarget(link));
-                } else if (window.AndroidSearchNav && window.AndroidSearchNav.navigateToPost) {
-                    navigateToPost(link);
-                }
+                // Direct threads, last-post redirects and floor redirects all stay in this WebView.
+                // The shared WebViewClient recognizes these as post navigation and will not call
+                // loadUrl a second time.
+                window.location.assign(navigationTarget(link));
             }, true);
         })();
     """.trimIndent()
