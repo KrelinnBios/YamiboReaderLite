@@ -17,15 +17,31 @@ class PageJsScriptsTest {
     }
 
     @Test
-    fun threadNavigationUsesSharedWebViewClientInsteadOfPageScript() {
+    fun bbsNavigationInterceptsThreadLinksBeforeLegacyListHandler() {
         val script = PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS
+        val navigationIndex = script.indexOf("BBS_THREAD_NAVIGATION_JS")
+        val listHandlerIndex = script.indexOf("THREAD_LIST_CLICK_FIX_JS")
 
-        assertTrue(script.contains("THREAD_LIST_CLICK_FIX_JS"))
-        assertFalse(script.contains("BBS_THREAD_NAVIGATION_JS"))
-        assertFalse(script.contains("__yamiboBbsThreadNavigation"))
-        assertFalse(script.contains("window.location.assign(navigationTarget(link))"))
+        assertTrue(navigationIndex >= 0)
+        assertTrue(listHandlerIndex > navigationIndex)
+        assertTrue(script.contains("__yamiboBbsThreadNavigationV8"))
+        assertTrue(script.contains("document.getElementById('toptb')"))
+        assertTrue(script.contains("return 'redirect'"))
+        assertTrue(script.contains("window.location.assign(navigationTarget(link))"))
+        assertTrue(script.contains("event.stopImmediatePropagation()"))
         assertTrue(PageJsScripts.SEARCH_DIRECT_NAV_JS.contains("window.location.assign(url)"))
         assertFalse(PageJsScripts.SEARCH_DIRECT_NAV_JS.contains("AndroidSearchNav.navigateToPost"))
+    }
+
+    @Test
+    fun bbsThreadNavigationIsNotInjectedIntoOtherWebViews() {
+        val marker = "__yamiboBbsThreadNavigationV8"
+
+        assertTrue(PageJsScripts.BBS_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertTrue(PageJsScripts.BBS_MANGA_REINJECT_JS.contains(marker))
+        assertFalse(PageJsScripts.MINE_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertFalse(PageJsScripts.OTHER_COMMIT_BOOTSTRAP_JS.contains(marker))
+        assertFalse(PageJsScripts.MANGA_BOOTSTRAP_JS.contains(marker))
     }
 
     @Test
