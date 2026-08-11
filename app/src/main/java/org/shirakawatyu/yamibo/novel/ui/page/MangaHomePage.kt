@@ -118,12 +118,12 @@ fun MangaHomePage(
         enabled = GlobalData.currentUid.isNotBlank(),
         steps = listOf(
             OnboardingStep(
-                title = "漫画发现小提示",
-                description = "可在顶部分区切换中文漫画区和漫画图源区，点击搜索图标按书名/作者搜索。"
+                title = "漫画发现",
+                description = "可以在顶部分区切换中文漫画区和漫画图源区，也可以按书名或作者搜索。"
             ),
             OnboardingStep(
-                title = "漫画发现小提示",
-                description = "点开一部作品后会自动生成本地漫画目录，之后可以在目录里更新章节。"
+                title = "漫画发现",
+                description = "打开作品后会自动生成本地目录，之后可以在目录中更新章节。"
             )
         )
     )
