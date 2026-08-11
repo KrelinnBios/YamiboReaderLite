@@ -42,11 +42,13 @@ object YamiboPostLinkUtil {
      */
     fun normalizePostUrlForTemplate(url: String?, desktopTemplate: Boolean): String? {
         val normalized = normalizePostUrl(url) ?: return null
-        if (!desktopTemplate) return normalized
-        return normalizeForumPageTemplateUrl(
-            url = normalized,
-            desktopSession = true
-        ) ?: normalized
+        val parsed = normalized.toHttpUrlOrNull() ?: return normalized
+        val expectedMobile = if (desktopTemplate) "no" else "2"
+        return parsed.newBuilder()
+            .removeAllQueryParameters("mobile")
+            .addQueryParameter("mobile", expectedMobile)
+            .build()
+            .toString()
     }
 
     private fun normalizeCandidate(candidate: String): String? {
@@ -129,7 +131,8 @@ object YamiboPostLinkUtil {
      * 当成用户主动切回手机版；只有明确的同页/论坛首页模板切换入口才改变用户选择。
      *
      * 标签页和明确进入的个人空间沿用现有电脑版流程；静态资源、附件、搜索等也不属于
-     * 常规论坛页面。无需改写时返回 null，避免 loadUrl 循环。
+     * 常规论坛页面。帖子 URL（含帖子内分页和 findpost 楼层中转）由网页原生导航或
+     * 导航前桥接独占处理，这里不再二次 loadUrl。无需改写时返回 null，避免加载竞态。
      */
     fun normalizeForumPageTemplateUrl(
         url: String?,
@@ -140,6 +143,7 @@ object YamiboPostLinkUtil {
         if (parsed.host.lowercase() !in validHosts) return null
         if (!isMobileForumPage(parsed)) return null
         if (explicitDesktopTemplateSelection(url, currentUrl) != null) return null
+        if (isPostUrl(parsed)) return null
         val expectedMobile = if (desktopSession) "no" else "2"
         val mobileValues = parsed.queryParameterValues("mobile")
         if (mobileValues.size == 1 &&
