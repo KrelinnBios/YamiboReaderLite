@@ -305,6 +305,64 @@ object PageJsScripts {
         })();
     """.trimIndent()
 
+    /**
+     * 论坛主 WebView 的帖子导航前置脚本：先确定当前页面模板，再只发起一次最终 URL 导航。
+     * YamiboWebViewClient 会放行帖子 URL，不能在 shouldOverrideUrlLoading 中再次 loadUrl。
+     */
+    val BBS_THREAD_NAVIGATION_JS = """
+        (function() {
+            if (window.__yamiboBbsThreadNavigationV8) return;
+            window.__yamiboBbsThreadNavigationV8 = true;
+            function threadKind(link) {
+                if (!link || !link.href) return '';
+                try {
+                    var url = new URL(link.href, document.baseURI);
+                    var path = url.pathname.replace(/^\/+/, '').toLowerCase();
+                    var mod = String(url.searchParams.get('mod') || '').toLowerCase();
+                    var tid = url.searchParams.get('tid') || '';
+                    var pid = url.searchParams.get('pid') || '';
+                    var ptid = url.searchParams.get('ptid') || '';
+                    if (url.hostname !== 'bbs.yamibo.com') return '';
+                    if (/^thread-\d+(?:-\d+){0,2}\.html${'$'}/.test(path) ||
+                        (path === 'forum.php' && mod === 'viewthread' && /^[1-9]\d*${'$'}/.test(tid))) {
+                        return 'viewthread';
+                    }
+                    if (path === 'forum.php' && mod === 'redirect' &&
+                        (/^[1-9]\d*${'$'}/.test(tid) ||
+                         /^[1-9]\d*${'$'}/.test(pid) ||
+                         /^[1-9]\d*${'$'}/.test(ptid))) {
+                        return 'redirect';
+                    }
+                    return '';
+                } catch (e) { return ''; }
+            }
+            function navigationTarget(link) {
+                var url = new URL(link.href, document.baseURI);
+                var expectedMobile = document.getElementById('toptb') ? 'no' : '2';
+                url.searchParams.delete('mobile');
+                url.searchParams.append('mobile', expectedMobile);
+                return url.href;
+            }
+            document.addEventListener('click', function(event) {
+                var link = event.target.closest ? event.target.closest('a[href]') : null;
+                if (link) {
+                    if (!threadKind(link)) return;
+                } else {
+                    var item = event.target.closest
+                        ? event.target.closest('li.list, tbody[id^="normalthread_"], tbody[id^="stickthread_"]')
+                        : null;
+                    if (!item) return;
+                    var links = item.querySelectorAll('a[href]');
+                    for (var i = 0; i < links.length && !link; i++) if (threadKind(links[i])) link = links[i];
+                }
+                if (!threadKind(link)) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                window.location.assign(navigationTarget(link));
+            }, true);
+        })();
+    """.trimIndent()
+
     val REMOVE_TRANSITION_STYLE_JS = """
         var style = document.getElementById('manga-transition-style');
         if (style) style.remove();
@@ -2723,6 +2781,7 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "SEARCH_DIRECT_NAV_JS" to SEARCH_DIRECT_NAV_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
@@ -2736,6 +2795,7 @@ $styleString
         combineJs(
             "INJECT_PSWP_AND_MANGA_JS" to INJECT_PSWP_AND_MANGA_JS,
             "FIX_CAROUSEL_LAYOUT_JS" to FIX_CAROUSEL_LAYOUT_JS,
+            "BBS_THREAD_NAVIGATION_JS" to BBS_THREAD_NAVIGATION_JS,
             "THREAD_LIST_CLICK_FIX_JS" to THREAD_LIST_CLICK_FIX_JS,
             "PRESERVE_DESKTOP_SPACE_LINKS_JS" to PRESERVE_DESKTOP_SPACE_LINKS_JS,
             "PULL_REFRESH_EDIT_FOCUS_JS" to PULL_REFRESH_EDIT_FOCUS_JS,
