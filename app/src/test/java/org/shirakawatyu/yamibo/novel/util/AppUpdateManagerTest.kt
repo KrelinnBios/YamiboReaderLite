@@ -70,7 +70,7 @@ class AppUpdateManagerTest {
     @Test
     fun buildsGithubFirstThenMirrorCandidates() {
         val apkUrl =
-            "https://github.com/KrelinnBios/YamiboReaderLite/releases/download/v1.1.8/300.Lite.apk"
+            "https://github.com/KrelinnBios/YamiboReaderLite/releases/download/v1.1.8/300-Lite.apk"
         val candidates = AppUpdateManager.buildDownloadCandidates(apkUrl)
 
         // GitHub 直链必须排第一
