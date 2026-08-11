@@ -199,16 +199,12 @@ fun NativeMangaPage(
         enabled = GlobalData.currentUid.isNotBlank(),
         steps = listOf(
             OnboardingStep(
-                title = "漫画阅读小提示",
-                description = "点击画面中间可呼出/收起菜单，菜单里能切换章节、调节亮度和阅读方向。"
+                title = "漫画阅读",
+                description = "点击画面中央可以显示或收起菜单，并在菜单中切换章节、调节亮度和阅读方向。"
             ),
             OnboardingStep(
-                title = "漫画阅读小提示",
-                description = "支持从上到下、从左到右、从右到左三种阅读方向，可在设置面板里切换。"
-            ),
-            OnboardingStep(
-                title = "漫画阅读小提示",
-                description = "阅读进度会自动记录，图片也会缓存到本地，下次打开同一章节能更快加载。"
+                title = "漫画阅读",
+                description = "支持从上到下、从左到右和从右到左三种方向；阅读进度会自动记录，图片也会缓存到本地。"
             )
         )
     )
