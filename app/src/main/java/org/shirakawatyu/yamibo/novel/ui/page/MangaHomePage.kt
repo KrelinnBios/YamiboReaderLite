@@ -123,7 +123,7 @@ fun MangaHomePage(
             ),
             OnboardingStep(
                 title = "漫画发现小提示",
-                description = "点开一部作品后会自动生成本地漫画目录，之后可以在目录里更新、整理章节顺序。"
+                description = "点开一部作品后会自动生成本地漫画目录，之后可以在目录里更新章节。"
             )
         )
     )
