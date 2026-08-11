@@ -207,24 +207,16 @@ fun FavoritePage(
         enabled = GlobalData.currentUid.isNotBlank(),
         steps = listOf(
             OnboardingStep(
-                title = "收藏管理小提示",
-                description = "长按收藏项弹出菜单：置顶、检查更新、清理缓存、删除都在这里。"
+                title = "收藏管理",
+                description = "长按收藏项可以置顶、检查更新、清理缓存或删除。"
             ),
             OnboardingStep(
-                title = "收藏管理小提示",
-                description = "点击右上角「管理」图标进入批量管理模式，可以全选、隐藏或删除多项收藏；顶部还支持分类切换和搜索。"
+                title = "收藏管理",
+                description = "点击「管理」可以批量隐藏或删除收藏；顶部还可以切换分类和搜索。"
             ),
             OnboardingStep(
-                title = "收藏管理小提示",
-                description = "长按小说、漫画或其他帖子收藏项可手动检查更新，检查后有新内容会显示提示。"
-            ),
-            OnboardingStep(
-                title = "收藏管理小提示",
-                description = "未识别收藏可长按选择小说、漫画或其他；选择「其他」会标记为 type=3，并立即从收藏页过滤隐藏。这只是过滤，不会删除论坛收藏。"
-            ),
-            OnboardingStep(
-                title = "收藏管理小提示",
-                description = "每个收藏都能单独清理本地缓存，不影响其他收藏的已缓存内容。"
+                title = "收藏管理",
+                description = "未识别的收藏可以长按选择类型；设为「其他」只会将其从收藏页隐藏，不会删除论坛收藏。"
             )
         )
     )
