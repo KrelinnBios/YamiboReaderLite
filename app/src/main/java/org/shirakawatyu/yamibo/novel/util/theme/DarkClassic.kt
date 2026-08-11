@@ -154,6 +154,8 @@ val DARK_MODE_CSS_RULES_CLASSIC = listOf(
     ".page { background: #0d141d !important; }",
     ".page a { background: #1f2c3d !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
     ".pgs .pg strong, .pg strong, .page strong { background: #3c5677 !important; color: #fff !important; }",
+    "/* 手机版日志列表的 .pgs 只是分页布局包装层；保持透明，避免在分页按钮下方露出整条面板色块。 */",
+    "body.pg_space .threadlist_box .pgs { background: transparent !important; }",
     "/* Desktop pagination jump label: input.px is themed globally, but the enclosing label/span kept light backgrounds on many pages. */",
     ".pg label, .pg label span, .pgs label, .pgs label span { background: #1f2c3d !important; background-image: none !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
     ".pg label input.px, .pgs label input.px { background-color: #223247 !important; background-image: none !important; color: #c7d8ea !important; border-color: #3c5677 !important; }",
