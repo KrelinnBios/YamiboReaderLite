@@ -16,7 +16,7 @@
 </p>
 
 > [!WARNING]
-> YamiboReaderLite 已停止维护并归档，不再发布更新。本仓库仅保留项目最终实现状态；后续开发仅在 [YamiboPlus](https://github.com/KrelinnBios/YamiboPlus) 进行。
+> YamiboReaderLite 已停止维护，不再发布更新。本仓库仅保留项目最终实现状态；后续开发仅在 [YamiboPlus](https://github.com/KrelinnBios/YamiboPlus) 进行。
 
 > [!IMPORTANT]
 > YamiboReaderLite 基于 [prprbell/YamiboReaderPro](https://github.com/prprbell/YamiboReaderPro) 修改和继续开发，同时延续 [flben233/YamiboReader](https://github.com/flben233/YamiboReader) 的上游代码，并非从零开发的独立项目。完整上游归属见 [NOTICE](./NOTICE)。感谢原作者及所有上游贡献者。
