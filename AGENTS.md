@@ -41,7 +41,7 @@ YamiboReaderLite 已结束维护，本仓库用于保留项目最终实现状态
 - 仅构建 `arm64-v8a`、`armeabi-v7a`。
 - APK 文件名固定为 `300-Lite.apk`。
 - 应用内更新源默认指向 `KrelinnBios/YamiboReaderLite` 的 GitHub Releases。
-- 本文件是完整 AI 项目规范来源；`CLAUDE.md` 只作为兼容入口引用本文件。
+- 本文件是完整 AI 项目规范来源。
 
 ## 开始任务前
 
@@ -267,7 +267,7 @@ Linux/macOS/CI 对应使用 `./gradlew`。
 - README 功能列表保持 `- 四字标签：描述。` 的扁平风格，不加粗标签，不按功能再拆三级标题。
 - README 项目简介保留“以下说明仅描述 YamiboReaderLite 最终版本实际提供的功能”一类范围说明。
 - 顶部图标使用 `icon/icon.svg`。
-- 本文件是唯一的 AI 项目规范来源；`CLAUDE.md` 只引用本文件，不维护第二套规则。
+- 本文件是唯一的 AI 项目规范来源。
 - 中文文档统一 UTF-8，尤其避免 PowerShell 默认编码造成乱码。
 
 ## 提交约定
